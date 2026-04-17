@@ -1,0 +1,29 @@
+[
+  {
+    "id": "vulnerable",
+    "name": "Vulnerable",
+    "type": "debuff",
+    "description": "Take 50% more damage. Lose 1 stack at end of turn.",
+    "tick": "turn_ended",
+    "tick_action": "decrement",
+    "damage_multiplier": 1.5
+  },
+  {
+    "id": "weak",
+    "name": "Weak",
+    "type": "debuff",
+    "description": "Deal 25% less damage. Lose 1 stack at end of turn.",
+    "tick": "turn_ended",
+    "tick_action": "decrement",
+    "damage_multiplier": 0.75
+  },
+  {
+    "id": "strength",
+    "name": "Strength",
+    "type": "buff",
+    "description": "Deal additional damage equal to Strength stacks.",
+    "tick": null,
+    "tick_action": null,
+    "damage_bonus_per_stack": 1
+  }
+]

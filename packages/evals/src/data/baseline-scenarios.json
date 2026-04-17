@@ -1,0 +1,142 @@
+{
+  "id": "baseline-v1",
+  "name": "Baseline Godot Game Scenarios",
+  "description": "Standard eval suite for generated Godot deckbuilder projects",
+  "version": "1.0.0",
+  "createdAt": "2026-04-03T00:00:00.000Z",
+  "scenarios": [
+    {
+      "id": "build-001",
+      "name": "Fresh scaffold typechecks",
+      "description": "Verify the scaffolded project compiles without TypeScript errors.",
+      "layer": "build",
+      "gameSpec": "",
+      "inputs": { "projectPath": "" },
+      "expectedOutputs": {
+        "buildSuccess": true,
+        "typecheckPasses": true,
+        "bundleSizeKbMax": 3072
+      },
+      "rubric": {
+        "dimensions": [
+          { "name": "typecheck", "description": "tsc exits 0", "maxScore": 10, "automated": true },
+          { "name": "build", "description": "vite build exits 0", "maxScore": 10, "automated": true },
+          { "name": "bundleSize", "description": "bundle <= 3MB", "maxScore": 5, "automated": true }
+        ],
+        "passingThreshold": 0.8
+      },
+      "tags": ["smoke", "build"],
+      "version": "1.0.0",
+      "createdAt": "2026-04-03T00:00:00.000Z"
+    },
+    {
+      "id": "functional-001",
+      "name": "Boot to MenuScene",
+      "description": "Verify the game boots and reaches MenuScene within 5 seconds.",
+      "layer": "functional",
+      "gameSpec": "",
+      "inputs": {
+        "projectPath": "",
+        "actions": [
+          { "type": "wait", "waitMs": 4000 },
+          { "type": "assert", "assertion": { "path": "scene", "operator": "eq", "value": "MenuScene" } }
+        ]
+      },
+      "expectedOutputs": {
+        "scenesReachable": ["MenuScene"],
+        "fpsMin": 30
+      },
+      "rubric": {
+        "dimensions": [
+          { "name": "boot", "description": "BootScene starts", "maxScore": 10, "automated": true },
+          { "name": "menu", "description": "MenuScene reached within 5s", "maxScore": 10, "automated": true },
+          { "name": "noErrors", "description": "No console errors", "maxScore": 5, "automated": true }
+        ],
+        "passingThreshold": 0.8
+      },
+      "tags": ["functional", "boot"],
+      "version": "1.0.0",
+      "createdAt": "2026-04-03T00:00:00.000Z"
+    },
+    {
+      "id": "functional-002",
+      "name": "Start game and enter GameScene",
+      "description": "Verify emit('start-game') transitions to GameScene.",
+      "layer": "functional",
+      "gameSpec": "",
+      "inputs": {
+        "projectPath": "",
+        "actions": [
+          { "type": "wait", "waitMs": 4000 },
+          { "type": "emit", "target": "start-game" },
+          { "type": "wait", "waitMs": 2000 },
+          { "type": "assert", "assertion": { "path": "scene", "operator": "eq", "value": "GameScene" } },
+          { "type": "assert", "assertion": { "path": "gameState.score", "operator": "exists" } },
+          { "type": "assert", "assertion": { "path": "gameState.lives", "operator": "gt", "value": 0 } }
+        ]
+      },
+      "expectedOutputs": {
+        "scenesReachable": ["GameScene"],
+        "stateAssertions": [
+          { "path": "gameState.score", "operator": "exists" },
+          { "path": "gameState.lives", "operator": "gt", "value": 0 }
+        ]
+      },
+      "rubric": {
+        "dimensions": [
+          { "name": "gameScene", "description": "GameScene starts after emit", "maxScore": 10, "automated": true },
+          { "name": "stateShape", "description": "score and lives in gameState", "maxScore": 5, "automated": true },
+          { "name": "noErrors", "description": "No console errors", "maxScore": 5, "automated": true }
+        ],
+        "passingThreshold": 0.8
+      },
+      "tags": ["functional", "gameplay"],
+      "version": "1.0.0",
+      "createdAt": "2026-04-03T00:00:00.000Z"
+    },
+    {
+      "id": "functional-003",
+      "name": "Restart from ResultScene",
+      "description": "Verify emit('restart') from ResultScene returns to GameScene.",
+      "layer": "functional",
+      "gameSpec": "",
+      "inputs": {
+        "projectPath": "",
+        "actions": [
+          { "type": "wait", "waitMs": 4000 },
+          { "type": "emit", "target": "start-game" },
+          { "type": "wait", "waitMs": 1000 }
+        ]
+      },
+      "expectedOutputs": {},
+      "rubric": {
+        "dimensions": [
+          { "name": "noErrors", "description": "No console errors during basic flow", "maxScore": 10, "automated": true }
+        ],
+        "passingThreshold": 0.8
+      },
+      "tags": ["functional", "restart"],
+      "version": "1.0.0",
+      "createdAt": "2026-04-03T00:00:00.000Z"
+    },
+    {
+      "id": "systems-001",
+      "name": "Autoloads and runtime scenes keep required GDScript bindings",
+      "description": "Verify required autoload patterns exist and each runtime scene root instantiates with its intended script attached.",
+      "layer": "systems",
+      "gameSpec": "",
+      "inputs": { "projectPath": "" },
+      "expectedOutputs": {},
+      "rubric": {
+        "dimensions": [
+          { "name": "autoloads", "description": "autoload scripts include required hooks", "maxScore": 10, "automated": true },
+          { "name": "sceneBindings", "description": "runtime scene roots keep intended scripts", "maxScore": 10, "automated": true }
+        ],
+        "passingThreshold": 1
+      },
+      "tags": ["systems", "scene-binding"],
+      "version": "1.0.0",
+      "createdAt": "2026-04-16T00:00:00.000Z"
+    }
+  ]
+}

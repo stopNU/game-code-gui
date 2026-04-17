@@ -1,0 +1,52 @@
+[
+  {
+    "id": "strike",
+    "name": "Strike",
+    "type": "attack",
+    "cost": 1,
+    "description": "Deal 6 damage.",
+    "effect": { "damage": 6 },
+    "artPrompt": "A glowing sword slash cutting through darkness, pixel art style, dark fantasy palette",
+    "artKey": ""
+  },
+  {
+    "id": "defend",
+    "name": "Defend",
+    "type": "skill",
+    "cost": 1,
+    "description": "Gain 5 Block.",
+    "effect": { "block": 5 },
+    "artPrompt": "A shimmering magical shield raised in defense, pixel art style, dark fantasy palette",
+    "artKey": ""
+  },
+  {
+    "id": "bash",
+    "name": "Bash",
+    "type": "attack",
+    "cost": 2,
+    "description": "Deal 8 damage. Apply 2 Vulnerable.",
+    "effect": { "damage": 8, "apply_status": { "id": "vulnerable", "stacks": 2 } },
+    "artPrompt": "A heavy warhammer smashing down with force, pixel art style, dark fantasy palette",
+    "artKey": ""
+  },
+  {
+    "id": "shiv",
+    "name": "Shiv",
+    "type": "attack",
+    "cost": 0,
+    "description": "Deal 4 damage. Exhaust.",
+    "effect": { "damage": 4, "exhaust": true },
+    "artPrompt": "A quick dagger strike in shadow, pixel art style, dark fantasy palette",
+    "artKey": ""
+  },
+  {
+    "id": "inflame",
+    "name": "Inflame",
+    "type": "power",
+    "cost": 1,
+    "description": "Gain 2 Strength.",
+    "effect": { "apply_status": { "id": "strength", "stacks": 2 } },
+    "artPrompt": "A warrior engulfed in flames gaining power, pixel art style, dark fantasy palette",
+    "artKey": ""
+  }
+]

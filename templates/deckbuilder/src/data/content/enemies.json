@@ -1,0 +1,38 @@
+[
+  {
+    "id": "cultist",
+    "name": "Cultist",
+    "act": 1,
+    "max_hp": 48,
+    "intents": [
+      { "id": "incantation", "type": "buff", "description": "Gains Ritual (strength each turn)", "weight": 100 },
+      { "id": "dark_strike", "type": "attack", "damage": 6, "description": "Deal 6 damage", "weight": 80 }
+    ],
+    "artPrompt": "A robed cultist with glowing eyes performing dark ritual, pixel art, dark dungeon atmosphere",
+    "artKey": ""
+  },
+  {
+    "id": "jaw_worm",
+    "name": "Jaw Worm",
+    "act": 1,
+    "max_hp": 40,
+    "intents": [
+      { "id": "chomp", "type": "attack", "damage": 11, "description": "Deal 11 damage", "weight": 30 },
+      { "id": "thrash", "type": "attack_defend", "damage": 7, "block": 5, "description": "Deal 7, gain 5 Block", "weight": 45 },
+      { "id": "bellow", "type": "buff", "description": "Gain Strength and Block", "weight": 25 }
+    ],
+    "artPrompt": "A worm-like creature with massive jaws drooling, pixel art, dark dungeon atmosphere",
+    "artKey": ""
+  },
+  {
+    "id": "louse_red",
+    "name": "Red Louse",
+    "act": 1,
+    "max_hp": 12,
+    "intents": [
+      { "id": "bite", "type": "attack", "damage": 5, "description": "Deal 5 damage", "weight": 100 }
+    ],
+    "artPrompt": "A small red insect parasite with sharp mandibles, pixel art, dark dungeon atmosphere",
+    "artKey": ""
+  }
+]

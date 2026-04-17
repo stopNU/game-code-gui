@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "lib": ["ES2023"]
+  },
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/tools" },
+    { "path": "../../packages/game-adapter" },
+    { "path": "../../packages/assets" },
+    { "path": "../../packages/playtest" },
+    { "path": "../../packages/evals" }
+  ],
+  "include": ["src/**/*", "bin/**/*"]
+}

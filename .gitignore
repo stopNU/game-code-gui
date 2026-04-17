@@ -1,0 +1,27 @@
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local
+
+# Generated game output dirs (not the templates)
+apps/*/output/
+
+# Playwright artifacts
+test-results/
+playwright-report/
+
+# Screenshots / baselines (committed per project)
+*.png.tmp
+
+# Studio build
+apps/studio/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+apps/cli/game-*
+apps/cli/slay-v0-1
+apps/cli/slay-the-cats

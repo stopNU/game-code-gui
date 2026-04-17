@@ -1,0 +1,42 @@
+{
+  "name": "@agent-harness/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "game-harness": "./bin/game-harness.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node ./bin/game-harness.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@agent-harness/assets": "workspace:*",
+    "@agent-harness/core": "workspace:*",
+    "@agent-harness/evals": "workspace:*",
+    "@agent-harness/game-adapter": "workspace:*",
+    "@agent-harness/playtest": "workspace:*",
+    "@agent-harness/tools": "workspace:*",
+    "chalk": "^5.3.0",
+    "glob": "^11.0.0",
+    "commander": "^12.0.0",
+    "dotenv": "^16.4.0",
+    "ink": "^5.0.0",
+    "ink-select-input": "^6.0.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "ora": "^8.1.0",
+    "prompts": "^2.4.0",
+    "react": "^18.3.0"
+  },
+  "devDependencies": {
+    "@types/prompts": "^2.4.0",
+    "@types/react": "^18.3.0",
+    "rimraf": "^6.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "*",
+    "vitest": "*"
+  }
+}

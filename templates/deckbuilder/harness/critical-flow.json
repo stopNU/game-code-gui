@@ -1,0 +1,313 @@
+{
+  "version": "1.0.0",
+  "name": "deckbuilder-early-run",
+  "timeoutMs": 2500,
+  "milestoneScenes": [
+    {
+      "sceneId": "MainMenuScene",
+      "scene": "TitleScene",
+      "label": "Main Menu",
+      "primaryAction": "Start New Run",
+      "acceptanceCriteria": [
+        {
+          "id": "renders-visibly",
+          "description": "The main menu renders visibly with the title menu on-screen.",
+          "stepIds": ["title"]
+        },
+        {
+          "id": "primary-action-visible",
+          "description": "The Start New Run action is visible on the main menu.",
+          "controlIds": ["start-new-run"]
+        },
+        {
+          "id": "progression-possible",
+          "description": "The Start New Run action can advance the run into character select.",
+          "actionIds": ["start-new-run"],
+          "stepIds": ["start-new-run", "character-select"]
+        },
+        {
+          "id": "no-runtime-blocker",
+          "description": "No runtime blocker prevents the main menu from loading or starting a run.",
+          "stepIds": ["title", "start-new-run"]
+        }
+      ]
+    },
+    {
+      "sceneId": "CharacterSelectScene",
+      "scene": "CharacterSelectScene",
+      "label": "Character Select",
+      "primaryAction": "Confirm Selection",
+      "acceptanceCriteria": [
+        {
+          "id": "renders-visibly",
+          "description": "The character select screen renders visibly with its selection panel on-screen.",
+          "stepIds": ["character-select"]
+        },
+        {
+          "id": "primary-action-visible",
+          "description": "The Confirm Selection action is visible on the character select screen.",
+          "controlIds": ["confirm"]
+        },
+        {
+          "id": "progression-possible",
+          "description": "A character can be selected and confirmed to advance to the map.",
+          "actionIds": ["select-vanguard", "confirm-selection"],
+          "stepIds": ["confirm", "map"]
+        },
+        {
+          "id": "no-runtime-blocker",
+          "description": "No runtime blocker prevents character selection or confirmation.",
+          "stepIds": ["character-select", "confirm"]
+        }
+      ]
+    },
+    {
+      "sceneId": "MapScene",
+      "scene": "MapScene",
+      "label": "Map",
+      "primaryAction": "Map progression",
+      "acceptanceCriteria": [
+        {
+          "id": "renders-visibly",
+          "description": "The map screen renders visibly with the core map content on-screen.",
+          "stepIds": ["map"]
+        },
+        {
+          "id": "primary-action-visible",
+          "description": "The map screen shows the content needed for the next progression choice.",
+          "controlIds": ["node-list"]
+        },
+        {
+          "id": "progression-possible",
+          "description": "The core run flow can progress successfully as far as the map milestone.",
+          "stepIds": ["map"]
+        },
+        {
+          "id": "no-runtime-blocker",
+          "description": "No runtime blocker prevents the map milestone from loading after confirmation.",
+          "stepIds": ["map"]
+        }
+      ]
+    }
+  ],
+  "visibilityChecks": [
+    {
+      "scene": "TitleScene",
+      "label": "Title",
+      "viewports": [
+        {
+          "id": "desktop",
+          "label": "Desktop 1280x720",
+          "width": 1280,
+          "height": 720
+        },
+        {
+          "id": "small",
+          "label": "Small 960x540",
+          "width": 960,
+          "height": 540
+        }
+      ],
+      "requiredControls": [
+        {
+          "id": "start-new-run",
+          "label": "Start New Run",
+          "nodePath": "Center/Menu/StartNewRunButton"
+        }
+      ],
+      "requiredRegions": [
+        {
+          "id": "title-menu",
+          "label": "Title Menu",
+          "nodePath": "Center/Menu"
+        }
+      ]
+    },
+    {
+      "scene": "CharacterSelectScene",
+      "label": "Character Select",
+      "viewports": [
+        {
+          "id": "desktop",
+          "label": "Desktop 1280x720",
+          "width": 1280,
+          "height": 720
+        },
+        {
+          "id": "small",
+          "label": "Small 960x540",
+          "width": 960,
+          "height": 540
+        }
+      ],
+      "requiredControls": [
+        {
+          "id": "vanguard",
+          "label": "Vanguard",
+          "nodePath": "Center/Panel/CharacterButtons/VanguardButton"
+        },
+        {
+          "id": "arcanist",
+          "label": "Arcanist",
+          "nodePath": "Center/Panel/CharacterButtons/ArcanistButton"
+        },
+        {
+          "id": "confirm",
+          "label": "Confirm",
+          "nodePath": "Center/Panel/ConfirmButton"
+        }
+      ],
+      "requiredRegions": [
+        {
+          "id": "character-select-panel",
+          "label": "Character Select Panel",
+          "nodePath": "Center/Panel"
+        }
+      ]
+    },
+    {
+      "scene": "MapScene",
+      "label": "Map",
+      "viewports": [
+        {
+          "id": "desktop",
+          "label": "Desktop 1280x720",
+          "width": 1280,
+          "height": 720
+        },
+        {
+          "id": "small",
+          "label": "Small 960x540",
+          "width": 960,
+          "height": 540
+        }
+      ],
+      "requiredControls": [
+        {
+          "id": "run-summary",
+          "label": "Run Summary",
+          "nodePath": "Margin/Content/RunSummaryLabel"
+        },
+        {
+          "id": "node-list",
+          "label": "Node List",
+          "nodePath": "Margin/Content/NodeListLabel"
+        }
+      ],
+      "requiredRegions": [
+        {
+          "id": "map-content",
+          "label": "Map Content",
+          "nodePath": "Margin/Content"
+        }
+      ]
+    }
+  ],
+  "inputReachabilityChecks": [
+    {
+      "scene": "TitleScene",
+      "label": "Title",
+      "viewports": [
+        {
+          "id": "desktop",
+          "label": "Desktop 1280x720",
+          "width": 1280,
+          "height": 720
+        },
+        {
+          "id": "small",
+          "label": "Small 960x540",
+          "width": 960,
+          "height": 540
+        }
+      ],
+      "requiredActions": [
+        {
+          "id": "start-new-run",
+          "label": "Start New Run",
+          "controlId": "start-new-run",
+          "nodePath": "Center/Menu/StartNewRunButton"
+        }
+      ]
+    },
+    {
+      "scene": "CharacterSelectScene",
+      "label": "Character Select",
+      "viewports": [
+        {
+          "id": "desktop",
+          "label": "Desktop 1280x720",
+          "width": 1280,
+          "height": 720
+        },
+        {
+          "id": "small",
+          "label": "Small 960x540",
+          "width": 960,
+          "height": 540
+        }
+      ],
+      "requiredActions": [
+        {
+          "id": "select-vanguard",
+          "label": "Select Vanguard",
+          "controlId": "vanguard",
+          "nodePath": "Center/Panel/CharacterButtons/VanguardButton"
+        },
+        {
+          "id": "confirm-selection",
+          "label": "Confirm Selection",
+          "controlId": "confirm",
+          "nodePath": "Center/Panel/ConfirmButton"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "id": "boot",
+      "label": "Boot",
+      "type": "scene",
+      "scene": "BootScene"
+    },
+    {
+      "id": "title",
+      "label": "Title",
+      "type": "scene",
+      "scene": "TitleScene"
+    },
+    {
+      "id": "start-new-run",
+      "label": "Start New Run",
+      "type": "action",
+      "action": {
+        "type": "call_method",
+        "method": "start_new_run_from_harness"
+      }
+    },
+    {
+      "id": "character-select",
+      "label": "Character Select",
+      "type": "scene",
+      "scene": "CharacterSelectScene"
+    },
+    {
+      "id": "confirm",
+      "label": "Confirm",
+      "type": "action",
+      "action": {
+        "type": "call_method",
+        "method": "confirm_selection_from_harness",
+        "args": [
+          "vanguard"
+        ]
+      }
+    },
+    {
+      "id": "map",
+      "label": "Map",
+      "type": "scene",
+      "scene": "MapScene"
+    }
+  ]
+}

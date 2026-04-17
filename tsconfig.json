@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/tools" },
+    { "path": "./packages/game-adapter" },
+    { "path": "./packages/assets" },
+    { "path": "./packages/playtest" },
+    { "path": "./packages/evals" },
+    { "path": "./apps/cli" }
+  ]
+}

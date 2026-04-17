@@ -1,0 +1,32 @@
+[
+  {
+    "id": "burning_blood",
+    "name": "Burning Blood",
+    "rarity": "starter",
+    "description": "At the end of combat, heal 6 HP.",
+    "trigger": "combat_ended",
+    "effect": { "heal": 6 },
+    "artPrompt": "A glowing ember-red droplet of magical blood, pixel art icon, dark fantasy",
+    "artKey": ""
+  },
+  {
+    "id": "ring_of_serpent",
+    "name": "Ring of the Serpent",
+    "rarity": "common",
+    "description": "At the start of each turn, draw 1 additional card.",
+    "trigger": "turn_started",
+    "effect": { "draw": 1 },
+    "artPrompt": "An ornate serpent-shaped ring with glowing green gem, pixel art icon, dark fantasy",
+    "artKey": ""
+  },
+  {
+    "id": "orichalcum",
+    "name": "Orichalcum",
+    "rarity": "uncommon",
+    "description": "If you end your turn without Block, gain 6 Block.",
+    "trigger": "turn_ended",
+    "effect": { "conditional_block": 6 },
+    "artPrompt": "A golden-orange ancient metal plate with mystical engravings, pixel art icon, dark fantasy",
+    "artKey": ""
+  }
+]
