@@ -891,6 +891,7 @@ db.loadExtension(vecPath);
 - Cross-provider sub-agents (requires all tool wrappers to thread model choice; iterate_project provider-aware)
 - Cross-platform (macOS, Linux) via electron-builder targets
 - Sentry crash reporting (optional, gated by user consent in settings)
+- Retire the Ink-based CLI TUI: remove the `game-harness tui` command, delete `apps/cli/src/tui`, and scrub TUI references from CLI output, docs, and tests so Studio is the only interactive UI surface
 
 ---
 
@@ -931,7 +932,7 @@ db.loadExtension(vecPath);
 ## What Gets Removed / Deprecated
 
 - `apps/studio` placeholder pages — removed
-- TUI in `apps/cli` — **not** removed; stays for terminal/CI use
+- TUI in `apps/cli` — kept during v1 for continuity; scheduled for removal in v2 once Studio fully replaces it
 - `harness/tasks.json` — not written by studio-created projects; CLI path unchanged
 
 ---

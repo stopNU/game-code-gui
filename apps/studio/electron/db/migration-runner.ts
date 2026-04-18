@@ -1,10 +1,8 @@
 import { readdirSync, readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import type { DatabaseConnection } from './sqlite.js';
 
-const currentDir = dirname(fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = join(currentDir, 'migrations');
+const MIGRATIONS_DIR = join(__dirname, 'migrations');
 
 export function readPragmaValue(db: DatabaseConnection, pragmaName: string): string | number | null {
   const row = db.prepare(`PRAGMA ${pragmaName}`).get() as Record<string, string | number> | undefined;

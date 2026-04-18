@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { router, publicProcedure } from '../router.js';
+import { router, publicProcedure } from '../trpc-base.js';
 
 export const projectsRouter = router({
   list: publicProcedure.input(z.void()).query(({ ctx }) => ctx.projectScanner.list(ctx.settingsService.getEffectiveWorkspaceRoot())),

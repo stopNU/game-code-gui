@@ -1,10 +1,26 @@
 import { resolve } from 'path';
+import { copyFileSync, mkdirSync, readdirSync } from 'fs';
 import react from '@vitejs/plugin-react';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
+import type { Plugin } from 'vite';
+
+function copyMigrationsPlugin(): Plugin {
+  return {
+    name: 'copy-migrations',
+    closeBundle() {
+      const src = resolve(__dirname, 'electron/db/migrations');
+      const dest = resolve(__dirname, 'dist-electron/main/migrations');
+      mkdirSync(dest, { recursive: true });
+      for (const file of readdirSync(src)) {
+        copyFileSync(resolve(src, file), resolve(dest, file));
+      }
+    },
+  };
+}
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(), copyMigrationsPlugin()],
     build: {
       outDir: 'dist-electron/main',
       rollupOptions: {
@@ -14,6 +30,8 @@ export default defineConfig({
         },
         output: {
           entryFileNames: '[name].cjs',
+          chunkFileNames: 'chunks/[name]-[hash].cjs',
+          format: 'cjs',
         },
       },
     },

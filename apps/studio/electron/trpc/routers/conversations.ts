@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { router, publicProcedure } from '../router.js';
+import { router, publicProcedure } from '../trpc-base.js';
 
 export const conversationsRouter = router({
   list: publicProcedure
