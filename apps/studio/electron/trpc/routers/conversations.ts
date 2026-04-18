@@ -49,7 +49,7 @@ export const conversationsRouter = router({
         projectId: z.string().nullable().optional(),
         title: z.string().min(1).max(80).default('New conversation'),
         model: z.string().min(1).optional(),
-        provider: z.enum(['anthropic', 'openai']).default('anthropic'),
+        provider: z.enum(['anthropic', 'openai', 'codex']).default('anthropic'),
       }),
     )
     .mutation(({ ctx, input }) => {

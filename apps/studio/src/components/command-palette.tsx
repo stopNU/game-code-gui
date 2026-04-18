@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ConversationSummary } from '@shared/domain';
 import { Input } from '@renderer/components/ui/input';
+import { formatProvider } from '@renderer/lib/utils';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -112,7 +113,7 @@ export function CommandPalette({
                 >
                   <div className="font-medium text-foreground">{conversation.title}</div>
                   <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                    {conversation.provider ?? 'anthropic'} · {conversation.model ?? 'default model'}
+                    {formatProvider(conversation.provider)} · {conversation.model ?? 'default model'}
                   </div>
                 </button>
               ))}

@@ -118,7 +118,7 @@ export function CenterPanel(): JSX.Element {
 
           updateConversationPreferences(activeConversationId, {
             provider,
-            model: provider === 'openai' ? 'gpt-5.4' : 'claude-sonnet-4-6',
+            model: provider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-5.4',
           });
         }}
         onModelChange={(model) => {

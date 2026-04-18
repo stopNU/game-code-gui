@@ -4,10 +4,12 @@ import type { ConversationPreferences, TokenUsageRecord } from '@renderer/store/
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
+import { formatProvider } from '@renderer/lib/utils';
 
 const PROVIDER_MODELS = {
   anthropic: ['claude-sonnet-4-6'],
   openai: ['gpt-5.4'],
+  codex: ['gpt-5.4'],
 } as const;
 
 const CONTEXT_BUDGET = 150_000;
@@ -18,7 +20,7 @@ interface ConversationHeaderProps {
   tokenUsage?: TokenUsageRecord | undefined;
   canUseOpenAI: boolean;
   running: boolean;
-  onProviderChange: (provider: 'anthropic' | 'openai') => void;
+  onProviderChange: (provider: 'anthropic' | 'openai' | 'codex') => void;
   onModelChange: (model: string) => void;
   onRename: (title: string) => Promise<void>;
 }
@@ -40,9 +42,10 @@ export function ConversationHeader({
     setDraftTitle(preferences?.title ?? 'Harness Studio');
   }, [preferences?.title]);
 
-  const provider = preferences?.provider === 'openai' && !canUseOpenAI ? 'anthropic' : (preferences?.provider ?? 'anthropic');
+  const provider =
+    preferences?.provider === 'openai' && !canUseOpenAI ? 'anthropic' : (preferences?.provider ?? 'anthropic');
   const availableProviders = useMemo(() => {
-    return canUseOpenAI ? (['anthropic', 'openai'] as const) : (['anthropic'] as const);
+    return canUseOpenAI ? (['anthropic', 'openai', 'codex'] as const) : (['anthropic', 'codex'] as const);
   }, [canUseOpenAI]);
   const model = preferences?.model ?? PROVIDER_MODELS[provider][0];
   const models = PROVIDER_MODELS[provider];
@@ -115,12 +118,12 @@ export function ConversationHeader({
             Provider
             <select
               value={provider}
-              onChange={(event) => onProviderChange(event.target.value as 'anthropic' | 'openai')}
+              onChange={(event) => onProviderChange(event.target.value as 'anthropic' | 'openai' | 'codex')}
               className="rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground outline-none"
             >
               {availableProviders.map((option) => (
                 <option key={option} value={option}>
-                  {option === 'openai' ? 'OpenAI' : 'Anthropic'}
+                  {formatProvider(option)}
                 </option>
               ))}
             </select>

@@ -47,7 +47,7 @@ export type ThemePreference = 'dark' | 'light';
 export interface ConversationPreferences {
   title: string;
   projectId: string | null;
-  provider: 'anthropic' | 'openai';
+  provider: 'anthropic' | 'openai' | 'codex';
   model: string;
   updatedAt: string;
 }
@@ -195,7 +195,7 @@ export const useConversationStore = create<ConversationStore>((set) => ({
           provider: conversation.provider ?? 'anthropic',
           model:
             conversation.model ??
-            ((conversation.provider ?? 'anthropic') === 'openai' ? 'gpt-5.4' : 'claude-sonnet-4-6'),
+            (conversation.provider === 'openai' || conversation.provider === 'codex' ? 'gpt-5.4' : 'claude-sonnet-4-6'),
           updatedAt: conversation.updatedAt,
         };
       }

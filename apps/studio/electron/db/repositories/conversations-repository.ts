@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { DatabaseConnection, StatementSync } from '../sqlite.js';
 
-type Provider = 'anthropic' | 'openai';
+type Provider = 'anthropic' | 'openai' | 'codex';
 type MessageRole = 'user' | 'assistant' | 'system' | 'error';
 
 interface ConversationRow {

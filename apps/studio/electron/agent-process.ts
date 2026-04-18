@@ -89,7 +89,7 @@ const agent = new ConversationAgent({
       projectId: string | null;
       title: string;
       model?: string;
-      provider: 'anthropic' | 'openai';
+      provider: 'anthropic' | 'openai' | 'codex';
     }>({
       action: 'ensure-conversation',
       conversationId: args.conversationId,

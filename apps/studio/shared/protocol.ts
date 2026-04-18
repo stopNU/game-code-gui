@@ -163,7 +163,7 @@ export interface AgentSendCommand {
   userMessage: string;
   projectId?: string;
   model: string;
-  provider: 'anthropic' | 'openai';
+  provider: 'anthropic' | 'openai' | 'codex';
 }
 
 export interface AgentAbortCommand {
@@ -185,7 +185,7 @@ export type AgentDbRequest =
       action: 'ensure-conversation';
       conversationId: string;
       title: string;
-      provider: 'anthropic' | 'openai';
+      provider: 'anthropic' | 'openai' | 'codex';
       model: string;
       projectId?: string;
     }

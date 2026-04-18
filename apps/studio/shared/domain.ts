@@ -15,7 +15,7 @@ export interface ConversationSummary {
   projectId: string | null;
   title: string;
   model?: string | null;
-  provider?: 'anthropic' | 'openai';
+  provider?: 'anthropic' | 'openai' | 'codex';
   archived?: boolean;
   updatedAt: string;
 }

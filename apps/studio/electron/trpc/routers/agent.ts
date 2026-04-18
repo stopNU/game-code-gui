@@ -9,7 +9,7 @@ export const agentRouter = router({
         userMessage: z.string().min(1),
         projectId: z.string().optional(),
         model: z.string().min(1).default('claude-sonnet-4-6'),
-        provider: z.enum(['anthropic', 'openai']).default('anthropic'),
+        provider: z.enum(['anthropic', 'openai', 'codex']).default('anthropic'),
       }),
     )
     .mutation(({ ctx, input }) => {

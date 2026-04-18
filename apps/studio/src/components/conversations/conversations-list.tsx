@@ -4,7 +4,7 @@ import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
 import { Skeleton } from '@renderer/components/ui/skeleton';
-import { cn } from '@renderer/lib/utils';
+import { cn, formatProvider } from '@renderer/lib/utils';
 
 interface ConversationsListProps {
   conversations: ConversationSummary[];
@@ -63,7 +63,7 @@ export function ConversationsList({
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">{conversation.title}</div>
                         <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.22em]">
-                          <span>{conversation.provider ?? 'anthropic'}</span>
+                          <span>{formatProvider(conversation.provider)}</span>
                           <span>&bull;</span>
                           <span className="truncate">{conversation.model ?? 'default model'}</span>
                         </div>
