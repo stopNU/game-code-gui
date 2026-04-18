@@ -6,8 +6,8 @@ This document turns the architecture plan into a working checklist so progress i
 
 ## Current Status
 
-- Active focus: `Phase 7`
-- Completed so far: `Phase 0`, `Phase 1`, `Phase 2`, `Phase 3`, `Phase 4`, `Phase 5`, `Phase 6`
+- Active focus: `v1 RC verification and follow-through`
+- Completed so far: `Phase 0`, `Phase 1`, `Phase 2`, `Phase 3`, `Phase 4`, `Phase 5`, `Phase 6`, `Phase 7`, `Phase 8`
 - Deferred by design: `Phase 0.2` until `iterate_project` is scheduled
 
 ## Phase 0: Service Layer Extraction
@@ -152,7 +152,7 @@ This document turns the architecture plan into a working checklist so progress i
 ## Phase 7: Logging, Updates, and Testing
 
 - [x] Add structured logging in main and utility process
-- [ ] Add studio log access from settings
+- [x] Add studio log access from settings
 - [x] Add auto-update flow with `electron-updater`
 - [x] Add Azure Trusted Signing integration
 - [x] Add DB unit tests
@@ -170,17 +170,28 @@ This document turns the architecture plan into a working checklist so progress i
 - While adding the `launch_game` contract, we found and fixed an abort edge case in `tool-registry.ts`: if the signal was already aborted or aborted mid-launch, the tool could hang instead of stopping the owned Godot session
 - `read_task_plan` now returns `{ plan: null }` for missing persisted plans so the registry behavior matches the intended contract instead of throwing
 - Added a Playwright Electron smoke harness in `apps/studio/tests/e2e/studio-smoke.spec.ts`, but it is currently opt-in via `RUN_STUDIO_E2E=1` because Electron window attachment has been flaky in this environment
-- The current renderer exposes log/update actions in the right-side runtime panel, not in a dedicated Settings page yet; the remaining unchecked item is specifically about moving that access into the eventual Phase 8 settings surface
+- Phase 8 completed the remaining settings integration: log access now also lives in the dedicated Settings surface via the new About tab
 - Verified `pnpm --filter @agent-harness/studio run typecheck`, `test:unit`, `build`, and `test:e2e` (with the smoke test currently skipped by default unless explicitly enabled)
 
 ## Phase 8: Polish
 
-- [ ] Add keyboard shortcuts
-- [ ] Build settings page
-- [ ] Add token usage progress display
-- [ ] Add theme handling
-- [ ] Add conversation rename support
-- [ ] Add empty states and final UX polish
+- [x] Add keyboard shortcuts
+- [x] Build settings page
+- [x] Add token usage progress display
+- [x] Add theme handling
+- [x] Add conversation rename support
+- [x] Add empty states and final UX polish
+
+### Notes
+
+- Added a dedicated renderer settings surface at `apps/studio/src/components/settings/settings-dialog.tsx` with tabs for Workspace, API Keys, LangSmith, Godot, and About
+- Extended the Electron runtime bridge in `apps/studio/electron/main.ts` and `apps/studio/electron/trpc/routers/runtime.ts` so the renderer can open the log file, browse for directories/files, open paths, and fetch doctor output without bypassing the existing IPC boundary
+- Added global keyboard shortcuts in `apps/studio/src/App.tsx`: `Ctrl/Cmd+N` creates a conversation, `Ctrl/Cmd+,` opens Settings, and `Esc` aborts the active run
+- Added theme state plus dark/light handling through `apps/studio/src/store/conversation-store.ts`, `apps/studio/src/App.tsx`, `apps/studio/src/index.css`, and `apps/studio/tailwind.config.ts`
+- Upgraded the conversation header so titles can be renamed inline and token usage is rendered as a context-budget progress bar instead of raw counts alone
+- Updated the composer to auto-grow and submit on `Ctrl/Cmd+Enter`, while preserving an explicit abort control during active turns
+- Refined empty-state copy for the project list so the shell now points the user toward scaffolding their first game from a conversation
+- Verified `pnpm --filter @agent-harness/studio run typecheck`, `test:unit`, and `build`
 
 ## v2 Follow-On Work
 

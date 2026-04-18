@@ -34,6 +34,29 @@ pnpm dev
 pnpm clean
 ```
 
+## Studio desktop app
+
+`apps/studio` is the Electron-based desktop shell for the harness. It is no longer a placeholder React page set.
+
+Current Studio capabilities:
+
+- Conversational agent UI with Anthropic/OpenAI top-level provider selection
+- Persisted conversations, projects, approvals, and task plans in SQLite
+- Godot launch/stop controls plus live log streaming
+- Settings tabs for Workspace, API Keys, LangSmith, Godot, and About
+- Keyboard shortcuts: `Ctrl/Cmd+N` new conversation, `Ctrl/Cmd+,` settings, `Esc` abort active run
+- Theme toggle with dark/light support
+
+Useful Studio commands:
+
+```bash
+pnpm --filter @agent-harness/studio run dev
+pnpm --filter @agent-harness/studio run typecheck
+pnpm --filter @agent-harness/studio run test:unit
+pnpm --filter @agent-harness/studio run build
+pnpm --filter @agent-harness/studio run package:win
+```
+
 ## CLI overview
 
 `game-harness` is a Godot-first CLI. There is no Phaser mode and no simple/advanced product split in the generated game output anymore.
@@ -257,7 +280,7 @@ godot --headless --export-release "Windows Desktop" builds/game.exe --path .
 | `packages/playtest` | Godot headless smoke test runner |
 | `packages/evals` | Eval layers, CI thresholds, regression reports |
 | `apps/cli` | `game-harness` CLI |
-| `apps/studio` | Optional React UI for tasks/evals/screenshots |
+| `apps/studio` | Electron desktop app for conversational orchestration, approvals, Godot launch/logs, settings, updates, and tracing |
 | `templates/deckbuilder` | Godot 4 deckbuilder roguelike template |
 
 ## Notes
@@ -270,4 +293,4 @@ godot --headless --export-release "Windows Desktop" builds/game.exe --path .
 
 ## Known drift to clean up
 
-The README now reflects the current Godot/fal.ai workflow, but there are still a few stale implementation references in code and config, such as `REPLICATE_API_TOKEN` in `turbo.json` and `apps/cli/src/utils/config-loader.ts`, plus some old `simple|advanced` wording in CLI internals. Those should be cleaned up separately so the code matches the docs end to end.
+The docs now reflect the current Godot/fal.ai workflow and the Electron-based Studio app, but there are still a few stale implementation references in code and config, such as `REPLICATE_API_TOKEN` in `turbo.json` and `apps/cli/src/utils/config-loader.ts`, plus some old `simple|advanced` wording in CLI internals. Those should be cleaned up separately so the code matches the docs end to end.

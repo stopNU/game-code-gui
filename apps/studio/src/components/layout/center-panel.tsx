@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import type { ConversationMessage } from '@renderer/store/conversation-store';
 import { Card } from '@renderer/components/ui/card';
 import { Separator } from '@renderer/components/ui/separator';
+import { Skeleton } from '@renderer/components/ui/skeleton';
 import { trpc } from '@renderer/lib/trpc';
 import { serializeContentBlocks } from '@renderer/lib/message-content';
 import { useConversationStore } from '@renderer/store/conversation-store';
@@ -41,10 +42,17 @@ export function CenterPanel(): JSX.Element {
   const preferences = useConversationStore((state) =>
     activeConversationId === null ? null : state.conversationPreferences[activeConversationId] ?? null,
   );
+  const running = useConversationStore((state) =>
+    activeConversationId === null ? false : (state.isRunning[activeConversationId] ?? false),
+  );
+  const tokenUsage = useConversationStore((state) =>
+    activeConversationId === null ? undefined : state.tokenUsage[activeConversationId],
+  );
   const sessionStatus = useConversationStore((state) => state.sessionStatus);
   const hydrateMessages = useConversationStore((state) => state.hydrateMessages);
   const addUserMessage = useConversationStore((state) => state.upsertUserMessage);
   const updateConversationPreferences = useConversationStore((state) => state.updateConversationPreferences);
+  const settingsStatusQuery = trpc.settings.getStatus.useQuery();
 
   const messagesQuery = trpc.conversations.getMessages.useQuery(
     { id: activeConversationId ?? '' },
@@ -58,6 +66,7 @@ export function CenterPanel(): JSX.Element {
     },
   });
   const abortMutation = trpc.agent.abort.useMutation();
+  const renameMutation = trpc.conversations.rename.useMutation();
 
   useEffect(() => {
     if (activeConversationId !== null && messagesQuery.data !== undefined) {
@@ -99,6 +108,9 @@ export function CenterPanel(): JSX.Element {
       <ConversationHeader
         preferences={preferences}
         sessionStatus={sessionStatus}
+        tokenUsage={tokenUsage}
+        canUseOpenAI={settingsStatusQuery.data?.openaiConfigured ?? false}
+        running={running}
         onProviderChange={(provider) => {
           if (activeConversationId === null) {
             return;
@@ -116,11 +128,30 @@ export function CenterPanel(): JSX.Element {
 
           updateConversationPreferences(activeConversationId, { model });
         }}
+        onRename={async (title) => {
+          if (activeConversationId === null) {
+            return;
+          }
+
+          const renamed = await renameMutation.mutateAsync({ id: activeConversationId, title });
+          if (renamed !== null) {
+            updateConversationPreferences(activeConversationId, { title: renamed.title });
+            await utils.conversations.list.invalidate();
+          }
+        }}
       />
       <Separator />
-      <MessageList messages={messages} toolCalls={visibleToolCalls} />
+      {messagesQuery.isLoading ? (
+        <div className="flex flex-1 flex-col gap-4 p-5">
+          <Skeleton className="h-20 w-[72%]" />
+          <Skeleton className="ml-auto h-16 w-[58%]" />
+          <Skeleton className="h-32 w-[80%]" />
+        </div>
+      ) : (
+        <MessageList messages={messages} toolCalls={visibleToolCalls} />
+      )}
       <Separator />
-      <ChatComposer disabled={activeConversationId === null} sending={sending} onSend={handleSend} onAbort={handleAbort} />
+      <ChatComposer disabled={activeConversationId === null} sending={running || sending} onSend={handleSend} onAbort={handleAbort} />
     </Card>
   );
 }

@@ -1,20 +1,27 @@
-import { MessageCircleMore, Sparkles } from 'lucide-react';
+import { MessageCircleMore, Sparkles, Trash2 } from 'lucide-react';
 import type { ConversationSummary } from '@shared/domain';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
+import { Skeleton } from '@renderer/components/ui/skeleton';
 import { cn } from '@renderer/lib/utils';
 
 interface ConversationsListProps {
   conversations: ConversationSummary[];
   activeConversationId: string | null;
+  loading?: boolean;
+  deletingConversationId?: string | null;
   onSelect: (conversationId: string) => void;
+  onDelete: (conversation: ConversationSummary) => void;
 }
 
 export function ConversationsList({
   conversations,
   activeConversationId,
+  loading,
+  deletingConversationId,
   onSelect,
+  onDelete,
 }: ConversationsListProps): JSX.Element {
   return (
     <Card className="flex min-h-0 flex-1 flex-col p-4">
@@ -23,43 +30,63 @@ export function ConversationsList({
         Conversations
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
-        {conversations.length === 0 ? (
+        {loading ? (
+          <>
+            <Skeleton className="h-[74px] w-full" />
+            <Skeleton className="h-[74px] w-full" />
+            <Skeleton className="h-[74px] w-full" />
+          </>
+        ) : null}
+
+        {!loading && conversations.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-background/20 p-4 text-sm text-muted-foreground">
             Start a conversation and the agent history will land here.
           </div>
         ) : null}
-        {conversations.map((conversation) => {
-          const isActive = conversation.id === activeConversationId;
 
-          return (
-            <Button
-              key={conversation.id}
-              variant="ghost"
-              className={cn(
-                'h-auto justify-start rounded-2xl border px-3 py-3 text-left',
-                isActive
-                  ? 'border-primary/60 bg-primary/10 text-foreground'
-                  : 'border-transparent bg-background/30 text-muted-foreground hover:border-border hover:bg-background/50',
-              )}
-              onClick={() => onSelect(conversation.id)}
-            >
-              <div className="flex w-full items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{conversation.title}</div>
-                  <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.22em]">
-                    <span>{conversation.provider ?? 'anthropic'}</span>
-                    <span>•</span>
-                    <span className="truncate">{conversation.model ?? 'default model'}</span>
-                  </div>
+        {!loading
+          ? conversations.map((conversation) => {
+              const isActive = conversation.id === activeConversationId;
+
+              return (
+                <div
+                  key={conversation.id}
+                  className={cn(
+                    'flex items-start gap-2 rounded-2xl border px-3 py-3',
+                    isActive
+                      ? 'border-primary/60 bg-primary/10 text-foreground'
+                      : 'border-transparent bg-background/30 text-muted-foreground hover:border-border hover:bg-background/50',
+                  )}
+                >
+                  <button className="min-w-0 flex-1 text-left" onClick={() => onSelect(conversation.id)}>
+                    <div className="flex w-full items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{conversation.title}</div>
+                        <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.22em]">
+                          <span>{conversation.provider ?? 'anthropic'}</span>
+                          <span>&bull;</span>
+                          <span className="truncate">{conversation.model ?? 'default model'}</span>
+                        </div>
+                      </div>
+                      <Badge className={isActive ? 'bg-primary text-primary-foreground' : ''}>
+                        <Sparkles className="mr-1 h-3 w-3" />
+                        Live
+                      </Badge>
+                    </div>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    className="h-9 rounded-full px-3"
+                    onClick={() => onDelete(conversation)}
+                    disabled={deletingConversationId === conversation.id}
+                    aria-label={`Delete ${conversation.title}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Badge className={isActive ? 'bg-primary text-primary-foreground' : ''}>
-                  <Sparkles className="mr-1 h-3 w-3" />
-                  Live
-                </Badge>
-              </div>
-            </Button>
-          );
-        })}
+              );
+            })
+          : null}
       </div>
     </Card>
   );

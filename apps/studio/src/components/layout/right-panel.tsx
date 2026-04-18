@@ -3,6 +3,7 @@ import { Cpu, Download, FileText, PlugZap, RadioTower } from 'lucide-react';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
+import { Skeleton } from '@renderer/components/ui/skeleton';
 import { trpc } from '@renderer/lib/trpc';
 import { useConversationStore } from '@renderer/store/conversation-store';
 import { GodotLauncher } from '@renderer/components/godot/godot-launcher';
@@ -50,6 +51,7 @@ export function RightPanel(): JSX.Element {
   }, [godotLogsQuery.data, godotStatusQuery.data, hydrateGodotRuntime]);
 
   const selectedProject = projectsQuery.data?.find((project) => project.id === selectedProjectId) ?? null;
+  const loadingSummary = settingsQuery.isLoading || langsmithQuery.isLoading || runtimeQuery.isLoading || projectsQuery.isLoading;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -67,6 +69,14 @@ export function RightPanel(): JSX.Element {
           <PlugZap className="h-4 w-4 text-accent" />
           Providers
         </div>
+        {loadingSummary ? (
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-full" />
+          </div>
+        ) : (
         <div className="space-y-2 text-sm text-muted-foreground">
           <div className="flex items-center justify-between">
             <span>Anthropic</span>
@@ -85,6 +95,7 @@ export function RightPanel(): JSX.Element {
             <Badge>{godotStatus.status}</Badge>
           </div>
         </div>
+        )}
       </Card>
 
       <Card className="p-4">
@@ -92,6 +103,13 @@ export function RightPanel(): JSX.Element {
           <Download className="h-4 w-4 text-primary" />
           Runtime
         </div>
+        {runtimeQuery.isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : (
         <div className="space-y-2 text-sm text-muted-foreground">
           <div className="flex items-center justify-between">
             <span>Version</span>
@@ -125,6 +143,7 @@ export function RightPanel(): JSX.Element {
             </Button>
           </div>
         </div>
+        )}
       </Card>
 
       <GodotLauncher

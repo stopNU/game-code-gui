@@ -14,6 +14,10 @@ export interface TrpcContext {
   godotManager: GodotManager;
   logFilePath: string;
   openLogFile: () => Promise<void>;
+  openPath: (targetPath: string) => Promise<void>;
+  chooseDirectory: (defaultPath?: string) => Promise<string | null>;
+  chooseFile: (args: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
+  getDoctorOutput: () => Promise<string>;
   installDownloadedUpdate: () => boolean;
   getUpdateState: () => StudioUpdateState;
   appVersion: string;

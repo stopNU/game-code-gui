@@ -6,30 +6,30 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        border: 'hsl(215 18% 18%)',
-        input: 'hsl(215 18% 18%)',
-        ring: 'hsl(192 83% 66%)',
-        background: 'hsl(222 30% 7%)',
-        foreground: 'hsl(210 24% 92%)',
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
         primary: {
-          DEFAULT: 'hsl(192 83% 66%)',
-          foreground: 'hsl(222 30% 10%)',
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
         },
         muted: {
-          DEFAULT: 'hsl(220 18% 14%)',
-          foreground: 'hsl(215 16% 68%)',
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
         },
         accent: {
-          DEFAULT: 'hsl(156 64% 57%)',
-          foreground: 'hsl(222 30% 10%)',
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
         },
         card: {
-          DEFAULT: 'hsl(224 26% 10%)',
-          foreground: 'hsl(210 24% 92%)',
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
         },
         destructive: {
-          DEFAULT: 'hsl(0 72% 58%)',
-          foreground: 'hsl(0 0% 98%)',
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
         },
       },
       fontFamily: {

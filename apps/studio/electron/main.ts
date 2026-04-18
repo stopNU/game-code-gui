@@ -1,5 +1,8 @@
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { join } from 'path';
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
+import type { OpenDialogOptions } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import type { StudioUpdateState } from '../shared/domain.js';
 import { openStudioDatabase } from './db/index.js';
@@ -19,6 +22,7 @@ type TrpcRequest = {
 };
 
 const workspaceRoot = process.cwd();
+const execFileAsync = promisify(execFile);
 
 let browserWindow: BrowserWindow | null = null;
 let sessionManager: SessionManager | null = null;
@@ -89,6 +93,53 @@ function getContext(): TrpcContext {
     logFilePath: logger.getLogFilePath(),
     openLogFile: async () => {
       shell.showItemInFolder(logger!.getLogFilePath());
+    },
+    openPath: async (targetPath) => {
+      await shell.openPath(targetPath);
+    },
+    chooseDirectory: async (defaultPath) => {
+      const options: OpenDialogOptions = {
+        properties: ['openDirectory'],
+        ...(defaultPath !== undefined ? { defaultPath } : {}),
+      };
+      const result =
+        browserWindow === null
+          ? await dialog.showOpenDialog(options)
+          : await dialog.showOpenDialog(browserWindow, options);
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+    chooseFile: async ({ defaultPath, filters }) => {
+      const options: OpenDialogOptions = {
+        properties: ['openFile'],
+        ...(defaultPath !== undefined ? { defaultPath } : {}),
+        ...(filters !== undefined ? { filters } : {}),
+      };
+      const result =
+        browserWindow === null
+          ? await dialog.showOpenDialog(options)
+          : await dialog.showOpenDialog(browserWindow, options);
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+    getDoctorOutput: async () => {
+      const appRoot = app.getAppPath();
+      const doctorScriptPath = join(appRoot, 'scripts', 'doctor.js');
+      const childEnv = {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+      };
+
+      try {
+        const { stdout, stderr } = await execFileAsync(process.execPath, [doctorScriptPath], {
+          cwd: appRoot,
+          env: childEnv,
+        });
+        return [stdout, stderr].filter((value) => value.trim().length > 0).join('\n').trim();
+      } catch (error) {
+        if (error instanceof Error) {
+          return error.message;
+        }
+        return String(error);
+      }
     },
     installDownloadedUpdate: () => {
       if (updateState.status !== 'downloaded') {

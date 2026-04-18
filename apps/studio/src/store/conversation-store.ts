@@ -42,6 +42,8 @@ export interface TokenUsageRecord {
   cached: number;
 }
 
+export type ThemePreference = 'dark' | 'light';
+
 export interface ConversationPreferences {
   title: string;
   projectId: string | null;
@@ -58,6 +60,8 @@ interface ConversationStore {
   approvals: Record<string, ApprovalRequestRecord[]>;
   tokenUsage: Record<string, TokenUsageRecord>;
   conversationPreferences: Record<string, ConversationPreferences>;
+  isRunning: Record<string, boolean>;
+  theme: ThemePreference;
   sessionStatus: 'starting' | 'ready' | 'restarting' | 'error';
   sessionDetail: string;
   latestToolCall: ToolCallRecord | null;
@@ -76,9 +80,10 @@ interface ConversationStore {
     stream: 'stdout' | 'stderr';
     timestamp: number;
   }>;
-  setActiveConversationId: (conversationId: string) => void;
+  setActiveConversationId: (conversationId: string | null) => void;
   setSelectedProjectId: (projectId: string | null) => void;
   registerConversations: (conversations: ConversationSummary[]) => void;
+  setTheme: (theme: ThemePreference) => void;
   updateConversationPreferences: (
     conversationId: string,
     updates: Partial<Pick<ConversationPreferences, 'provider' | 'model' | 'title' | 'projectId'>>,
@@ -111,6 +116,8 @@ const DEFAULT_STATE = {
   approvals: {} as Record<string, ApprovalRequestRecord[]>,
   tokenUsage: {} as Record<string, TokenUsageRecord>,
   conversationPreferences: {} as Record<string, ConversationPreferences>,
+  isRunning: {} as Record<string, boolean>,
+  theme: 'dark' as const,
   sessionStatus: 'starting' as const,
   sessionDetail: 'Waiting for the session manager to attach a MessagePort.',
   latestToolCall: null as ToolCallRecord | null,
@@ -200,6 +207,11 @@ export const useConversationStore = create<ConversationStore>((set) => ({
       };
     });
   },
+  setTheme: (theme) => {
+    set({
+      theme,
+    });
+  },
   updateConversationPreferences: (conversationId, updates) => {
     set((state) => {
       const existing = state.conversationPreferences[conversationId];
@@ -284,6 +296,10 @@ export const useConversationStore = create<ConversationStore>((set) => ({
 
         return {
           latestToolCall: nextToolCall,
+          isRunning: {
+            ...state.isRunning,
+            [event.conversationId]: true,
+          },
           toolCalls: {
             ...state.toolCalls,
             [event.conversationId]: upsertToolCall(state.toolCalls[event.conversationId] ?? [], nextToolCall),
@@ -392,6 +408,10 @@ export const useConversationStore = create<ConversationStore>((set) => ({
       if (event.type === 'done') {
         return {
           latestNotice: 'Conversation complete.',
+          isRunning: {
+            ...state.isRunning,
+            [event.conversationId]: false,
+          },
         };
       }
 
@@ -414,11 +434,21 @@ export const useConversationStore = create<ConversationStore>((set) => ({
           };
         }
 
-        return appendNoticeMessage(state, conversationId, event.message);
+        return {
+          ...appendNoticeMessage(state, conversationId, event.message),
+          isRunning: {
+            ...state.isRunning,
+            [conversationId]: false,
+          },
+        };
       }
 
       if (event.type === 'message-start') {
         return {
+          isRunning: {
+            ...state.isRunning,
+            [event.conversationId]: true,
+          },
           messages: {
             ...state.messages,
             [event.conversationId]: [
