@@ -9,7 +9,13 @@ asar: true
 win:
   target:
     - nsis
+  signingHashAlgorithms:
+    - sha256
+  sign: scripts/sign.cjs
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+publish:
+  provider: github
+  releaseType: release

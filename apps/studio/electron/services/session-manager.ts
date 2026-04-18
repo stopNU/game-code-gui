@@ -3,7 +3,9 @@ import { MessageChannelMain, type MessagePortMain, utilityProcess, type UtilityP
 import type { BrowserWindow } from 'electron';
 import type { AgentCommand, AgentDbRequest, AgentPortMessage, StreamEvent } from '../../shared/protocol.js';
 import type { StudioDatabase } from '../db/index.js';
+import type { GodotManager } from './godot-manager.js';
 import type { SettingsService } from './settings-service.js';
+import type { StudioLoggerService } from './studio-logger.js';
 
 function createSessionId(): string {
   return `studio-${randomUUID()}`;
@@ -13,7 +15,9 @@ export class SessionManager {
   private readonly utilityEntryPath: string;
   private readonly browserWindow: BrowserWindow;
   private readonly database: StudioDatabase;
+  private readonly godotManager: GodotManager;
   private readonly settingsService: SettingsService;
+  private readonly logger: StudioLoggerService;
   private child: UtilityProcess | null = null;
   private utilityPort: MessagePortMain | null = null;
   private rendererPort: MessagePortMain | null = null;
@@ -25,15 +29,20 @@ export class SessionManager {
     browserWindow: BrowserWindow,
     utilityEntryPath: string,
     database: StudioDatabase,
+    godotManager: GodotManager,
     settingsService: SettingsService,
+    logger: StudioLoggerService,
   ) {
     this.browserWindow = browserWindow;
     this.utilityEntryPath = utilityEntryPath;
     this.database = database;
+    this.godotManager = godotManager;
     this.settingsService = settingsService;
+    this.logger = logger;
   }
 
   public async start(): Promise<void> {
+    this.logger.child({ process: 'main', service: 'session-manager' }).info('Starting studio session manager.');
     this.emitToRenderer({
       type: 'session-state',
       status: 'starting',
@@ -77,6 +86,10 @@ export class SessionManager {
     });
   }
 
+  public emitStreamEvent(event: StreamEvent): void {
+    this.emitToRenderer(event);
+  }
+
   private spawnChild(): void {
     const child = utilityProcess.fork(this.utilityEntryPath, [], {
       serviceName: 'harness-studio-agent',
@@ -94,12 +107,20 @@ export class SessionManager {
           return;
         }
 
+        if (payload.payload.type === 'log-line') {
+          this.logger.writeRawLine(payload.payload.line);
+          return;
+        }
+
         void this.handleDbRequest(payload.payload.requestId, payload.payload.request);
       }
     });
 
     child.postMessage({ type: 'connect' }, [channel.port2]);
     child.on('exit', (code) => {
+      this.logger
+        .child({ process: 'main', service: 'session-manager' })
+        .warn({ exitCode: code ?? null }, 'Agent utility process exited; restarting session.');
       this.database.approvals.abortPending(this.lastConversationId ?? undefined);
       this.emitToRenderer({
         type: 'error',
@@ -248,6 +269,18 @@ export class SessionManager {
         return this.settingsService.getApiKey(request.provider);
       case 'get-langsmith-config':
         return this.settingsService.getLangSmithRuntimeConfig();
+      case 'launch-godot':
+        return await this.godotManager.launch({
+          projectPath: request.projectPath,
+          launchedBy: request.launchedBy,
+          ...(request.ownerConversationId !== undefined ? { ownerConversationId: request.ownerConversationId } : {}),
+        });
+      case 'stop-godot':
+        return await this.godotManager.stop({
+          requester: request.requester,
+          ...(request.ownerConversationId !== undefined ? { ownerConversationId: request.ownerConversationId } : {}),
+          ...(request.force !== undefined ? { force: request.force } : {}),
+        });
       default:
         throw new Error(`Unhandled db request ${(request as { action: string }).action}.`);
     }

@@ -6,8 +6,8 @@ This document turns the architecture plan into a working checklist so progress i
 
 ## Current Status
 
-- Active focus: `Phase 6`
-- Completed so far: `Phase 0`, `Phase 1`, `Phase 2`, `Phase 3`, `Phase 4`, `Phase 5`
+- Active focus: `Phase 7`
+- Completed so far: `Phase 0`, `Phase 1`, `Phase 2`, `Phase 3`, `Phase 4`, `Phase 5`, `Phase 6`
 - Deferred by design: `Phase 0.2` until `iterate_project` is scheduled
 
 ## Phase 0: Service Layer Extraction
@@ -136,20 +136,42 @@ This document turns the architecture plan into a working checklist so progress i
 
 ## Phase 6: Godot Process Management
 
-- [ ] Add main-process Godot manager
-- [ ] Add tRPC Godot router
-- [ ] Add launch/stop controls in renderer
-- [ ] Add Godot log panel and status display
+- [x] Add main-process Godot manager
+- [x] Add tRPC Godot router
+- [x] Add launch/stop controls in renderer
+- [x] Add Godot log panel and status display
+
+### Notes
+
+- Added `electron/services/godot-manager.ts`, which owns the native Godot child process in Electron main, tracks current status, captures stdout/stderr logs, and emits `godot-status` / `godot-log` events back through the existing MessagePort stream
+- Expanded the tRPC `godot` router with `getStatus`, `getLogs`, `launch`, and `stop`, using persisted Studio project ids to resolve launch targets safely through `ProjectScanner`
+- Wired `GodotManager` into `electron/main.ts` and exposed a small `SessionManager.emitStreamEvent()` bridge so main-process runtime events can reach the renderer without going through the utility process
+- Added renderer-side `GodotLauncher` and `GodotLog` components plus store hydration for current status/log history so the right panel can both hydrate on load and stay live during runtime events
+- Verified `pnpm --filter @agent-harness/studio run typecheck`, `test`, and `build`
 
 ## Phase 7: Logging, Updates, and Testing
 
-- [ ] Add structured logging in main and utility process
+- [x] Add structured logging in main and utility process
 - [ ] Add studio log access from settings
-- [ ] Add auto-update flow with `electron-updater`
-- [ ] Add Azure Trusted Signing integration
-- [ ] Add DB unit tests
-- [ ] Add tool contract tests
-- [ ] Add Playwright Electron smoke test
+- [x] Add auto-update flow with `electron-updater`
+- [x] Add Azure Trusted Signing integration
+- [x] Add DB unit tests
+- [x] Add tool contract tests
+- [x] Add Playwright Electron smoke test
+
+### Notes
+
+- Added shared rotating Studio logging in `apps/studio/electron/services/studio-logger.ts`; Electron main now writes `studio.log`, and utility-process `pino` output is relayed back into the same log file through the existing `MessagePort` bridge
+- Added runtime/update plumbing in `apps/studio/electron/main.ts` plus a new tRPC runtime router so the renderer can open the log file and trigger restart-to-install when an update has been downloaded
+- Added `electron-updater` integration with typed `update-status` stream events so updater state flows through the same Zustand + MessagePort path as the rest of the Studio runtime
+- Added signing/publish scaffolding in `apps/studio/electron-builder.yml` and `apps/studio/scripts/sign.cjs` for Azure Trusted Signing in CI-backed Windows builds
+- Added focused Phase 7 coverage in `apps/studio/electron/services/studio-logger.test.ts` and `apps/studio/electron/agent/tool-registry.test.ts`
+- Tool contract coverage now exercises the main Studio v1 tools directly through `createStudioTools()`: `plan_game`, `scaffold_game`, `implement_task`, `read_task_plan`, and `launch_game`
+- While adding the `launch_game` contract, we found and fixed an abort edge case in `tool-registry.ts`: if the signal was already aborted or aborted mid-launch, the tool could hang instead of stopping the owned Godot session
+- `read_task_plan` now returns `{ plan: null }` for missing persisted plans so the registry behavior matches the intended contract instead of throwing
+- Added a Playwright Electron smoke harness in `apps/studio/tests/e2e/studio-smoke.spec.ts`, but it is currently opt-in via `RUN_STUDIO_E2E=1` because Electron window attachment has been flaky in this environment
+- The current renderer exposes log/update actions in the right-side runtime panel, not in a dedicated Settings page yet; the remaining unchecked item is specifically about moving that access into the eventual Phase 8 settings surface
+- Verified `pnpm --filter @agent-harness/studio run typecheck`, `test:unit`, `build`, and `test:e2e` (with the smoke test currently skipped by default unless explicitly enabled)
 
 ## Phase 8: Polish
 

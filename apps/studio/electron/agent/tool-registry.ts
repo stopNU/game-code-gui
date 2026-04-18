@@ -1,4 +1,3 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
 import { existsSync } from 'fs';
@@ -15,6 +14,8 @@ interface ToolBridge {
   upsertProject(args: { normalizedPath: string; displayPath: string; title?: string | null }): Promise<{ id: string; displayPath: string; title: string | null }>;
   getTaskPlan(projectId: string): Promise<{ projectId: string; planJson: string; updatedAt: number } | null>;
   upsertTaskPlan(args: { projectId: string; planJson: string }): Promise<void>;
+  launchGodot(args: { projectPath: string; ownerConversationId?: string }): Promise<unknown>;
+  stopGodot(args: { ownerConversationId?: string; force?: boolean }): Promise<unknown>;
   getAnthropicApiKey(): Promise<string | null>;
 }
 
@@ -33,7 +34,7 @@ interface StudioToolContext {
   };
 }
 
-async function loadRunTaskModule(workspaceRoot: string): Promise<{
+interface RunTaskModule {
   runTask: (
     projectPath: string,
     task: TaskState,
@@ -56,61 +57,49 @@ async function loadRunTaskModule(workspaceRoot: string): Promise<{
     toolCallCount: number;
     tokensUsed: { input: number; output: number; cached: number };
   }>;
-}> {
+}
+
+interface StudioToolDependencies {
+  planGameServiceImpl: typeof planGameService;
+  scaffoldGameImpl: typeof scaffoldGame;
+  loadRunTaskModuleImpl: (workspaceRoot: string) => Promise<RunTaskModule>;
+}
+
+const defaultToolDependencies: StudioToolDependencies = {
+  planGameServiceImpl: planGameService,
+  scaffoldGameImpl: scaffoldGame,
+  loadRunTaskModuleImpl: loadRunTaskModule,
+};
+
+function toAbortError(signal: AbortSignal): Error {
+  const reason = signal.reason;
+  if (reason instanceof Error) {
+    return reason;
+  }
+
+  return new Error(typeof reason === 'string' && reason.length > 0 ? reason : 'The operation was aborted.');
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) {
+    throw toAbortError(signal);
+  }
+}
+
+async function loadRunTaskModule(workspaceRoot: string): Promise<RunTaskModule> {
   const cliDistPath = resolve(workspaceRoot, 'apps/cli/dist/commands/implement-task.js');
   if (!existsSync(cliDistPath)) {
     throw new Error('Studio needs the built CLI command for implement_task. Run `pnpm build` first.');
   }
 
-  return (await import(pathToFileURL(cliDistPath).href)) as {
-    runTask: (
-      projectPath: string,
-      task: TaskState,
-      plan: TaskPlan,
-      onProgress?: (msg: string) => void,
-      mode?: 'simple' | 'advanced',
-      onToolCallDetail?: (call: { name: string; input: Record<string, unknown> }) => void,
-      onAgentMessage?: undefined,
-      onTokens?: (tokens: { input: number; output: number; cached: number }) => void,
-      signal?: AbortSignal,
-      onText?: (delta: string) => void,
-      model?: string,
-      persistPlan?: (plan: TaskPlan) => Promise<void>,
-      onBudgetExhausted?: (used: number, budget: number, filesWritten: number) => Promise<{ action: 'continue' | 'abort'; extraBudget: number }>,
-      reconciliationReportPath?: string,
-    ) => Promise<{
-      success: boolean;
-      summary: string;
-      filesModified: string[];
-      toolCallCount: number;
-      tokensUsed: { input: number; output: number; cached: number };
-    }>;
-  };
+  return (await import(pathToFileURL(cliDistPath).href)) as RunTaskModule;
 }
 
-function createChildLifetime(processes: Set<ChildProcessWithoutNullStreams>, child: ChildProcessWithoutNullStreams, signal: AbortSignal): void {
-  processes.add(child);
-  const onAbort = () => {
-    if (child.killed) {
-      return;
-    }
-
-    child.kill('SIGTERM');
-    setTimeout(() => {
-      if (!child.killed) {
-        child.kill('SIGKILL');
-      }
-    }, 3000);
+export function createStudioTools(dependencies: Partial<StudioToolDependencies> = {}): ToolContract[] {
+  const resolvedDependencies = {
+    ...defaultToolDependencies,
+    ...dependencies,
   };
-
-  signal.addEventListener('abort', onAbort, { once: true });
-  child.once('exit', () => {
-    processes.delete(child);
-    signal.removeEventListener('abort', onAbort);
-  });
-}
-
-export function createStudioTools(processes: Set<ChildProcessWithoutNullStreams>): ToolContract[] {
   const projectToolPermissions = ['fs:read', 'fs:write'] as const;
 
   const planGameTool: ToolContract = {
@@ -152,7 +141,7 @@ export function createStudioTools(processes: Set<ChildProcessWithoutNullStreams>
       });
 
       const outputPath = resolve(ctx.bridge.workspaceRoot, toolInput.outputPath);
-      const plan = await planGameService({
+      const plan = await resolvedDependencies.planGameServiceImpl({
         brief: toolInput.brief,
         outputPath,
       });
@@ -206,7 +195,7 @@ export function createStudioTools(processes: Set<ChildProcessWithoutNullStreams>
         preprocessedBrief: PreprocessedBrief;
       };
       const outputPath = resolve(ctx.bridge.workspaceRoot, toolInput.outputPath);
-      await scaffoldGame({
+      await resolvedDependencies.scaffoldGameImpl({
         outputPath,
         plan: toolInput.plan,
         preprocessedBrief: toolInput.preprocessedBrief,
@@ -244,7 +233,7 @@ export function createStudioTools(processes: Set<ChildProcessWithoutNullStreams>
     outputSchema: {
       type: 'object',
       properties: {
-        plan: { type: 'object' },
+        plan: {},
       },
       required: ['plan'],
     },
@@ -254,7 +243,9 @@ export function createStudioTools(processes: Set<ChildProcessWithoutNullStreams>
       const toolInput = input as { projectId: string };
       const planRecord = await ctx.bridge.getTaskPlan(toolInput.projectId);
       if (planRecord === null) {
-        throw new Error(`No task plan is stored for project ${toolInput.projectId}.`);
+        return {
+          plan: null,
+        };
       }
 
       return {
@@ -312,7 +303,7 @@ export function createStudioTools(processes: Set<ChildProcessWithoutNullStreams>
         throw new Error(`Task ${toolInput.taskId} was not found in project ${toolInput.projectId}.`);
       }
 
-      const { runTask } = await loadRunTaskModule(ctx.bridge.workspaceRoot);
+      const { runTask } = await resolvedDependencies.loadRunTaskModuleImpl(ctx.bridge.workspaceRoot);
       const result = await runTask(
         project.displayPath,
         task,
@@ -368,7 +359,7 @@ export function createStudioTools(processes: Set<ChildProcessWithoutNullStreams>
   const launchGameTool: ToolContract = {
     name: 'launch_game',
     group: 'npm',
-    description: 'Launch a Godot project and stream stdout/stderr lines back to Studio.',
+    description: 'Launch a Godot project through the shared main-process runtime owner.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -389,46 +380,60 @@ export function createStudioTools(processes: Set<ChildProcessWithoutNullStreams>
     execute: async (input: unknown, rawCtx: unknown) => {
       const ctx = rawCtx as StudioToolContext;
       const toolInput = input as { projectId: string; headless?: boolean };
+      throwIfAborted(ctx.signal);
       const project = await ctx.bridge.getProject(toolInput.projectId);
       if (project === null) {
         throw new Error(`Unknown project ${toolInput.projectId}.`);
       }
-
-      const godotPath = process.env['GODOT_PATH'] ?? 'godot';
-      const args = toolInput.headless === true ? ['--headless', '--path', project.displayPath] : ['--path', project.displayPath];
-      const child = spawn(godotPath, args, {
-        cwd: project.displayPath,
-      });
-      createChildLifetime(processes, child, ctx.signal);
+      if (toolInput.headless === true) {
+        throw new Error('Shared Studio runtime currently supports windowed launches only.');
+      }
 
       ctx.bridge.emit({
-        type: 'godot-status',
-        status: 'running',
+        type: 'tool-progress',
+        conversationId: ctx.conversationId,
+        toolCallId: ctx.toolCallId,
+        message: `Launching ${project.title ?? project.displayPath} through the main-process Godot manager.`,
       });
 
-      child.stdout.on('data', (chunk: Buffer) => {
-        ctx.bridge.emit({
-          type: 'godot-log',
-          line: chunk.toString('utf8'),
-          stream: 'stdout',
-          timestamp: Date.now(),
+      if (ctx.signal.aborted) {
+        await ctx.bridge.stopGodot({
+          ownerConversationId: ctx.conversationId,
+          force: true,
         });
+        throw toAbortError(ctx.signal);
+      }
+
+      const abortPromise = new Promise<never>((_, reject) => {
+        if (ctx.signal.aborted) {
+          void ctx.bridge.stopGodot({
+            ownerConversationId: ctx.conversationId,
+            force: true,
+          });
+          reject(toAbortError(ctx.signal));
+          return;
+        }
+
+        ctx.signal.addEventListener(
+          'abort',
+          () => {
+            void ctx.bridge.stopGodot({
+              ownerConversationId: ctx.conversationId,
+              force: true,
+            });
+            reject(toAbortError(ctx.signal));
+          },
+          { once: true },
+        );
       });
-      child.stderr.on('data', (chunk: Buffer) => {
-        ctx.bridge.emit({
-          type: 'godot-log',
-          line: chunk.toString('utf8'),
-          stream: 'stderr',
-          timestamp: Date.now(),
-        });
-      });
-      child.once('exit', (code) => {
-        ctx.bridge.emit({
-          type: 'godot-status',
-          status: code === 0 ? 'stopped' : 'crashed',
-          ...(code !== null ? { exitCode: code } : {}),
-        });
-      });
+
+      await Promise.race([
+        ctx.bridge.launchGodot({
+          projectPath: project.displayPath,
+          ownerConversationId: ctx.conversationId,
+        }),
+        abortPromise,
+      ]);
 
       return {
         launched: true,

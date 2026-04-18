@@ -1,4 +1,6 @@
+import { Writable } from 'stream';
 import type { MessagePortMain } from 'electron';
+import pino from 'pino';
 import { ConversationAgent } from './agent/conversation-agent.js';
 import type { AgentDbRequest, AgentPortMessage, MainDbResponseMessage, StreamEvent } from '../shared/protocol.js';
 
@@ -10,6 +12,39 @@ const pendingDbRequests = new Map<
     reject: (error: Error) => void;
   }
 >();
+
+class PortLogStream extends Writable {
+  public override _write(
+    chunk: string | Buffer,
+    encoding: BufferEncoding,
+    callback: (error?: Error | null) => void,
+  ): void {
+    try {
+      const line = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : Buffer.from(chunk, encoding).toString('utf8');
+      port?.postMessage({
+        type: 'utility-message',
+        payload: {
+          type: 'log-line',
+          line,
+        },
+      } satisfies AgentPortMessage);
+      callback();
+    } catch (error) {
+      callback(error as Error);
+    }
+  }
+}
+
+const logger = pino(
+  {
+    level: process.env['NODE_ENV'] === 'development' ? 'debug' : 'info',
+    base: {
+      process: 'agent',
+    },
+    timestamp: pino.stdTimeFunctions.isoTime,
+  },
+  new PortLogStream(),
+);
 
 function emit(event: StreamEvent): void {
   port?.postMessage({
@@ -137,6 +172,20 @@ const agent = new ConversationAgent({
       planJson: args.planJson,
     });
   },
+  launchGodot: async (args) =>
+    await requestDb({
+      action: 'launch-godot',
+      projectPath: args.projectPath,
+      launchedBy: 'agent',
+      ...(args.ownerConversationId !== undefined ? { ownerConversationId: args.ownerConversationId } : {}),
+    }),
+  stopGodot: async (args) =>
+    await requestDb({
+      action: 'stop-godot',
+      requester: 'agent',
+      ...(args.ownerConversationId !== undefined ? { ownerConversationId: args.ownerConversationId } : {}),
+      ...(args.force !== undefined ? { force: args.force } : {}),
+    }),
   getApiKey: async (provider) =>
     await requestDb<string | null>({
       action: 'get-api-key',
@@ -197,6 +246,7 @@ process.parentPort?.on('message', (event) => {
 
   port = receivedPort;
   port.start();
+  logger.info('Agent utility process connected to main session.');
   emit({
     type: 'session-state',
     status: 'ready',
@@ -235,7 +285,13 @@ process.parentPort?.on('message', (event) => {
     }
 
     if (data.command.type === 'abort') {
+      logger.warn({ conversationId: data.command.conversationId }, 'Abort requested from renderer.');
       agent.abortConversation(data.command.conversationId);
+      void requestDb({
+        action: 'stop-godot',
+        requester: 'agent',
+        ownerConversationId: data.command.conversationId,
+      }).catch(() => undefined);
       emit({
         type: 'error',
         conversationId: data.command.conversationId,
@@ -255,6 +311,7 @@ process.parentPort?.on('message', (event) => {
         signal: controller.signal,
       })
       .catch((error) => {
+        logger.error({ conversationId: data.command.conversationId, error: String(error) }, 'Agent turn failed.');
         emit({
           type: 'error',
           conversationId: data.command.conversationId,

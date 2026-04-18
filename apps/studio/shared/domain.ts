@@ -43,6 +43,8 @@ export interface ApprovalRecord {
 export interface GodotStatus {
   status: 'stopped' | 'running' | 'crashed';
   projectPath?: string;
+  launchedBy?: 'agent' | 'ui';
+  ownerConversationId?: string;
   exitCode?: number;
 }
 
@@ -57,6 +59,13 @@ export interface LangSmithStatus {
   enabled: boolean;
   endpoint?: string;
   projectName?: string;
+}
+
+export interface StudioUpdateState {
+  status: 'disabled' | 'idle' | 'checking' | 'available' | 'downloaded' | 'error';
+  version?: string;
+  downloadedVersion?: string;
+  message?: string;
 }
 
 export interface ProjectDetails extends ProjectSummary {

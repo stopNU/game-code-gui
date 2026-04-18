@@ -1,14 +1,26 @@
-import { Cpu, PlugZap, RadioTower, ScrollText } from 'lucide-react';
+import { useEffect } from 'react';
+import { Cpu, Download, FileText, PlugZap, RadioTower } from 'lucide-react';
 import { Badge } from '@renderer/components/ui/badge';
+import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
-import { ScrollArea } from '@renderer/components/ui/scroll-area';
 import { trpc } from '@renderer/lib/trpc';
 import { useConversationStore } from '@renderer/store/conversation-store';
+import { GodotLauncher } from '@renderer/components/godot/godot-launcher';
+import { GodotLog } from '@renderer/components/godot/godot-log';
 
 export function RightPanel(): JSX.Element {
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
+  const selectedProjectId = useConversationStore((state) => state.selectedProjectId);
   const settingsQuery = trpc.settings.getStatus.useQuery();
   const langsmithQuery = trpc.langsmith.getStatus.useQuery();
+  const runtimeQuery = trpc.runtime.getStatus.useQuery();
+  const projectsQuery = trpc.projects.list.useQuery(undefined);
+  const godotStatusQuery = trpc.godot.getStatus.useQuery();
+  const godotLogsQuery = trpc.godot.getLogs.useQuery();
+  const launchGodot = trpc.godot.launch.useMutation();
+  const stopGodot = trpc.godot.stop.useMutation();
+  const openLogFile = trpc.runtime.openLogFile.useMutation();
+  const restartToInstallUpdate = trpc.runtime.restartToInstallUpdate.useMutation();
   const sessionStatus = useConversationStore((state) => state.sessionStatus);
   const sessionDetail = useConversationStore((state) => state.sessionDetail);
   const latestToolCall = useConversationStore((state) => state.latestToolCall);
@@ -17,6 +29,27 @@ export function RightPanel(): JSX.Element {
   );
   const godotStatus = useConversationStore((state) => state.godotStatus);
   const godotLogs = useConversationStore((state) => state.godotLogs);
+  const updateStatus = useConversationStore((state) => state.updateStatus);
+  const hydrateGodotRuntime = useConversationStore((state) => state.hydrateGodotRuntime);
+
+  useEffect(() => {
+    if (runtimeQuery.data !== undefined) {
+      useConversationStore.setState({
+        updateStatus: runtimeQuery.data.updateState,
+      });
+    }
+  }, [runtimeQuery.data]);
+
+  useEffect(() => {
+    if (godotStatusQuery.data !== undefined && godotLogsQuery.data !== undefined) {
+      hydrateGodotRuntime({
+        status: godotStatusQuery.data,
+        logs: godotLogsQuery.data,
+      });
+    }
+  }, [godotLogsQuery.data, godotStatusQuery.data, hydrateGodotRuntime]);
+
+  const selectedProject = projectsQuery.data?.find((project) => project.id === selectedProjectId) ?? null;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -56,6 +89,74 @@ export function RightPanel(): JSX.Element {
 
       <Card className="p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Download className="h-4 w-4 text-primary" />
+          Runtime
+        </div>
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <div className="flex items-center justify-between">
+            <span>Version</span>
+            <span>{runtimeQuery.data?.appVersion ?? 'loading'}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Updates</span>
+            <Badge>{updateStatus.status}</Badge>
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">
+            {updateStatus.message ?? 'No update activity reported yet.'}
+          </p>
+          {updateStatus.downloadedVersion !== undefined ? (
+            <div className="text-xs text-foreground">Ready to install: {updateStatus.downloadedVersion}</div>
+          ) : null}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              variant="outline"
+              onClick={() => void openLogFile.mutateAsync()}
+              disabled={openLogFile.isPending || runtimeQuery.data === undefined}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Open Log File
+            </Button>
+            <Button
+              onClick={() => void restartToInstallUpdate.mutateAsync()}
+              disabled={restartToInstallUpdate.isPending || updateStatus.status !== 'downloaded'}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Restart to Update
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <GodotLauncher
+        projectName={selectedProject?.title ?? selectedProject?.name ?? null}
+        projectPath={selectedProject?.path ?? null}
+        status={godotStatus}
+        launching={launchGodot.isPending}
+        stopping={stopGodot.isPending}
+        onLaunch={async () => {
+          if (selectedProjectId === null) {
+            return;
+          }
+
+          const status = await launchGodot.mutateAsync({
+            projectId: selectedProjectId,
+          });
+          hydrateGodotRuntime({
+            status,
+            logs: [],
+          });
+        }}
+        onStop={async () => {
+          const status = await stopGodot.mutateAsync();
+          hydrateGodotRuntime({
+            status,
+            logs: useConversationStore.getState().godotLogs,
+          });
+        }}
+      />
+
+      <Card className="p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
           <Cpu className="h-4 w-4 text-primary" />
           Live Usage
         </div>
@@ -82,28 +183,7 @@ export function RightPanel(): JSX.Element {
         ) : null}
       </Card>
 
-      <Card className="flex min-h-0 flex-1 flex-col p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <ScrollText className="h-4 w-4 text-primary" />
-          Godot Log
-        </div>
-        <ScrollArea className="min-h-0 flex-1 rounded-2xl bg-background/35 p-3">
-          <div className="space-y-2 text-xs text-muted-foreground">
-            {godotLogs.length === 0 ? (
-              <div>No runtime logs yet. Phase 6 will deepen launch and stop controls.</div>
-            ) : (
-              godotLogs.slice(-40).map((entry) => (
-                <div key={entry.id}>
-                  <span className={entry.stream === 'stderr' ? 'text-amber-300' : 'text-primary/80'}>
-                    [{entry.stream}]
-                  </span>{' '}
-                  {entry.line}
-                </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
-      </Card>
+      <GodotLog logs={godotLogs} />
     </div>
   );
 }

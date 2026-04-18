@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ConversationSummary } from '@shared/domain';
+import type { ConversationSummary, StudioUpdateState } from '@shared/domain';
 import type { StreamEvent } from '@shared/protocol';
 
 export interface ConversationMessage {
@@ -62,8 +62,12 @@ interface ConversationStore {
   sessionDetail: string;
   latestToolCall: ToolCallRecord | null;
   latestNotice: string | null;
+  updateStatus: StudioUpdateState;
   godotStatus: {
     status: 'running' | 'stopped' | 'crashed';
+    projectPath?: string;
+    launchedBy?: 'agent' | 'ui';
+    ownerConversationId?: string;
     exitCode?: number;
   };
   godotLogs: Array<{
@@ -81,6 +85,19 @@ interface ConversationStore {
   ) => void;
   hydrateMessages: (conversationId: string, messages: ConversationMessage[]) => void;
   hydrateApprovals: (approvals: ApprovalRequestRecord[]) => void;
+  hydrateGodotRuntime: (args: {
+    status: {
+      status: 'running' | 'stopped' | 'crashed';
+      projectPath?: string;
+      exitCode?: number;
+    };
+    logs: Array<{
+      id: string;
+      line: string;
+      stream: 'stdout' | 'stderr';
+      timestamp: number;
+    }>;
+  }) => void;
   upsertUserMessage: (conversationId: string, content: string) => void;
   applyEvent: (event: StreamEvent) => void;
   reset: () => void;
@@ -98,6 +115,10 @@ const DEFAULT_STATE = {
   sessionDetail: 'Waiting for the session manager to attach a MessagePort.',
   latestToolCall: null as ToolCallRecord | null,
   latestNotice: null as string | null,
+  updateStatus: {
+    status: 'disabled',
+    message: 'Waiting for updater state.',
+  } as StudioUpdateState,
   godotStatus: {
     status: 'stopped' as const,
   },
@@ -215,6 +236,12 @@ export const useConversationStore = create<ConversationStore>((set) => ({
       return {
         approvals: nextApprovals,
       };
+    });
+  },
+  hydrateGodotRuntime: ({ status, logs }) => {
+    set({
+      godotStatus: status,
+      godotLogs: logs,
     });
   },
   upsertUserMessage: (conversationId, content) => {
@@ -368,6 +395,17 @@ export const useConversationStore = create<ConversationStore>((set) => ({
         };
       }
 
+      if (event.type === 'update-status') {
+        return {
+          updateStatus: {
+            status: event.status,
+            ...(event.version !== undefined ? { version: event.version } : {}),
+            ...(event.downloadedVersion !== undefined ? { downloadedVersion: event.downloadedVersion } : {}),
+            ...(event.message !== undefined ? { message: event.message } : {}),
+          },
+        };
+      }
+
       if (event.type === 'error') {
         const conversationId = event.conversationId ?? state.activeConversationId;
         if (conversationId === null) {
@@ -432,6 +470,21 @@ export const useConversationStore = create<ConversationStore>((set) => ({
         return {
           godotStatus: {
             status: event.status,
+            ...(event.projectPath !== undefined
+              ? { projectPath: event.projectPath }
+              : state.godotStatus.projectPath !== undefined
+                ? { projectPath: state.godotStatus.projectPath }
+                : {}),
+            ...(event.launchedBy !== undefined
+              ? { launchedBy: event.launchedBy }
+              : state.godotStatus.launchedBy !== undefined
+                ? { launchedBy: state.godotStatus.launchedBy }
+                : {}),
+            ...(event.ownerConversationId !== undefined
+              ? { ownerConversationId: event.ownerConversationId }
+              : state.godotStatus.ownerConversationId !== undefined
+                ? { ownerConversationId: state.godotStatus.ownerConversationId }
+                : {}),
             ...(event.exitCode !== undefined ? { exitCode: event.exitCode } : {}),
           },
         };

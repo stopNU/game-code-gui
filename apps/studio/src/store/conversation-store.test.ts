@@ -81,4 +81,21 @@ describe('conversation store', () => {
     expect(state.approvals.c1?.[0]?.status).toBe('pending');
     expect(state.tokenUsage.c1).toEqual({ input: 100, output: 50, cached: 25 });
   });
+
+  it('updates runtime updater state from stream events', () => {
+    const store = useConversationStore.getState();
+
+    store.applyEvent({
+      type: 'update-status',
+      status: 'downloaded',
+      downloadedVersion: '0.2.0',
+      message: 'Update ready. Restart to install.',
+    });
+
+    expect(useConversationStore.getState().updateStatus).toEqual({
+      status: 'downloaded',
+      downloadedVersion: '0.2.0',
+      message: 'Update ready. Restart to install.',
+    });
+  });
 });

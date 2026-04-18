@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-import type { ChildProcessWithoutNullStreams } from 'child_process';
 import type { ClaudeContentBlock, ClaudeMessage, ToolContract } from '@agent-harness/core';
 import { buildConversationAgentPrompt } from './conversation-agent-prompt.js';
 import { ApprovalGate, type ToolRiskLevel } from './approval-gate.js';
@@ -43,6 +42,8 @@ interface ConversationAgentBridge {
   getTaskPlan(projectId: string): Promise<{ projectId: string; planJson: string; updatedAt: number } | null>;
   upsertProject(args: { normalizedPath: string; displayPath: string; title?: string | null }): Promise<{ id: string; displayPath: string; title: string | null }>;
   upsertTaskPlan(args: { projectId: string; planJson: string }): Promise<void>;
+  launchGodot(args: { projectPath: string; ownerConversationId?: string }): Promise<unknown>;
+  stopGodot(args: { ownerConversationId?: string; force?: boolean }): Promise<unknown>;
   getApiKey(provider: 'anthropic' | 'openai'): Promise<string | null>;
   getLangSmithConfig(): Promise<{
     enabled: boolean;
@@ -115,7 +116,6 @@ function getToolRiskLevel(toolName: string): ToolRiskLevel {
 
 export class ConversationAgent {
   private readonly controllers = new Map<string, AbortController>();
-  private readonly processes = new Set<ChildProcessWithoutNullStreams>();
   private readonly approvalGate: ApprovalGate;
   private readonly tools: ToolContract[];
 
@@ -126,7 +126,7 @@ export class ConversationAgent {
       resolveApproval: (args) => this.bridge.resolveApproval(args),
       emit: (event) => this.bridge.emit(event),
     });
-    this.tools = createStudioTools(this.processes);
+    this.tools = createStudioTools();
   }
 
   public async sendMessage(args: {
@@ -360,6 +360,8 @@ export class ConversationAgent {
                       upsertProject: (toolArgs) => this.bridge.upsertProject(toolArgs),
                       getTaskPlan: (projectId) => this.bridge.getTaskPlan(projectId),
                       upsertTaskPlan: (toolArgs) => this.bridge.upsertTaskPlan(toolArgs),
+                      launchGodot: (toolArgs) => this.bridge.launchGodot(toolArgs),
+                      stopGodot: (toolArgs) => this.bridge.stopGodot(toolArgs),
                       getAnthropicApiKey: () => this.bridge.getApiKey('anthropic'),
                     },
                   }),

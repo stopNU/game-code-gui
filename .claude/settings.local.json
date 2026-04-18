@@ -67,7 +67,8 @@
       "Bash(powershell -Command \"Get-ChildItem 'D:\\\\dev\\\\agent-harness\\\\apps\\\\cli\\\\slay-the-cats\\\\src' -Recurse -Filter '*.gd' | Select-Object FullName\")",
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
       "Bash(find \"D:\\\\dev\\\\game-code-gui\" -name \"package.json\" -type f -exec grep -l \"electron-trpc\\\\|sqlite-vec\\\\|better-sqlite3\" {} \\\\;)",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "Bash(xargs wc *)"
     ]
   }
 }

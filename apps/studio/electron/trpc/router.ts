@@ -6,6 +6,7 @@ import { conversationsRouter } from './routers/conversations.js';
 import { godotRouter } from './routers/godot.js';
 import { langsmithRouter } from './routers/langsmith.js';
 import { projectsRouter } from './routers/projects.js';
+import { runtimeRouter } from './routers/runtime.js';
 import { settingsRouter } from './routers/settings.js';
 import type { TrpcContext } from './context.js';
 
@@ -32,6 +33,7 @@ export const appRouter = router({
   godot: godotRouter,
   settings: settingsRouter,
   langsmith: langsmithRouter,
+  runtime: runtimeRouter,
 });
 
 export type AppRouter = typeof appRouter;

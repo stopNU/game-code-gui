@@ -122,7 +122,18 @@ export interface GodotLogEvent {
 export interface GodotStatusEvent {
   type: 'godot-status';
   status: 'running' | 'stopped' | 'crashed';
+  projectPath?: string;
+  launchedBy?: 'agent' | 'ui';
+  ownerConversationId?: string;
   exitCode?: number;
+}
+
+export interface UpdateStatusEvent {
+  type: 'update-status';
+  status: 'disabled' | 'idle' | 'checking' | 'available' | 'downloaded' | 'error';
+  version?: string;
+  downloadedVersion?: string;
+  message?: string;
 }
 
 export type StreamEvent =
@@ -143,7 +154,8 @@ export type StreamEvent =
   | ErrorEvent
   | DoneEvent
   | GodotLogEvent
-  | GodotStatusEvent;
+  | GodotStatusEvent
+  | UpdateStatusEvent;
 
 export interface AgentSendCommand {
   type: 'send';
@@ -253,13 +265,26 @@ export type AgentDbRequest =
     }
   | {
       action: 'get-langsmith-config';
+    }
+  | {
+      action: 'launch-godot';
+      projectPath: string;
+      launchedBy: 'agent' | 'ui';
+      ownerConversationId?: string;
+    }
+  | {
+      action: 'stop-godot';
+      requester: 'agent' | 'ui';
+      ownerConversationId?: string;
+      force?: boolean;
     };
 
 export interface UtilityEnvelopeMessage {
   type: 'utility-message';
   payload:
     | { type: 'stream-event'; event: StreamEvent }
-    | { type: 'db-request'; requestId: string; request: AgentDbRequest };
+    | { type: 'db-request'; requestId: string; request: AgentDbRequest }
+    | { type: 'log-line'; line: string };
 }
 
 export interface MainDbResponseMessage {
