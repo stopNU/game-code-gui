@@ -191,6 +191,8 @@ const agent = new ConversationAgent({
       action: 'get-api-key',
       provider,
     }),
+  getClaudeCodeToken: async () =>
+    await requestDb<string | null>({ action: 'get-claude-code-token' }),
   getLangSmithConfig: async () =>
     await requestDb<{
       enabled: boolean;

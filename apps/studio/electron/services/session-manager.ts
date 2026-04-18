@@ -267,6 +267,8 @@ export class SessionManager {
         return { ok: true };
       case 'get-api-key':
         return this.settingsService.getApiKey(request.provider);
+      case 'get-claude-code-token':
+        return this.settingsService.getClaudeCodeToken();
       case 'get-langsmith-config':
         return this.settingsService.getLangSmithRuntimeConfig();
       case 'launch-godot':

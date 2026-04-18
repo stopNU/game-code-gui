@@ -1,4 +1,6 @@
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 import type { SettingsStatus, LangSmithStatus } from '../../shared/domain.js';
 import type { SettingsRepository } from '../db/repositories/settings-repository.js';
 import type { SecretStorage } from './secret-storage.js';
@@ -81,11 +83,24 @@ export class SettingsService {
     this.settingsRepository.set(secretSettingKeys[name], this.secretStorage.encryptString(value));
   }
 
+  public getClaudeCodeToken(): string | null {
+    try {
+      const credPath = path.join(os.homedir(), '.claude', '.credentials.json');
+      const raw = fs.readFileSync(credPath, 'utf8');
+      const parsed = JSON.parse(raw) as { claudeAiOauth?: { accessToken?: string } };
+      const token = parsed.claudeAiOauth?.accessToken;
+      return typeof token === 'string' && token.length > 0 ? token : null;
+    } catch {
+      return null;
+    }
+  }
+
   public getStatus(): SettingsStatus {
     return {
       workspaceRoot: this.getEffectiveWorkspaceRoot(),
       anthropicConfigured: this.getApiKey('anthropic') !== null,
       openaiConfigured: this.getApiKey('openai') !== null,
+      claudeCodeConfigured: this.getClaudeCodeToken() !== null,
     };
   }
 

@@ -277,6 +277,9 @@ export type AgentDbRequest =
       requester: 'agent' | 'ui';
       ownerConversationId?: string;
       force?: boolean;
+    }
+  | {
+      action: 'get-claude-code-token';
     };
 
 export interface UtilityEnvelopeMessage {
