@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ConversationSummary } from '@shared/domain';
 import { trpc } from '@renderer/lib/trpc';
+import { getDefaultConversationConfig } from '@renderer/lib/conversation-defaults';
 import { useConversationStore } from '@renderer/store/conversation-store';
 import { ConversationsList } from '@renderer/components/conversations/conversations-list';
 import { DeleteConversationDialog } from '@renderer/components/conversations/delete-conversation-dialog';
@@ -38,9 +39,7 @@ export function LeftPanel(): JSX.Element {
   const handleCreateConversation = (): void => {
     void createConversation.mutateAsync({
       projectId: selectedProjectId,
-      title: selectedProjectId === null ? 'New conversation' : 'Project conversation',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      ...getDefaultConversationConfig(selectedProjectId),
     });
   };
 

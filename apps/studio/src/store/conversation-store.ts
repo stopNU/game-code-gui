@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import type { ConversationSummary, StudioUpdateState } from '@shared/domain';
 import type { StreamEvent } from '@shared/protocol';
+import {
+  DEFAULT_CONVERSATION_PROVIDER,
+  getDefaultModelForProvider,
+} from '@renderer/lib/conversation-defaults';
 
 export interface ConversationMessage {
   id: string;
@@ -192,10 +196,8 @@ export const useConversationStore = create<ConversationStore>((set) => ({
         nextPreferences[conversation.id] = {
           title: conversation.title,
           projectId: conversation.projectId,
-          provider: conversation.provider ?? 'anthropic',
-          model:
-            conversation.model ??
-            (conversation.provider === 'openai' || conversation.provider === 'codex' ? 'gpt-5.4' : 'claude-sonnet-4-6'),
+          provider: conversation.provider ?? DEFAULT_CONVERSATION_PROVIDER,
+          model: conversation.model ?? getDefaultModelForProvider(conversation.provider ?? DEFAULT_CONVERSATION_PROVIDER),
           updatedAt: conversation.updatedAt,
         };
       }

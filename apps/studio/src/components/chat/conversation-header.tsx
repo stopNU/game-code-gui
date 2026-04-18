@@ -5,12 +5,12 @@ import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { formatProvider } from '@renderer/lib/utils';
-
-const PROVIDER_MODELS = {
-  anthropic: ['claude-sonnet-4-6'],
-  openai: ['gpt-5.4'],
-  codex: ['gpt-5.4'],
-} as const;
+import {
+  getAvailableProviders,
+  getDefaultModelForProvider,
+  getEffectiveProvider,
+  PROVIDER_MODELS,
+} from '@renderer/lib/conversation-defaults';
 
 const CONTEXT_BUDGET = 150_000;
 
@@ -42,12 +42,9 @@ export function ConversationHeader({
     setDraftTitle(preferences?.title ?? 'Harness Studio');
   }, [preferences?.title]);
 
-  const provider =
-    preferences?.provider === 'openai' && !canUseOpenAI ? 'anthropic' : (preferences?.provider ?? 'anthropic');
-  const availableProviders = useMemo(() => {
-    return canUseOpenAI ? (['anthropic', 'openai', 'codex'] as const) : (['anthropic', 'codex'] as const);
-  }, [canUseOpenAI]);
-  const model = preferences?.model ?? PROVIDER_MODELS[provider][0];
+  const provider = getEffectiveProvider(preferences?.provider, canUseOpenAI);
+  const availableProviders = useMemo(() => getAvailableProviders(canUseOpenAI), [canUseOpenAI]);
+  const model = preferences?.model ?? getDefaultModelForProvider(provider);
   const models = PROVIDER_MODELS[provider];
   const totalTokens = (tokenUsage?.input ?? 0) + (tokenUsage?.output ?? 0) + (tokenUsage?.cached ?? 0);
   const budgetRatio = Math.min(totalTokens / CONTEXT_BUDGET, 1);

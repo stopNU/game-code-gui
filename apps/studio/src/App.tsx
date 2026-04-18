@@ -9,6 +9,7 @@ import { SettingsDialog } from '@renderer/components/settings/settings-dialog';
 import { Button } from '@renderer/components/ui/button';
 import { useConversationStream } from '@renderer/hooks/useConversationStream';
 import { trpc } from '@renderer/lib/trpc';
+import { getDefaultConversationConfig } from '@renderer/lib/conversation-defaults';
 import { useConversationStore } from '@renderer/store/conversation-store';
 
 const THEME_STORAGE_KEY = 'harness-studio.theme';
@@ -46,9 +47,7 @@ export function App(): JSX.Element {
   const createConversationFromCurrentContext = (): void => {
     void createConversation.mutateAsync({
       projectId: selectedProjectId,
-      title: selectedProjectId === null ? 'New conversation' : 'Project conversation',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      ...getDefaultConversationConfig(selectedProjectId),
     });
   };
 

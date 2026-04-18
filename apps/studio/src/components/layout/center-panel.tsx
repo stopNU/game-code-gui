@@ -5,6 +5,10 @@ import { Separator } from '@renderer/components/ui/separator';
 import { Skeleton } from '@renderer/components/ui/skeleton';
 import { trpc } from '@renderer/lib/trpc';
 import { serializeContentBlocks } from '@renderer/lib/message-content';
+import {
+  DEFAULT_CONVERSATION_PROVIDER,
+  getDefaultModelForProvider,
+} from '@renderer/lib/conversation-defaults';
 import { useConversationStore } from '@renderer/store/conversation-store';
 import { ConversationHeader } from '@renderer/components/chat/conversation-header';
 import { MessageList } from '@renderer/components/chat/message-list';
@@ -88,8 +92,8 @@ export function CenterPanel(): JSX.Element {
       conversationId: activeConversationId,
       userMessage: content,
       ...(selectedProjectId !== null ? { projectId: selectedProjectId } : {}),
-      model: preferences?.model ?? 'claude-sonnet-4-6',
-      provider: preferences?.provider ?? 'anthropic',
+      model: preferences?.model ?? getDefaultModelForProvider(DEFAULT_CONVERSATION_PROVIDER),
+      provider: preferences?.provider ?? DEFAULT_CONVERSATION_PROVIDER,
     });
   };
 
@@ -118,7 +122,7 @@ export function CenterPanel(): JSX.Element {
 
           updateConversationPreferences(activeConversationId, {
             provider,
-            model: provider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-5.4',
+            model: getDefaultModelForProvider(provider),
           });
         }}
         onModelChange={(model) => {
