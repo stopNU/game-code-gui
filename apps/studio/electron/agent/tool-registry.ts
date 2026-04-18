@@ -1,4 +1,4 @@
-import { resolve } from 'path';
+import { resolve, isAbsolute } from 'path';
 import { pathToFileURL } from 'url';
 import { existsSync } from 'fs';
 import { preprocessBrief, createAdvancedPlan, type PreprocessedBrief, type TaskPlan, type TaskState, type ToolContract } from '@agent-harness/core';
@@ -6,6 +6,15 @@ import { scaffoldGame } from '@agent-harness/game-adapter';
 import { planGameService } from '@agent-harness/services';
 import { normalizePath } from '../db/normalize-path.js';
 import type { StreamEvent } from '../../shared/protocol.js';
+
+function resolveProjectPath(workspaceRoot: string, outputPath: string): string {
+  if (isAbsolute(outputPath)) {
+    // Strip leading slashes so absolute AI-provided paths resolve under the workspace root
+    const relative = outputPath.replace(/^[/\\]+/, '');
+    return resolve(workspaceRoot, relative);
+  }
+  return resolve(workspaceRoot, outputPath);
+}
 
 interface ToolBridge {
   workspaceRoot: string;
@@ -140,7 +149,7 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
         message: 'Planning the game brief and scaffolding the Godot project.',
       });
 
-      const outputPath = resolve(ctx.bridge.workspaceRoot, toolInput.outputPath);
+      const outputPath = resolveProjectPath(ctx.bridge.workspaceRoot, toolInput.outputPath);
       const plan = await resolvedDependencies.planGameServiceImpl({
         brief: toolInput.brief,
         outputPath,
@@ -194,7 +203,7 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
         plan: TaskPlan;
         preprocessedBrief: PreprocessedBrief;
       };
-      const outputPath = resolve(ctx.bridge.workspaceRoot, toolInput.outputPath);
+      const outputPath = resolveProjectPath(ctx.bridge.workspaceRoot, toolInput.outputPath);
       await resolvedDependencies.scaffoldGameImpl({
         outputPath,
         plan: toolInput.plan,

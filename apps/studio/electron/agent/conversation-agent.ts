@@ -53,7 +53,6 @@ interface ConversationAgentBridge {
   launchGodot(args: { projectPath: string; ownerConversationId?: string }): Promise<unknown>;
   stopGodot(args: { ownerConversationId?: string; force?: boolean }): Promise<unknown>;
   getApiKey(provider: 'anthropic' | 'openai'): Promise<string | null>;
-  getClaudeCodeToken(): Promise<string | null>;
   getLangSmithConfig(): Promise<{
     enabled: boolean;
     apiKey: string | null;
@@ -151,15 +150,8 @@ export class ConversationAgent {
       if (providerKey !== null) {
         if (args.provider === 'anthropic') {
           process.env['ANTHROPIC_API_KEY'] = providerKey;
-          delete process.env['ANTHROPIC_AUTH_TOKEN'];
         } else {
           process.env['OPENAI_API_KEY'] = providerKey;
-        }
-      } else if (args.provider === 'anthropic') {
-        const ccToken = await this.bridge.getClaudeCodeToken();
-        if (ccToken !== null) {
-          process.env['ANTHROPIC_AUTH_TOKEN'] = ccToken;
-          delete process.env['ANTHROPIC_API_KEY'];
         }
       }
     }

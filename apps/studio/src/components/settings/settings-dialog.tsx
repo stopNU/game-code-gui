@@ -303,17 +303,13 @@ export function SettingsDialog({
                   title="Provider Keys"
                   description="Anthropic is required for the main harness flow. If no API key is set, Studio will fall back to your Claude.ai subscription credentials."
                 >
-                  {statusQuery.data?.anthropicConfigured ? null : statusQuery.data?.claudeCodeConfigured ? (
-                    <div className="mb-4 rounded-2xl border border-accent/40 bg-accent/10 p-4 text-sm text-accent">
-                      No Anthropic API key set — using your Claude.ai subscription (OAuth token from{' '}
-                      <code className="font-mono">~/.claude/.credentials.json</code>).
-                    </div>
-                  ) : (
+                  {!statusQuery.data?.anthropicConfigured ? (
                     <div className="mb-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
-                      Anthropic is not configured. Add an API key below, or sign in to Claude.ai via the Claude Code CLI
-                      to use your subscription.
+                      {statusQuery.data?.claudeCodeConfigured
+                        ? 'Claude Code is authenticated, but its OAuth token cannot be used with the Anthropic API directly. An API key is still required.'
+                        : 'Anthropic is not configured yet, so conversation turns will fail until a key is saved.'}
                     </div>
-                  )}
+                  ) : null}
                   <div className="grid gap-4">
                     <label className="grid gap-2">
                       <span className="text-sm font-medium text-foreground">Anthropic</span>

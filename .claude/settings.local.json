@@ -74,7 +74,11 @@
       "Bash(pnpm --filter @agent-harness/studio run dev)",
       "Bash(node -e ' *)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\); [print\\(k, ':', type\\(v\\).__name__, str\\(v\\)[:80] if not isinstance\\(v,dict\\) else list\\(v.keys\\(\\)\\)\\) for k,v in d.items\\(\\)]\")",
-      "Bash(node -e \"const d = JSON.parse\\(require\\('fs'\\).readFileSync\\(process.env.HOME+'/.claude/.credentials.json','utf8'\\)\\); console.log\\('keys:', Object.keys\\(d\\)\\); Object.entries\\(d\\).forEach\\(\\([k,v]\\) => console.log\\(k, ':', typeof v, JSON.stringify\\(v\\).slice\\(0,120\\)\\)\\)\")"
+      "Bash(node -e \"const d = JSON.parse\\(require\\('fs'\\).readFileSync\\(process.env.HOME+'/.claude/.credentials.json','utf8'\\)\\); console.log\\('keys:', Object.keys\\(d\\)\\); Object.entries\\(d\\).forEach\\(\\([k,v]\\) => console.log\\(k, ':', typeof v, JSON.stringify\\(v\\).slice\\(0,120\\)\\)\\)\")",
+      "Read(//c/Users/Michael/AppData/Roaming/**)",
+      "Read(//c/Users/Michael/AppData/Roaming//**)",
+      "Bash(sqlite3 \"/c/Users/Michael/AppData/Roaming/@agent-harness/studio/studio.sqlite3\" \"SELECT id, display_path, title FROM projects;\")",
+      "Bash(node D:/dev/game-code-gui/fix-project-path.mjs)"
     ]
   }
 }
