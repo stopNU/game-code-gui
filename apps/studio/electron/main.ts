@@ -50,21 +50,21 @@ function createWindow(): BrowserWindow {
     },
   });
 
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:;",
-        ],
-      },
-    });
-  });
-
   const rendererUrl = process.env.ELECTRON_RENDERER_URL;
   if (rendererUrl !== undefined) {
     void window.loadURL(rendererUrl);
+    window.webContents.openDevTools();
   } else {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:;",
+          ],
+        },
+      });
+    });
     void window.loadFile(join(__dirname, '../../dist/index.html'));
   }
 

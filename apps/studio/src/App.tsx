@@ -28,8 +28,8 @@ export function App(): JSX.Element {
     activeConversationId === null ? false : (state.isRunning[activeConversationId] ?? false),
   );
   const approvals = useConversationStore((state) =>
-    activeConversationId === null ? [] : state.approvals[activeConversationId] ?? [],
-  );
+    activeConversationId === null ? null : (state.approvals[activeConversationId] ?? null),
+  ) ?? [];
   const setActiveConversationId = useConversationStore((state) => state.setActiveConversationId);
   const registerConversations = useConversationStore((state) => state.registerConversations);
   const conversationsQuery = trpc.conversations.list.useQuery(undefined);

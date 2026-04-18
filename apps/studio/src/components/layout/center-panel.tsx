@@ -34,11 +34,11 @@ export function CenterPanel(): JSX.Element {
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
   const selectedProjectId = useConversationStore((state) => state.selectedProjectId);
   const messages = useConversationStore((state) =>
-    activeConversationId === null ? [] : state.messages[activeConversationId] ?? [],
-  );
+    activeConversationId === null ? null : (state.messages[activeConversationId] ?? null),
+  ) ?? [];
   const toolCalls = useConversationStore((state) =>
-    activeConversationId === null ? [] : state.toolCalls[activeConversationId] ?? [],
-  );
+    activeConversationId === null ? null : (state.toolCalls[activeConversationId] ?? null),
+  ) ?? [];
   const preferences = useConversationStore((state) =>
     activeConversationId === null ? null : state.conversationPreferences[activeConversationId] ?? null,
   );
