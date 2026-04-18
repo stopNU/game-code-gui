@@ -16,7 +16,7 @@ export function ApprovalDialog({ approval, submitting, onDecision }: ApprovalDia
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-      <div className="pointer-events-auto w-full max-w-2xl rounded-[28px] border border-border bg-card p-6 shadow-glow">
+      <div className="pointer-events-auto flex w-full max-w-2xl flex-col rounded-[28px] border border-border bg-card p-6 shadow-glow" style={{ maxHeight: 'calc(100vh - 3rem)' }}>
         <div className="flex items-start gap-3">
           <div className="rounded-2xl bg-amber-500/15 p-3 text-amber-300">
             <ShieldAlert className="h-6 w-6" />
@@ -27,7 +27,7 @@ export function ApprovalDialog({ approval, submitting, onDecision }: ApprovalDia
             <p className="mt-2 text-sm text-muted-foreground">{approval.rationale}</p>
           </div>
         </div>
-        <div className="mt-5 grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <div className="mt-5 grid min-h-0 flex-1 gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
           <div className="rounded-2xl border border-border bg-background/40 p-4">
             <div className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">Risk</div>
             <div className="mt-2 text-lg font-semibold text-foreground">{approval.riskLevel}</div>
@@ -36,7 +36,7 @@ export function ApprovalDialog({ approval, submitting, onDecision }: ApprovalDia
             {stringifyJson(approval.args)}
           </pre>
         </div>
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-5 flex shrink-0 flex-wrap gap-2">
           <Button onClick={() => void onDecision('approved', 'once')} disabled={submitting}>
             Approve once
           </Button>

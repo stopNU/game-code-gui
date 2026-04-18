@@ -78,7 +78,8 @@
       "Read(//c/Users/Michael/AppData/Roaming/**)",
       "Read(//c/Users/Michael/AppData/Roaming//**)",
       "Bash(sqlite3 \"/c/Users/Michael/AppData/Roaming/@agent-harness/studio/studio.sqlite3\" \"SELECT id, display_path, title FROM projects;\")",
-      "Bash(node D:/dev/game-code-gui/fix-project-path.mjs)"
+      "Bash(node D:/dev/game-code-gui/fix-project-path.mjs)",
+      "Bash(find \"D:\\\\dev\\\\game-code-gui\\\\apps\\\\studio\\\\src\\\\components\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec grep -l \"getPlan\\\\|plan\\\\.\\\\|phases\\\\|tasks\" {} \\\\;)"
     ]
   }
 }

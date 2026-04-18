@@ -8,6 +8,7 @@ import { trpc } from '@renderer/lib/trpc';
 import { useConversationStore } from '@renderer/store/conversation-store';
 import { GodotLauncher } from '@renderer/components/godot/godot-launcher';
 import { GodotLog } from '@renderer/components/godot/godot-log';
+import { TaskPlanCard } from '@renderer/components/project/task-plan-card';
 
 export function RightPanel(): JSX.Element {
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
@@ -173,6 +174,8 @@ export function RightPanel(): JSX.Element {
           });
         }}
       />
+
+      {selectedProjectId !== null && <TaskPlanCard projectId={selectedProjectId} />}
 
       <Card className="p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
