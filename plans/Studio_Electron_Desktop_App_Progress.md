@@ -6,8 +6,8 @@ This document turns the architecture plan into a working checklist so progress i
 
 ## Current Status
 
-- Active focus: `Phase 5`
-- Completed so far: `Phase 0`, `Phase 1`, `Phase 2`, `Phase 3`, `Phase 4`
+- Active focus: `Phase 6`
+- Completed so far: `Phase 0`, `Phase 1`, `Phase 2`, `Phase 3`, `Phase 4`, `Phase 5`
 - Deferred by design: `Phase 0.2` until `iterate_project` is scheduled
 
 ## Phase 0: Service Layer Extraction
@@ -116,14 +116,23 @@ This document turns the architecture plan into a working checklist so progress i
 
 ## Phase 5: Chat UI
 
-- [ ] Build 3-panel application layout
-- [ ] Add conversation list and new conversation flow
-- [ ] Add conversation header with model/provider selector
-- [ ] Add message list and markdown rendering
-- [ ] Add tool call cards
-- [ ] Add chat composer
-- [ ] Add approval dialog
-- [ ] Add live streaming state via Zustand + MessagePort
+- [x] Build 3-panel application layout
+- [x] Add conversation list and new conversation flow
+- [x] Add conversation header with model/provider selector
+- [x] Add message list and markdown rendering
+- [x] Add tool call cards
+- [x] Add chat composer
+- [x] Add approval dialog
+- [x] Add live streaming state via Zustand + MessagePort
+
+### Notes
+
+- Replaced the placeholder renderer shell with a true three-panel chat workspace backed by persisted projects and conversations
+- Added a richer Zustand conversation store that tracks message hydration, live stream events, tool-call state, approvals, token usage, and Godot runtime status
+- Added chat UI components for conversation lists, project context, header selectors, markdown-rendered messages, tool-call cards, and a composer with abort support
+- Added an approval modal wired to the existing `approvals.decide` router and `MessagePort` event flow
+- Added markdown rendering dependencies: `react-markdown`, `remark-gfm`, `rehype-sanitize`, and `rehype-highlight`
+- Verified `pnpm --filter @agent-harness/studio run typecheck`, `test`, and `build`
 
 ## Phase 6: Godot Process Management
 
