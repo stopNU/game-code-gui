@@ -48,6 +48,7 @@
     "autoprefixer": "^10.4.21",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
+    "esbuild": "^0.28.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "*",

@@ -269,7 +269,7 @@ app.whenReady().then(async () => {
   godotManager = new GodotManager(settingsService, (event) => sessionManager?.emitStreamEvent(event));
   sessionManager = new SessionManager(
     browserWindow,
-    join(__dirname, 'agent-process.cjs'),
+    join(__dirname, 'agent-process.mjs'),
     database,
     godotManager,
     settingsService,

@@ -68,7 +68,11 @@
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
       "Bash(find \"D:\\\\dev\\\\game-code-gui\" -name \"package.json\" -type f -exec grep -l \"electron-trpc\\\\|sqlite-vec\\\\|better-sqlite3\" {} \\\\;)",
       "Bash(npm test *)",
-      "Bash(xargs wc *)"
+      "Bash(xargs wc *)",
+      "Bash(node -e \"require\\('esbuild'\\)\")",
+      "Bash(pnpm --filter @agent-harness/studio add -D esbuild)",
+      "Bash(pnpm --filter @agent-harness/studio run dev)",
+      "Bash(node -e ' *)"
     ]
   }
 }
