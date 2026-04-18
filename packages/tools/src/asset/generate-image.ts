@@ -4,7 +4,7 @@ import type { ToolContract, ToolExecutionContext } from '@agent-harness/core';
 import { upsertManifestEntry, generateImageBuffer, generatePlaceholderBuffer } from './manifest-utils.js';
 
 interface GenerateImageInput {
-  /** Unique snake_case key used as the Phaser texture key, e.g. "card_strike" */
+  /** Unique snake_case key used as the asset artKey, e.g. "card_strike" */
   key: string;
   /** What to draw — the subject, not the style */
   prompt: string;
@@ -12,7 +12,7 @@ interface GenerateImageInput {
   styleGuide?: string;
   width?: number;
   height?: number;
-  /** Phaser scene that will load this asset, e.g. "BootScene" */
+  /** Godot scene that will load this asset, e.g. "BootScene" */
   scene?: string;
 }
 
@@ -36,12 +36,12 @@ export const generateImageTool: ToolContract<GenerateImageInput, GenerateImageOu
   inputSchema: {
     type: 'object',
     properties: {
-      key: { type: 'string', description: 'Unique snake_case texture key, e.g. "card_strike"' },
+      key: { type: 'string', description: 'Unique snake_case artKey, e.g. "card_strike"' },
       prompt: { type: 'string', description: 'Subject description — do not include style here' },
       styleGuide: { type: 'string', description: 'Style prefix applied to all assets, e.g. "dark fantasy card art, painterly"' },
       width: { type: 'number', description: 'Pixel width (default 512, use 256 for small icons)' },
       height: { type: 'number', description: 'Pixel height (default 512, use 768 for portrait cards)' },
-      scene: { type: 'string', description: 'Phaser scene that loads this asset (default "BootScene")' },
+      scene: { type: 'string', description: 'Godot scene that loads this asset (default "BootScene")' },
     },
     required: ['key', 'prompt'],
   },

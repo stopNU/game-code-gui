@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { join } from 'path';
+import { dirname, join, resolve } from 'path';
+import { existsSync } from 'fs';
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
 import type { OpenDialogOptions } from 'electron';
 import { autoUpdater } from 'electron-updater';
@@ -21,7 +22,43 @@ type TrpcRequest = {
   type: 'query' | 'mutation' | 'subscription';
 };
 
-const workspaceRoot = process.cwd();
+function looksLikeWorkspaceRoot(candidate: string): boolean {
+  return (
+    existsSync(join(candidate, 'pnpm-workspace.yaml')) &&
+    existsSync(join(candidate, 'apps', 'cli', 'dist', 'commands', 'implement-task.js'))
+  );
+}
+
+function findWorkspaceRoot(start: string): string | null {
+  let current = resolve(start);
+
+  while (true) {
+    if (looksLikeWorkspaceRoot(current)) {
+      return current;
+    }
+
+    const parent = dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+}
+
+function resolveWorkspaceRoot(): string {
+  const candidates = [process.cwd(), app.getAppPath(), __dirname];
+
+  for (const candidate of candidates) {
+    const resolved = findWorkspaceRoot(candidate);
+    if (resolved !== null) {
+      return resolved;
+    }
+  }
+
+  return process.cwd();
+}
+
+const workspaceRoot = resolveWorkspaceRoot();
 const execFileAsync = promisify(execFile);
 
 let browserWindow: BrowserWindow | null = null;

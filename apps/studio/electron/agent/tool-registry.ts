@@ -1,9 +1,7 @@
 import { resolve, isAbsolute } from 'path';
-import { pathToFileURL } from 'url';
-import { existsSync } from 'fs';
 import { preprocessBrief, createAdvancedPlan, type PreprocessedBrief, type TaskPlan, type TaskState, type ToolContract } from '@agent-harness/core';
 import { scaffoldGame } from '@agent-harness/game-adapter';
-import { planGameService } from '@agent-harness/services';
+import { planGameService, runTask } from '@agent-harness/services';
 import { normalizePath } from '../db/normalize-path.js';
 import type { StreamEvent } from '../../shared/protocol.js';
 
@@ -43,41 +41,16 @@ interface StudioToolContext {
   };
 }
 
-interface RunTaskModule {
-  runTask: (
-    projectPath: string,
-    task: TaskState,
-    plan: TaskPlan,
-    onProgress?: (msg: string) => void,
-    mode?: 'simple' | 'advanced',
-    onToolCallDetail?: (call: { name: string; input: Record<string, unknown> }) => void,
-    onAgentMessage?: undefined,
-    onTokens?: (tokens: { input: number; output: number; cached: number }) => void,
-    signal?: AbortSignal,
-    onText?: (delta: string) => void,
-    model?: string,
-    persistPlan?: (plan: TaskPlan) => Promise<void>,
-    onBudgetExhausted?: (used: number, budget: number, filesWritten: number) => Promise<{ action: 'continue' | 'abort'; extraBudget: number }>,
-    reconciliationReportPath?: string,
-  ) => Promise<{
-    success: boolean;
-    summary: string;
-    filesModified: string[];
-    toolCallCount: number;
-    tokensUsed: { input: number; output: number; cached: number };
-  }>;
-}
-
 interface StudioToolDependencies {
   planGameServiceImpl: typeof planGameService;
   scaffoldGameImpl: typeof scaffoldGame;
-  loadRunTaskModuleImpl: (workspaceRoot: string) => Promise<RunTaskModule>;
+  runTaskImpl: typeof runTask;
 }
 
 const defaultToolDependencies: StudioToolDependencies = {
   planGameServiceImpl: planGameService,
   scaffoldGameImpl: scaffoldGame,
-  loadRunTaskModuleImpl: loadRunTaskModule,
+  runTaskImpl: runTask,
 };
 
 function toAbortError(signal: AbortSignal): Error {
@@ -93,15 +66,6 @@ function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) {
     throw toAbortError(signal);
   }
-}
-
-async function loadRunTaskModule(workspaceRoot: string): Promise<RunTaskModule> {
-  const cliDistPath = resolve(workspaceRoot, 'apps/cli/dist/commands/implement-task.js');
-  if (!existsSync(cliDistPath)) {
-    throw new Error('Studio needs the built CLI command for implement_task. Run `pnpm build` first.');
-  }
-
-  return (await import(pathToFileURL(cliDistPath).href)) as RunTaskModule;
 }
 
 export function createStudioTools(dependencies: Partial<StudioToolDependencies> = {}): ToolContract[] {
@@ -312,8 +276,7 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
         throw new Error(`Task ${toolInput.taskId} was not found in project ${toolInput.projectId}.`);
       }
 
-      const { runTask } = await resolvedDependencies.loadRunTaskModuleImpl(ctx.bridge.workspaceRoot);
-      const result = await runTask(
+      const result = await resolvedDependencies.runTaskImpl(
         project.displayPath,
         task,
         plan,

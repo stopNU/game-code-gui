@@ -49,11 +49,11 @@ export const generateBatchTool: ToolContract<GenerateBatchInput, GenerateBatchOu
         items: {
           type: 'object',
           properties: {
-            key: { type: 'string', description: 'Unique snake_case texture key' },
+            key: { type: 'string', description: 'Unique snake_case artKey' },
             prompt: { type: 'string', description: 'Subject description for this specific image' },
             width: { type: 'number', description: 'Pixel width (default 512)' },
             height: { type: 'number', description: 'Pixel height (default 512)' },
-            scene: { type: 'string', description: 'Phaser scene key (default "BootScene")' },
+            scene: { type: 'string', description: 'Godot scene key (default "BootScene")' },
             type: { type: 'string', enum: ['image', 'spritesheet'] },
           },
           required: ['key', 'prompt'],

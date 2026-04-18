@@ -202,19 +202,6 @@ game-harness verify-project -p ./my-game
 - `inspect-scenes` prints compact scene-binding and instantiation status JSON
 - `verify-project` runs the generated-project verification suite and writes a JSON report
 
-### TUI
-
-The CLI also ships with an Ink-based TUI:
-
-```bash
-game-harness tui
-game-harness tui new-game
-game-harness tui new-game --brief "A poisoned cathedral deckbuilder"
-game-harness tui plan-game --brief "..."
-game-harness tui implement-task --project ./my-game --resume
-game-harness tui implement-task --project ./my-game --task <id>
-```
-
 ## Typical workflow
 
 ```bash

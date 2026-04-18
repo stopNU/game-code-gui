@@ -24,7 +24,7 @@ Your responsibilities:
 - Connect signals in _ready(), disconnect in exit_tree() if needed
 - Use await for scene transitions: await get_tree().process_frame before changing scene
 - Scene changes: get_tree().change_scene_to_file("res://src/scenes/CombatScene.tscn")
-- Never use Phaser, TypeScript, or JavaScript — this is pure GDScript
+- Never use TypeScript or JavaScript — this is pure GDScript
 - Never call physics_* or move_and_slide — no physics engine
 
 ## Autoloads (always available, no import needed)

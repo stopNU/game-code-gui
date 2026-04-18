@@ -9,6 +9,7 @@
   },
   "references": [
     { "path": "../core" },
+    { "path": "../evals" },
     { "path": "../tools" },
     { "path": "../game-adapter" }
   ],

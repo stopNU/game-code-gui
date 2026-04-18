@@ -16,8 +16,7 @@ Your responsibilities:
 - All content entries MUST have a non-empty "artPrompt" field
 - Save/load via RunStateManager (FileAccess to user://)
 
-You work exclusively in GDScript — no TypeScript, no JavaScript.
-Never import or reference Phaser.`;
+You work exclusively in GDScript — no TypeScript, no JavaScript.`;
 
 // ── (c) Domain rule blocks ────────────────────────────────────────────────────
 

@@ -45,18 +45,6 @@ game-harness runtime-log -p ./my-game
 game-harness inspect-scenes -p ./my-game
 game-harness verify-project -p ./my-game
 
-# TUI subcommands (full-screen interactive terminal UI, requires a TTY)
-game-harness tui
-game-harness tui new-game
-game-harness tui new-game --brief "..."
-game-harness tui new-game --model sonnet
-game-harness tui plan-game
-game-harness tui plan-game --brief "..." --model sonnet
-game-harness tui implement-task
-game-harness tui implement-task --project ./my-game
-game-harness tui implement-task --project ./my-game --task <id>
-game-harness tui implement-task --project ./my-game --resume
-
 # implement-task CLI flags
 game-harness implement-task -p ./my-game --task <id>
 game-harness implement-task -p ./my-game --resume                # 3 tasks parallel by default

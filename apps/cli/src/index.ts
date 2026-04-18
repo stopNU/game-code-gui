@@ -154,37 +154,6 @@ async function run(fn: () => Promise<void>): Promise<void> {
   }
 }
 
-program
-  .command('tui')
-  .description('Launch the interactive TUI (full-screen terminal UI)')
-  .argument('[command]', 'Command to run in TUI mode: new-game | plan-game | implement-task (prompted if omitted)')
-  .option('-n, --name <name>', 'Game name to use for the default output folder')
-  .option('-b, --brief <text>', 'Game description')
-  .option('--brief-file <path>', 'Path to a markdown file containing the game brief')
-  .option('-o, --output <path>', 'Output directory')
-  .option('--plan-only', 'Plan only — skip implementation')
-  .option('--advanced', 'Use advanced mode')
-  .option('-p, --project <path>', 'Path to game project')
-  .option('-t, --task <id>', 'Task ID from harness/tasks.json')
-  .option('--resume', 'Resume from first non-complete task')
-  .option('--mode <mode>', 'Agent mode: simple | advanced')
-  .option('--model <model>', 'Execution model: sonnet | opus | haiku | codex (or full model ID, prompted if omitted)')
-  .option('--reconciliation-report <path>', 'Optional reconciliation report path relative to the project for later repair-aware work')
-  .action(async (cmd: string | undefined, opts: Record<string, unknown>) => {
-    if (cmd !== undefined && cmd !== 'new-game' && cmd !== 'plan-game' && cmd !== 'implement-task') {
-      console.error(chalk.red(`Unknown TUI command: ${cmd}. Use new-game, plan-game, or implement-task.`));
-      process.exit(1);
-    }
-    // Resolve shorthand model names
-    const rawModel = opts['model'] as string | undefined;
-    if (rawModel) {
-      const resolved = resolveModelId(rawModel);
-      opts = { ...opts, model: resolved };
-    }
-    const { startTui } = await import('./tui/index.js');
-    startTui({ command: (cmd ?? null) as 'new-game' | 'plan-game' | 'implement-task' | null, options: opts });
-  });
-
 program.parse();
 
 function resolveModelId(input: string): string {

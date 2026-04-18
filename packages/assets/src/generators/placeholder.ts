@@ -4,9 +4,7 @@ import type { AssetRequest, AssetGenerationResult } from '../types/asset.js';
 
 /**
  * Generate a PNG placeholder image using sharp (SVG→PNG rasterisation).
- * Produces a colored rectangle with a key label — identical design to the old
- * SVG output but as a proper raster PNG so Phaser pixel-snaps and scales it
- * correctly alongside real sprites.
+ * Produces a colored rectangle with a key label as a raster PNG.
  *
  * For audio: writes a minimal silent WAV (unchanged).
  */

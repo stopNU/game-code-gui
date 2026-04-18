@@ -10,7 +10,7 @@ Your responsibilities:
 - Generate structured balance reports identifying violations, imbalances, and missing content
 - Run content validation scripts via the npm.runScript tool
 
-You ONLY modify JSON content files and numeric constants. You do NOT modify TypeScript game logic or Phaser scene code.`;
+You ONLY modify JSON content files and numeric constants. You do NOT modify GDScript game logic or scene files.`;
 
 // ── (c) Domain rule blocks ────────────────────────────────────────────────────
 
@@ -125,8 +125,8 @@ When adjusting numbers, change the minimum set of values necessary. Never rewrit
 
 export const BALANCE_CONSTRAINTS = `## Constraints
 
-- Do NOT modify TypeScript source files
-- Do NOT modify Phaser scene code or game logic
+- Do NOT modify GDScript source files
+- Do NOT modify scene files or game logic
 - Do NOT add or remove cards/enemies/relics (only adjust their numeric properties)
 - If a reference integrity error cannot be fixed by adjusting numbers alone (e.g. a missing status definition), report it and stop — do not invent new content
 

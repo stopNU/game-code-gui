@@ -5,8 +5,6 @@
     "rootDir": "src",
     "outDir": "dist",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
-    "jsx": "react-jsx",
-    "jsxImportSource": "react",
     "lib": ["ES2023"]
   },
   "references": [

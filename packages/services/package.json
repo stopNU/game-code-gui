@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@agent-harness/core": "workspace:*",
+    "@agent-harness/evals": "workspace:*",
     "@agent-harness/game-adapter": "workspace:*",
     "@agent-harness/tools": "workspace:*"
   },

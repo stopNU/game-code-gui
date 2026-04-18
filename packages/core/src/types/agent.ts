@@ -155,7 +155,7 @@ const ROLE_TEMPERATURE: Partial<Record<AgentRole, number>> = {
 /**
  * Per-role token budgets for the main agent loop.
  *
- * - gameplay: writes full Phaser scenes with boilerplate — needs headroom
+ * - gameplay: writes full Godot scenes with boilerplate — needs headroom
  * - systems: moderate reads + writes, but properly scoped tasks should fit
  * - integration-verifier: reads many files, writes targeted fixes
  * - balance: analysis-heavy, reads telemetry data, iterates

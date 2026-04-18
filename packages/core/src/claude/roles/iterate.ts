@@ -19,7 +19,7 @@ Return a JSON array of task objects. Each object must have EXACTLY these fields 
   - Feature tasks must be prefixed "feat-" (e.g. "feat-double-jump")
 - phase: JSON number — use 90 for bug tasks, 91 for feature tasks
 - role: one of "gameplay" | "asset" | "qa" | "systems" | "designer"
-  - Use "gameplay" for TypeScript/Phaser code changes
+  - Use "gameplay" for GDScript code changes
   - Use "asset" for sprite/audio/visual-only changes
   - Use "qa" for test harness or eval scenario additions
   - Use "systems" only for advanced-mode EventBus/StateMachine/ContentLoader changes
