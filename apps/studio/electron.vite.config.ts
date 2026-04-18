@@ -37,7 +37,7 @@ function buildAgentProcessPlugin(): Plugin {
           ...builtinModules.map((m) => `node:${m}`),
         ],
         banner: {
-          js: `import { createRequire } from 'node:module';\nconst require = createRequire(import.meta.url);`,
+          js: `import { createRequire as __createRequire } from 'node:module';\nconst require = __createRequire(import.meta.url);`,
         },
       });
     },

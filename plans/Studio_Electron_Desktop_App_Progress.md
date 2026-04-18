@@ -206,3 +206,4 @@ This document turns the architecture plan into a working checklist so progress i
 - [ ] Add light theme and frameless window polish
 - [ ] Add cross-provider sub-agents
 - [ ] Add cross-platform packaging
+- [ ] Investigate if we should add CF Agent Memory for each game? https://blog.cloudflare.com/introducing-agent-memory/

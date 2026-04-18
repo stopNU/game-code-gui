@@ -1,9 +1,9 @@
-import { createRequire } from 'module';
+import { createRequire as createNodeRequire } from 'module';
 
-const require = createRequire(import.meta.url);
+const nodeRequire = createNodeRequire(import.meta.url);
 
 function getSafeStorage() {
-  const electronModule = require('electron') as {
+  const electronModule = nodeRequire('electron') as {
     safeStorage: {
       isEncryptionAvailable: () => boolean;
       encryptString: (plainText: string) => Buffer;

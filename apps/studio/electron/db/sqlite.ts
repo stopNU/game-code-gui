@@ -1,11 +1,11 @@
-import { createRequire } from 'module';
+import { createRequire as createNodeRequire } from 'module';
 import type { StatementSync } from 'node:sqlite';
 
-const require = createRequire(import.meta.url);
+const nodeRequire = createNodeRequire(import.meta.url);
 
 type DatabaseConnection = import('node:sqlite').DatabaseSync;
 
-const sqliteModule = require('node:sqlite') as {
+const sqliteModule = nodeRequire('node:sqlite') as {
   DatabaseSync: new (location: string) => DatabaseConnection;
 };
 

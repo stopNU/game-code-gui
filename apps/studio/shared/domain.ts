@@ -52,6 +52,7 @@ export interface SettingsStatus {
   workspaceRoot: string;
   anthropicConfigured: boolean;
   openaiConfigured: boolean;
+  claudeCodeConfigured: boolean;
 }
 
 export interface LangSmithStatus {
