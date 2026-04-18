@@ -12,6 +12,7 @@
   "references": [
     { "path": "../../packages/core" },
     { "path": "../../packages/tools" },
+    { "path": "../../packages/services" },
     { "path": "../../packages/game-adapter" },
     { "path": "../../packages/assets" },
     { "path": "../../packages/playtest" },

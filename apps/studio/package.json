@@ -4,20 +4,44 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package:win": "electron-vite build && electron-builder --win",
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "doctor": "node ./scripts/doctor.js"
   },
   "dependencies": {
+    "@agent-harness/core": "workspace:*",
+    "@agent-harness/game-adapter": "workspace:*",
+    "@agent-harness/services": "workspace:*",
+    "@tanstack/react-query": "^5.90.3",
+    "@trpc/client": "^11.7.1",
+    "@trpc/react-query": "^11.7.1",
+    "@trpc/server": "^11.7.1",
+    "clsx": "^2.1.1",
+    "electron": "^41.0.0",
+    "lucide-react": "^0.542.0",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^4.1.8",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.21",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
     "typescript": "*",
-    "vite": "^5.4.0"
+    "vite": "^5.4.0",
+    "vitest": "*"
   }
 }

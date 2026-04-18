@@ -1,14 +1,13 @@
-import { resolve } from 'path';
-import prompts from 'prompts';
-import { preprocessBrief, createAdvancedPlan, ClaudeClient } from '@agent-harness/core';
-import type { TaskPlan, PreprocessedBrief } from '@agent-harness/core';
-import { scaffoldGame } from '@agent-harness/game-adapter';
-import { installDeps } from '@agent-harness/tools';
-import { loadHarnessConfig } from '../utils/config-loader.js';
-import { spinner, c, printSection } from '../utils/output.js';
-import { resolveProjectOutputPath } from '../utils/project-name.js';
 import { readFile } from 'fs/promises';
+import { resolve } from 'path';
+import type { TaskPlan } from '@agent-harness/core';
+import type { PlanGameStage } from '@agent-harness/services';
+import { planGameService } from '@agent-harness/services';
 import chalk from 'chalk';
+import prompts from 'prompts';
+import { loadHarnessConfig } from '../utils/config-loader.js';
+import { c, printSection, spinner } from '../utils/output.js';
+import { resolveProjectOutputPath } from '../utils/project-name.js';
 
 export interface PlanGameOptions {
   name?: string;
@@ -23,7 +22,6 @@ export async function planGame(opts: PlanGameOptions): Promise<void> {
 
   let gameName = opts.name?.trim();
 
-  // 1. Get brief
   let brief: string | undefined;
   let briefFromFlag = false;
 
@@ -39,7 +37,7 @@ export async function planGame(opts: PlanGameOptions): Promise<void> {
       type: 'text',
       name: 'brief',
       message: 'Describe your game:',
-      validate: (v: string) => (v.length > 10 ? true : 'Please provide more detail'),
+      validate: (value: string) => (value.length > 10 ? true : 'Please provide more detail'),
     });
     brief = response.brief as string;
     if (!brief) {
@@ -53,7 +51,7 @@ export async function planGame(opts: PlanGameOptions): Promise<void> {
       type: 'text',
       name: 'gameName',
       message: 'Game name:',
-      validate: (v: string) => (v.trim().length > 0 ? true : 'Please enter a game name'),
+      validate: (value: string) => (value.trim().length > 0 ? true : 'Please enter a game name'),
     });
     gameName = (response.gameName as string | undefined)?.trim();
     if (!gameName) {
@@ -62,7 +60,6 @@ export async function planGame(opts: PlanGameOptions): Promise<void> {
     }
   }
 
-  // 1b. Clarifying questions — only when brief is short/vague and not pre-supplied
   if (!briefFromFlag && brief.length < 120) {
     console.log(c.info('A few quick questions to sharpen the plan (press Enter to skip any):'));
     const clarify = await prompts([
@@ -94,56 +91,72 @@ export async function planGame(opts: PlanGameOptions): Promise<void> {
     }
   }
 
-  // 2. Determine output path
   const outputPath = resolveProjectOutputPath(opts.output, gameName ?? 'game');
 
-  // 3. Plan
   printSection('Creating game plan');
   const planSpinner = spinner(
     `Asking Designer agent to plan "${brief.slice(0, 60)}${brief.length > 60 ? '...' : ''}"...`,
   );
 
   let plan: TaskPlan;
-  let preprocessedBrief: PreprocessedBrief | undefined;
-  try {
-    const client = new ClaudeClient();
-    planSpinner.text = 'Preprocessing brief...';
-    const preprocessed = await preprocessBrief(brief, client);
-    preprocessedBrief = preprocessed;
-    planSpinner.text = 'Running planner...';
-    plan = await createAdvancedPlan(preprocessed, client);
-    planSpinner.succeed(`Plan created: "${plan.gameTitle}" (${plan.genre})`);
-  } catch (err) {
-    planSpinner.fail('Planning failed');
-    throw err;
-  }
+  let scaffoldSpinner: ReturnType<typeof spinner> | undefined;
+  let installSpinner: ReturnType<typeof spinner> | undefined;
+  let planningCompleted = false;
+  let installDepsFailed = false;
 
-  // 4. Scaffold
-  printSection('Scaffolding project');
-  const scaffoldSpinner = spinner('Creating Godot project structure...');
   try {
-    await scaffoldGame({
+    plan = await planGameService({
+      brief,
       outputPath,
-      plan,
-      ...(preprocessedBrief !== undefined ? { preprocessedBrief } : {}),
+      onStageChange: (stage: PlanGameStage) => {
+        if (stage === 'preprocessing') {
+          planSpinner.text = 'Preprocessing brief...';
+          return;
+        }
+
+        if (stage === 'planning') {
+          planSpinner.text = 'Running planner...';
+          return;
+        }
+
+        if (stage === 'scaffolding') {
+          planSpinner.succeed('Plan created');
+          planningCompleted = true;
+          printSection('Scaffolding project');
+          scaffoldSpinner = spinner('Creating Godot project structure...');
+          return;
+        }
+
+        if (stage === 'installing-deps') {
+          scaffoldSpinner?.succeed(`Project created at ${c.path(outputPath)}`);
+          installSpinner = spinner('Installing dependencies...');
+        }
+      },
+      onInstallDepsError: (error: unknown) => {
+        installDepsFailed = true;
+        installSpinner?.fail('npm install failed - run manually');
+        console.error(c.warn(String(error)));
+      },
     });
-    scaffoldSpinner.succeed(`Project created at ${c.path(outputPath)}`);
-  } catch (err) {
-    scaffoldSpinner.fail('Scaffold failed');
-    throw err;
+  } catch (error) {
+    if (installSpinner !== undefined) {
+      installSpinner.fail('Installing dependencies failed');
+    } else if (scaffoldSpinner !== undefined) {
+      scaffoldSpinner.fail('Scaffold failed');
+    } else {
+      planSpinner.fail('Planning failed');
+    }
+    throw error;
   }
 
-  // 5. Install deps
-  const installSpinner = spinner('Installing dependencies...');
-  try {
-    await installDeps(outputPath);
+  if (!planningCompleted) {
+    planSpinner.succeed(`Plan created: "${plan.gameTitle}" (${plan.genre})`);
+  }
+
+  if (installSpinner !== undefined && !installDepsFailed) {
     installSpinner.succeed('Dependencies installed');
-  } catch (err) {
-    installSpinner.fail('npm install failed — run manually');
-    console.error(c.warn(String(err)));
   }
 
-  // 6. Print rich plan summary
   printSection('Implementation Plan');
 
   console.log(chalk.bold.white(`  ${plan.gameTitle}`));
@@ -165,7 +178,7 @@ export async function planGame(opts: PlanGameOptions): Promise<void> {
     console.log();
   }
 
-  const totalTasks = plan.phases.reduce((n, p) => n + p.tasks.length, 0);
+  const totalTasks = plan.phases.reduce((count, phase) => count + phase.tasks.length, 0);
 
   for (const phase of [...plan.phases].sort((a, b) => a.phase - b.phase)) {
     const phaseLabel = (phase as { description?: string }).description ?? '';
@@ -177,7 +190,7 @@ export async function planGame(opts: PlanGameOptions): Promise<void> {
       const roleTag = chalk.dim(`[${task.role}]`);
       const depInfo =
         task.dependencies.length > 0
-          ? chalk.dim(` ← ${task.dependencies.join(', ')}`)
+          ? chalk.dim(` <- ${task.dependencies.join(', ')}`)
           : '';
       console.log(`    ${chalk.dim('·')} ${chalk.white(task.id)}: ${task.title} ${roleTag}${depInfo}`);
     }
@@ -186,7 +199,6 @@ export async function planGame(opts: PlanGameOptions): Promise<void> {
 
   console.log(chalk.dim(`  Total: ${totalTasks} tasks across ${plan.phases.length} phases`));
 
-  // 7. Next-step instructions
   printSection('Next Steps');
   console.log(c.info(`Project: ${c.path(outputPath)}`));
   console.log();

@@ -141,6 +141,14 @@ export async function planIteration(
   description: string,
   opts?: PlanIterationOptions,
 ): Promise<TaskState[]> {
+  const requestedModel = opts?.model ?? DEFAULT_MODEL;
+  const provider = getModelProvider(requestedModel);
+  if (provider !== 'anthropic') {
+    throw new Error(
+      `planIteration only supports Anthropic models right now. Received "${requestedModel}" from provider "${provider}".`,
+    );
+  }
+
   const client = new ClaudeClient();
 
   // Load the existing plan for game context
@@ -179,13 +187,8 @@ Request: ${description}
 
 Return ONLY the JSON array of tasks.`.trim();
 
-  // Never forward a non-Anthropic model to ClaudeClient — fall back to default.
-  const rawModel = opts?.model;
-  const resolvedModel =
-    rawModel && getModelProvider(rawModel) === 'anthropic' ? rawModel : DEFAULT_MODEL;
-
   const result = await client.sendMessage({
-    model: resolvedModel,
+    model: requestedModel,
     maxTokens: 4096,
     temperature: 0.3,
     systemPrompt: ITERATION_PLANNER_SYSTEM_PROMPT,

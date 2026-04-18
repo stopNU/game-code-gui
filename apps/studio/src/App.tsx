@@ -1,67 +1,35 @@
-import { useState } from 'react';
-import { TasksPage } from './pages/TasksPage.js';
-import { EvalReportsPage } from './pages/EvalReportsPage.js';
-import { ScreenshotsPage } from './pages/ScreenshotsPage.js';
+import { LeftPanel } from '@renderer/components/layout/left-panel';
+import { CenterPanel } from '@renderer/components/layout/center-panel';
+import { RightPanel } from '@renderer/components/layout/right-panel';
+import { useConversationStream } from '@renderer/hooks/useConversationStream';
 
-type Page = 'tasks' | 'evals' | 'screenshots';
-
-export function App() {
-  const [page, setPage] = useState<Page>('tasks');
+export function App(): JSX.Element {
+  useConversationStream();
 
   return (
-    <div style={{ display: 'flex', height: '100vh' }}>
-      <nav style={navStyle}>
-        <div style={logoStyle}>🎮 Harness Studio</div>
-        <NavItem active={page === 'tasks'} onClick={() => setPage('tasks')} label="Tasks" />
-        <NavItem active={page === 'evals'} onClick={() => setPage('evals')} label="Eval Reports" />
-        <NavItem active={page === 'screenshots'} onClick={() => setPage('screenshots')} label="Screenshots" />
-      </nav>
-      <main style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
-        {page === 'tasks' && <TasksPage />}
-        {page === 'evals' && <EvalReportsPage />}
-        {page === 'screenshots' && <ScreenshotsPage />}
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(43,144,217,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(24,214,164,0.12),transparent_22%)]" />
+      <div className="absolute inset-0 bg-grid bg-[size:48px_48px] opacity-20" />
+      <main className="relative mx-auto flex min-h-screen max-w-[1800px] flex-col gap-5 p-4 lg:p-6">
+        <header className="rounded-[28px] border border-border bg-card/80 px-6 py-5 shadow-glow">
+          <p className="text-xs uppercase tracking-[0.32em] text-primary">Desktop Studio</p>
+          <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold text-foreground">Electron shell for the agent harness</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                Phase 2 wires the studio shell onto SQLite-backed projects, conversations, approvals, and encrypted
+                settings while keeping the IPC streaming loop in place for the agent layer.
+              </p>
+            </div>
+          </div>
+        </header>
+
+        <section className="grid flex-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
+          <LeftPanel />
+          <CenterPanel />
+          <RightPanel />
+        </section>
       </main>
     </div>
   );
 }
-
-function NavItem({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'block',
-        width: '100%',
-        padding: '10px 16px',
-        background: active ? '#1e2a3a' : 'transparent',
-        color: active ? '#64d8ff' : '#a0a8b8',
-        border: 'none',
-        borderLeft: active ? '3px solid #64d8ff' : '3px solid transparent',
-        cursor: 'pointer',
-        textAlign: 'left',
-        fontSize: '14px',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-const navStyle: React.CSSProperties = {
-  width: '200px',
-  background: '#111118',
-  borderRight: '1px solid #1e2030',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '4px',
-  paddingTop: '16px',
-};
-
-const logoStyle: React.CSSProperties = {
-  padding: '8px 16px 16px',
-  fontSize: '16px',
-  fontWeight: 'bold',
-  color: '#e8e8f0',
-  borderBottom: '1px solid #1e2030',
-  marginBottom: '8px',
-};

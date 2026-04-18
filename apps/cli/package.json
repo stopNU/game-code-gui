@@ -18,6 +18,7 @@
     "@agent-harness/evals": "workspace:*",
     "@agent-harness/game-adapter": "workspace:*",
     "@agent-harness/playtest": "workspace:*",
+    "@agent-harness/services": "workspace:*",
     "@agent-harness/tools": "workspace:*",
     "chalk": "^5.3.0",
     "glob": "^11.0.0",

@@ -1,0 +1,408 @@
+import { randomUUID } from 'crypto';
+import type { ChildProcessWithoutNullStreams } from 'child_process';
+import type { ClaudeContentBlock, ClaudeMessage, ToolContract } from '@agent-harness/core';
+import { buildConversationAgentPrompt } from './conversation-agent-prompt.js';
+import { ApprovalGate, type ToolRiskLevel } from './approval-gate.js';
+import { AnthropicProvider, OpenAIProvider, type LLMProvider } from './llm-provider.js';
+import { buildToolExecutionContext, createStudioTools, summarizeToolResult } from './tool-registry.js';
+import type { StreamEvent } from '../../shared/protocol.js';
+
+interface DbMessageRecord {
+  id: string;
+  conversationId: string;
+  seq: number;
+  role: 'user' | 'assistant' | 'system' | 'error';
+  contentBlocks: unknown[];
+  createdAt: string;
+}
+
+interface ConversationAgentBridge {
+  workspaceRoot: string;
+  emit(event: StreamEvent): void;
+  ensureConversation(args: {
+    conversationId: string;
+    projectId?: string;
+    title: string;
+    model: string;
+    provider: 'anthropic' | 'openai';
+  }): Promise<{ id: string; projectId: string | null; title: string; model?: string; provider: 'anthropic' | 'openai' }>;
+  listMessages(conversationId: string): Promise<DbMessageRecord[]>;
+  createMessage(args: {
+    conversationId: string;
+    role: 'user' | 'assistant' | 'system' | 'error';
+    contentBlocks: unknown[];
+  }): Promise<DbMessageRecord>;
+  addConversationTokens(args: {
+    conversationId: string;
+    inputTokens: number;
+    outputTokens: number;
+    cachedTokens: number;
+  }): Promise<void>;
+  getProject(projectId: string): Promise<{ id: string; normalizedPath: string; displayPath: string; title: string | null } | null>;
+  getTaskPlan(projectId: string): Promise<{ projectId: string; planJson: string; updatedAt: number } | null>;
+  upsertProject(args: { normalizedPath: string; displayPath: string; title?: string | null }): Promise<{ id: string; displayPath: string; title: string | null }>;
+  upsertTaskPlan(args: { projectId: string; planJson: string }): Promise<void>;
+  getApiKey(provider: 'anthropic' | 'openai'): Promise<string | null>;
+  createApproval(args: {
+    conversationId: string;
+    toolCallId: string;
+    toolName: string;
+    args: unknown;
+    argsHash: string;
+    projectId?: string | null;
+    riskLevel: ToolRiskLevel;
+    rationale: string;
+  }): Promise<{ id: string; status: 'pending' | 'approved' | 'denied' | 'timeout' | 'aborted' }>;
+  findApprovalDecision(args: {
+    conversationId: string;
+    toolName: string;
+    argsHash: string;
+    projectId?: string | null;
+  }): Promise<{ id: string; status: 'pending' | 'approved' | 'denied' | 'timeout' | 'aborted' } | null>;
+  resolveApproval(args: {
+    approvalId: string;
+    status: 'approved' | 'denied' | 'timeout' | 'aborted';
+    scope?: 'once' | 'conversation' | 'project';
+  }): Promise<void>;
+}
+
+function toClaudeMessage(record: DbMessageRecord): ClaudeMessage {
+  const contentBlocks = record.contentBlocks as ClaudeContentBlock[];
+  return {
+    role: record.role === 'error' || record.role === 'system' ? 'assistant' : record.role,
+    content: contentBlocks,
+  };
+}
+
+function truncateToolResultBlocks(blocks: ClaudeContentBlock[]): ClaudeContentBlock[] {
+  return blocks.map((block) => {
+    if (block.type !== 'tool_result' || typeof block.content !== 'string' || block.content.length <= 8_000) {
+      return block;
+    }
+
+    return {
+      ...block,
+      content: `${block.content.slice(0, 8_000)}\n[truncated - full result stored in the database]`,
+    };
+  });
+}
+
+function getTextFromContent(content: string | ClaudeContentBlock[]): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  return content
+    .filter((block) => block.type === 'text' && typeof block.text === 'string')
+    .map((block) => block.text)
+    .join('');
+}
+
+function getToolRiskLevel(toolName: string): ToolRiskLevel {
+  if (toolName === 'read_task_plan' || toolName === 'launch_game' || toolName === 'plan_game') {
+    return toolName === 'read_task_plan' ? 'low' : 'medium';
+  }
+
+  return 'high';
+}
+
+export class ConversationAgent {
+  private readonly controllers = new Map<string, AbortController>();
+  private readonly processes = new Set<ChildProcessWithoutNullStreams>();
+  private readonly approvalGate: ApprovalGate;
+  private readonly tools: ToolContract[];
+
+  public constructor(private readonly bridge: ConversationAgentBridge) {
+    this.approvalGate = new ApprovalGate({
+      requestApprovalRecord: (args) => this.bridge.createApproval(args),
+      findReusableDecision: (args) => this.bridge.findApprovalDecision(args),
+      resolveApproval: (args) => this.bridge.resolveApproval(args),
+      emit: (event) => this.bridge.emit(event),
+    });
+    this.tools = createStudioTools(this.processes);
+  }
+
+  public async sendMessage(args: {
+    conversationId: string;
+    userMessage: string;
+    projectId?: string;
+    model: string;
+    provider: 'anthropic' | 'openai';
+    signal: AbortSignal;
+  }): Promise<void> {
+    const providerKey = await this.bridge.getApiKey(args.provider);
+    if (providerKey !== null) {
+      if (args.provider === 'anthropic') {
+        process.env['ANTHROPIC_API_KEY'] = providerKey;
+      } else {
+        process.env['OPENAI_API_KEY'] = providerKey;
+      }
+    }
+
+    const project = args.projectId === undefined ? null : await this.bridge.getProject(args.projectId);
+    await this.bridge.ensureConversation({
+      conversationId: args.conversationId,
+      ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+      title: project?.title ?? 'Studio conversation',
+      model: args.model,
+      provider: args.provider,
+    });
+
+    await this.bridge.createMessage({
+      conversationId: args.conversationId,
+      role: 'user',
+      contentBlocks: [{ type: 'text', text: args.userMessage }],
+    });
+
+    const provider = this.createProvider(args.provider);
+    const startedAt = Date.now();
+    let toolCallCount = 0;
+
+    while (!args.signal.aborted) {
+      if (Date.now() - startedAt > 15 * 60 * 1000) {
+        this.bridge.emit({
+          type: 'cap-exceeded',
+          conversationId: args.conversationId,
+          cap: 'wall-clock',
+        });
+        return;
+      }
+
+      if (toolCallCount > 50) {
+        this.bridge.emit({
+          type: 'cap-exceeded',
+          conversationId: args.conversationId,
+          cap: 'tool-calls',
+        });
+        return;
+      }
+
+      const storedMessages = await this.bridge.listMessages(args.conversationId);
+      const history = storedMessages.map(toClaudeMessage);
+      const messageId = randomUUID();
+      let streamedText = '';
+
+      this.bridge.emit({
+        type: 'message-start',
+        conversationId: args.conversationId,
+        messageId,
+        role: 'assistant',
+        createdAt: new Date().toISOString(),
+      });
+
+      const llmResult = await provider.streamMessage({
+        messages: history.map((message) =>
+          message.role === 'user' ? message : { ...message, content: truncateToolResultBlocks(message.content as ClaudeContentBlock[]) },
+        ),
+        tools: this.tools,
+        system: buildConversationAgentPrompt({
+          project,
+        }),
+        model: args.model,
+        signal: args.signal,
+        onEvent: (event) => {
+          if (event.type === 'text-delta') {
+            streamedText += event.delta;
+            this.bridge.emit({
+              type: 'text-delta',
+              conversationId: args.conversationId,
+              messageId,
+              delta: event.delta,
+            });
+            return;
+          }
+
+          this.bridge.emit({
+            type: 'retrying',
+            conversationId: args.conversationId,
+            attempt: event.attempt,
+            reason: event.reason,
+          });
+        },
+      });
+
+      await this.bridge.addConversationTokens({
+        conversationId: args.conversationId,
+        inputTokens: llmResult.tokens.input,
+        outputTokens: llmResult.tokens.output,
+        cachedTokens: llmResult.tokens.cached,
+      });
+      this.bridge.emit({
+        type: 'tokens',
+        conversationId: args.conversationId,
+        input: llmResult.tokens.input,
+        output: llmResult.tokens.output,
+        cached: llmResult.tokens.cached,
+      });
+
+      await this.bridge.createMessage({
+        conversationId: args.conversationId,
+        role: 'assistant',
+        contentBlocks: llmResult.message.content as unknown[],
+      });
+      this.bridge.emit({
+        type: 'message-complete',
+        conversationId: args.conversationId,
+        messageId,
+        fullText: streamedText.length > 0 ? streamedText : getTextFromContent(llmResult.message.content),
+        completedAt: new Date().toISOString(),
+      });
+
+      const toolBlocks = (llmResult.message.content as ClaudeContentBlock[]).filter((block) => block.type === 'tool_use');
+      if (toolBlocks.length === 0) {
+        this.bridge.emit({
+          type: 'done',
+          conversationId: args.conversationId,
+        });
+        return;
+      }
+
+      for (const block of toolBlocks) {
+        if (block.id === undefined || block.name === undefined || block.input === undefined) {
+          continue;
+        }
+
+        toolCallCount += 1;
+        const tool = this.tools.find((candidate) => candidate.name === block.name);
+        if (tool === undefined) {
+          throw new Error(`Unknown Studio tool "${block.name}".`);
+        }
+
+        this.bridge.emit({
+          type: 'tool-call',
+          conversationId: args.conversationId,
+          toolCallId: block.id,
+          toolName: block.name,
+          input: block.input,
+        });
+
+        const approvalDecision = await this.approvalGate.ensureApproved({
+          conversationId: args.conversationId,
+          toolCallId: block.id,
+          toolName: block.name,
+          input: block.input,
+          ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+          riskLevel: getToolRiskLevel(block.name),
+          rationale: `This tool can modify code, generate a project, or launch external processes.`,
+          signal: args.signal,
+        });
+        if (approvalDecision !== 'approved') {
+          const output = {
+            ok: false,
+            message: `Tool ${block.name} was ${approvalDecision}.`,
+          };
+          await this.bridge.createMessage({
+            conversationId: args.conversationId,
+            role: 'user',
+            contentBlocks: [
+              {
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: JSON.stringify(output),
+              },
+            ],
+          });
+          this.bridge.emit({
+            type: 'tool-result',
+            conversationId: args.conversationId,
+            toolCallId: block.id,
+            success: false,
+            output,
+          });
+          continue;
+        }
+
+        try {
+          const output = await tool.execute(
+            block.input,
+            buildToolExecutionContext({
+              conversationId: args.conversationId,
+              ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+              toolCallId: block.id,
+              signal: args.signal,
+              bridge: {
+                workspaceRoot: this.bridge.workspaceRoot,
+                emit: (event) => this.bridge.emit(event),
+                getProject: (projectId) => this.bridge.getProject(projectId),
+                upsertProject: (toolArgs) => this.bridge.upsertProject(toolArgs),
+                getTaskPlan: (projectId) => this.bridge.getTaskPlan(projectId),
+                upsertTaskPlan: (toolArgs) => this.bridge.upsertTaskPlan(toolArgs),
+                getAnthropicApiKey: () => this.bridge.getApiKey('anthropic'),
+              },
+            }),
+          );
+
+          await this.bridge.createMessage({
+            conversationId: args.conversationId,
+            role: 'user',
+            contentBlocks: [
+              {
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: summarizeToolResult(output),
+              },
+            ],
+          });
+          this.bridge.emit({
+            type: 'tool-result',
+            conversationId: args.conversationId,
+            toolCallId: block.id,
+            success: true,
+            output,
+          });
+        } catch (error) {
+          const output = {
+            ok: false,
+            error: String(error),
+          };
+          await this.bridge.createMessage({
+            conversationId: args.conversationId,
+            role: 'user',
+            contentBlocks: [
+              {
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: summarizeToolResult(output),
+              },
+            ],
+          });
+          this.bridge.emit({
+            type: 'tool-result',
+            conversationId: args.conversationId,
+            toolCallId: block.id,
+            success: false,
+            output,
+          });
+        }
+      }
+    }
+  }
+
+  public abortConversation(conversationId: string): void {
+    this.controllers.get(conversationId)?.abort();
+  }
+
+  public createController(conversationId: string): AbortController {
+    this.controllers.get(conversationId)?.abort();
+    const controller = new AbortController();
+    this.controllers.set(conversationId, controller);
+    return controller;
+  }
+
+  public handleApprovalDecision(message: {
+    approvalId: string;
+    decision: 'approved' | 'denied' | 'timeout' | 'aborted';
+    scope?: 'once' | 'conversation' | 'project';
+  }): void {
+    this.approvalGate.resolveDecision({
+      type: 'approval-decision',
+      approvalId: message.approvalId,
+      decision: message.decision,
+      ...(message.scope !== undefined ? { scope: message.scope } : {}),
+    });
+  }
+
+  private createProvider(provider: 'anthropic' | 'openai'): LLMProvider {
+    return provider === 'anthropic' ? new AnthropicProvider() : new OpenAIProvider();
+  }
+}

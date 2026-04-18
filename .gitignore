@@ -17,6 +17,8 @@ playwright-report/
 
 # Studio build
 apps/studio/dist/
+apps/studio/dist-electron/
+apps/studio/release/
 
 # OS
 .DS_Store

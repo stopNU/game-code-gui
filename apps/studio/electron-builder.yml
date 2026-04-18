@@ -1,0 +1,15 @@
+appId: com.agent-harness.studio
+productName: Harness Studio
+directories:
+  output: release
+files:
+  - dist/**
+  - dist-electron/**
+asar: true
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true

@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": ".",
+    "outDir": "dist-types/renderer",
+    "tsBuildInfoFile": "./dist-types/renderer/.tsbuildinfo",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "types": ["node", "electron"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "baseUrl": ".",
+    "paths": {
+      "@renderer/*": ["src/*"],
+      "@shared/*": ["shared/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "shared/**/*.ts",
+    "electron/preload.ts",
+    "electron/trpc/**/*.ts",
+    "electron/db/**/*.ts",
+    "electron/services/**/*.ts"
+  ]
+}
