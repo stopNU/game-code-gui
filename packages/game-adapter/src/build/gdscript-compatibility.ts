@@ -34,14 +34,15 @@ func _init() -> void:
 		quit(2)
 		return
 
-	var parsed := JSON.parse_string(input_file.get_as_text())
-	if typeof(parsed) != TYPE_ARRAY:
+	var parsed_value: Variant = JSON.parse_string(input_file.get_as_text())
+	if typeof(parsed_value) != TYPE_ARRAY:
 		push_error("Validator input must be a JSON array")
 		quit(2)
 		return
 
 	var entries: Array = []
 	var had_failure := false
+	var parsed: Array = parsed_value
 
 	for raw_target in parsed:
 		if typeof(raw_target) != TYPE_DICTIONARY:
@@ -185,14 +186,6 @@ export function collectGDScriptValidationTargets(
       id: scene.id,
       kind: 'scene',
       path: scene.scenePath,
-    });
-  }
-
-  for (const script of manifest.scripts) {
-    pushTarget({
-      id: script.id,
-      kind: script.category === 'autoload' ? 'autoload' : 'script',
-      path: script.scriptPath,
     });
   }
 

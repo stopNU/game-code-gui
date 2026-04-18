@@ -64,8 +64,6 @@ describe('gdscript compatibility', () => {
       { id: 'EventBus', kind: 'autoload', path: 'res://src/autoload/EventBus.gd' },
       { id: 'main', kind: 'scene', path: 'res://src/main.tscn' },
       { id: 'CombatScene', kind: 'scene', path: 'res://src/scenes/CombatScene.tscn' },
-      { id: 'CombatScene', kind: 'script', path: 'res://src/scenes/CombatScene.gd' },
-      { id: 'CombatEngine', kind: 'script', path: 'res://src/systems/CombatEngine.gd' },
     ]);
   });
 

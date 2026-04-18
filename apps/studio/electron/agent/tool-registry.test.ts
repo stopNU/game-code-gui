@@ -190,9 +190,7 @@ describe('Studio tool contracts', () => {
   });
 
   it('implement_task validates that the requested task exists before invoking runTask', async () => {
-    const loadRunTaskModuleImpl = vi.fn(async () => ({
-      runTask: vi.fn(),
-    }));
+    const runTaskImpl = vi.fn();
     const { bridge } = createBridge({
       getTaskPlan: vi.fn(async () => ({
         projectId: 'project-1',
@@ -201,7 +199,7 @@ describe('Studio tool contracts', () => {
       })),
     });
     const tool = getTool('implement_task', {
-      loadRunTaskModuleImpl,
+      runTaskImpl,
     });
 
     await expect(
@@ -219,7 +217,7 @@ describe('Studio tool contracts', () => {
         }),
       ),
     ).rejects.toThrow('Task task-1 was not found in project project-1.');
-    expect(loadRunTaskModuleImpl).not.toHaveBeenCalled();
+    expect(runTaskImpl).not.toHaveBeenCalled();
   });
 
   it('implement_task invokes runTask, persists updated plans, and emits budget exhaustion events', async () => {
@@ -258,7 +256,7 @@ describe('Studio tool contracts', () => {
     );
     const { bridge, events } = createBridge();
     const tool = getTool('implement_task', {
-      loadRunTaskModuleImpl: vi.fn(async () => ({ runTask })),
+      runTaskImpl: runTask,
     });
 
     const result = await tool.execute(
@@ -301,6 +299,43 @@ describe('Studio tool contracts', () => {
       filesModified: ['src/main.gd'],
       toolCallCount: 2,
       tokensUsed: { input: 12, output: 34, cached: 5 },
+    });
+  });
+
+  it('implement_task returns a failure-first summary when verification fails after writing files', async () => {
+    const runTaskImpl = vi.fn(async () => ({
+      success: false,
+      summary: 'Scaffold files were created. Fix pass: 2 type error(s) remain',
+      filesModified: ['project.godot', 'src/scenes/BootScene.tscn'],
+      toolCallCount: 4,
+      tokensUsed: { input: 100, output: 50, cached: 25 },
+    }));
+    const { bridge } = createBridge();
+    const tool = getTool('implement_task', {
+      runTaskImpl,
+    });
+
+    const result = await tool.execute(
+      {
+        projectId: 'project-1',
+        taskId: 'task-1',
+      },
+      buildToolExecutionContext({
+        conversationId: 'conversation-1',
+        projectId: 'project-1',
+        toolCallId: 'tool-9',
+        signal: new AbortController().signal,
+        bridge: bridge as never,
+      }),
+    );
+
+    expect(result).toEqual({
+      success: false,
+      summary: 'Implementation produced changes, but verification failed. Scaffold files were created. Fix pass: 2 type error(s) remain',
+      failureStage: 'verification',
+      filesModified: ['project.godot', 'src/scenes/BootScene.tscn'],
+      toolCallCount: 4,
+      tokensUsed: { input: 100, output: 50, cached: 25 },
     });
   });
 

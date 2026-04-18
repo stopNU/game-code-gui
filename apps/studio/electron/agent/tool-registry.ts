@@ -53,6 +53,22 @@ const defaultToolDependencies: StudioToolDependencies = {
   runTaskImpl: runTask,
 };
 
+function formatImplementTaskResult(result: Awaited<ReturnType<typeof runTask>>) {
+  if (result.success) {
+    return result;
+  }
+
+  const verificationNote = result.summary.trim().length > 0
+    ? `Implementation produced changes, but verification failed. ${result.summary}`
+    : 'Implementation produced changes, but verification failed.';
+
+  return {
+    ...result,
+    summary: verificationNote,
+    failureStage: 'verification' as const,
+  };
+}
+
 function toAbortError(signal: AbortSignal): Error {
   const reason = signal.reason;
   if (reason instanceof Error) {
@@ -246,6 +262,10 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
       properties: {
         success: { type: 'boolean' },
         summary: { type: 'string' },
+        failureStage: {
+          type: 'string',
+          enum: ['verification'],
+        },
       },
       required: ['success', 'summary'],
     },
@@ -324,7 +344,7 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
         },
       );
 
-      return result;
+      return formatImplementTaskResult(result);
     },
   };
 
