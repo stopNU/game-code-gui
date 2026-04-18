@@ -245,6 +245,7 @@ function extractEventTypes(plan: TaskPlan): string[] {
 // ---------------------------------------------------------------------------
 
 function buildGameSpec(plan: TaskPlan): string {
+  const milestoneScenes = plan.milestoneScenes ?? [];
   return `# ${plan.gameTitle}
 
 ## Brief
@@ -263,7 +264,7 @@ ${plan.controls.map((c) => `- ${c}`).join('\n')}
 ${plan.scenes.map((s) => `- ${s}`).join('\n')}
 
 ## Milestone Scene Acceptance
-${plan.milestoneScenes.map((scene) => {
+${milestoneScenes.length > 0 ? milestoneScenes.map((scene) => {
   const header = `### ${scene.label} (\`${scene.sceneId}\`)`;
   const action = scene.primaryAction !== undefined
     ? `Primary action: ${scene.primaryAction}`
@@ -272,7 +273,7 @@ ${plan.milestoneScenes.map((scene) => {
     .map((criterion) => `- ${criterion.id}: ${criterion.description}`)
     .join('\n');
   return `${header}\n${action}\n${criteria}`;
-}).join('\n\n')}
+}).join('\n\n') : '- No milestone scenes were specified in the provided plan.'}
 
 ## Entities / Systems
 ${plan.entities.map((e) => `- ${e}`).join('\n')}

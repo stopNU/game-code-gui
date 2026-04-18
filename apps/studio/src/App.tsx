@@ -159,11 +159,11 @@ export function App(): JSX.Element {
   const pendingApproval = approvals.find((approval) => approval.status === 'pending') ?? null;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="h-screen overflow-hidden bg-background text-foreground">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(199,102,43,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(28,179,138,0.12),transparent_22%)]" />
       <div className="absolute inset-0 bg-grid bg-[size:48px_48px] opacity-20" />
-      <main className="relative mx-auto flex min-h-screen max-w-[1880px] flex-col gap-5 p-4 lg:p-6">
-        <header className="rounded-[28px] border border-border bg-card/85 px-6 py-5 shadow-glow">
+      <main className="relative mx-auto flex h-full max-w-[1880px] flex-col gap-5 overflow-hidden p-4 lg:p-6">
+        <header className="shrink-0 rounded-[28px] border border-border bg-card/85 px-6 py-5 shadow-glow">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.32em] text-primary">Harness Studio</p>
@@ -196,7 +196,7 @@ export function App(): JSX.Element {
           </div>
         </header>
 
-        <section className="grid flex-1 gap-5 xl:grid-cols-[340px_minmax(0,1fr)_320px]">
+        <section className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[340px_minmax(0,1fr)_320px]">
           <LeftPanel />
           <CenterPanel />
           <RightPanel />
@@ -216,6 +216,7 @@ export function App(): JSX.Element {
             decision,
             ...(decision === 'approved' ? { scope } : {}),
           });
+          await utils.approvals.listPending.invalidate();
         }}
       />
 

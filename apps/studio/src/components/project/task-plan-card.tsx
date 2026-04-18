@@ -150,7 +150,7 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
   };
 
   return (
-    <Card className="flex min-h-0 flex-col p-4">
+    <Card className="flex flex-col p-4">
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
         <ClipboardList className="h-4 w-4 text-primary" />
         Task Plan
@@ -164,7 +164,7 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
         />
       </div>
 
-      <div className="min-h-0 overflow-y-auto rounded-md border border-border">
+      <div className="max-h-[50vh] min-h-48 overflow-y-auto rounded-md border border-border">
         {plan.phases.map((phase) => (
           <PhaseSection
             key={phase.phase}

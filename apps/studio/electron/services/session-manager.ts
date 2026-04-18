@@ -43,6 +43,8 @@ export class SessionManager {
 
   public async start(): Promise<void> {
     this.logger.child({ process: 'main', service: 'session-manager' }).info('Starting studio session manager.');
+    // Abort any approvals left pending from a previous app session
+    this.database.approvals.abortPending();
     this.emitToRenderer({
       type: 'session-state',
       status: 'starting',

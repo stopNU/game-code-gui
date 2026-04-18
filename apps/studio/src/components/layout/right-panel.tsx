@@ -55,7 +55,7 @@ export function RightPanel(): JSX.Element {
   const loadingSummary = settingsQuery.isLoading || langsmithQuery.isLoading || runtimeQuery.isLoading || projectsQuery.isLoading;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto">
       <Card className="p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
           <RadioTower className="h-4 w-4 text-primary" />
