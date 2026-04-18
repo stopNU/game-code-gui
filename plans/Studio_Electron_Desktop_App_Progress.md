@@ -6,8 +6,8 @@ This document turns the architecture plan into a working checklist so progress i
 
 ## Current Status
 
-- Active focus: `Phase 3`
-- Completed so far: `Phase 0`, `Phase 1`, `Phase 2`
+- Active focus: `Phase 5`
+- Completed so far: `Phase 0`, `Phase 1`, `Phase 2`, `Phase 3`, `Phase 4`
 - Deferred by design: `Phase 0.2` until `iterate_project` is scheduled
 
 ## Phase 0: Service Layer Extraction
@@ -69,24 +69,50 @@ This document turns the architecture plan into a working checklist so progress i
 
 ## Phase 3: Conversation Agent and Tooling
 
-- [ ] Add conversation agent running inside `utilityProcess`
-- [ ] Define shared stream protocol for text, tool calls, approvals, errors, tokens, and Godot events
-- [ ] Add tool registry with v1 tools
-- [ ] Implement `scaffold_game` tool
-- [ ] Implement `plan_game` tool using extracted service
-- [ ] Implement `implement_task` tool
-- [ ] Implement `launch_game` tool
-- [ ] Implement `read_task_plan` tool
-- [ ] Add approval gate and approval persistence
-- [ ] Add abort propagation and hard caps
-- [ ] Add studio system prompt
+- [x] Add conversation agent running inside `utilityProcess`
+- [x] Define shared stream protocol for text, tool calls, approvals, errors, tokens, and Godot events
+- [x] Add tool registry with v1 tools
+- [x] Implement `scaffold_game` tool
+- [x] Implement `plan_game` tool using extracted service
+- [x] Implement `implement_task` tool
+- [x] Implement `launch_game` tool
+- [x] Implement `read_task_plan` tool
+- [x] Add approval gate and approval persistence
+- [x] Add abort propagation and hard caps
+- [x] Add studio system prompt
+
+### Notes
+
+- Replaced the Phase 1 deterministic utility-process stub with a real `ConversationAgent` in `apps/studio/electron/agent`
+- Expanded the shared stream protocol in `apps/studio/shared/protocol.ts` to cover tool calls/results, approvals, token updates, retry notices, cap exhaustion, completion, and Godot status/log events
+- Added a main-process DB relay so the utility process can persist conversations, messages, token totals, task plans, approval rows, and API-key lookups without owning the SQLite connection
+- Added a new SQLite migration, `002_approval_scopes.sql`, so approvals can be scoped by `(tool_name, args_hash, project_id)` and reused for conversation/project-level allow decisions
+- Implemented the Phase 3 v1 Studio tools in `apps/studio/electron/agent/tool-registry.ts`: `plan_game`, `scaffold_game`, `implement_task`, `launch_game`, and `read_task_plan`
+- `plan_game` uses the extracted `@agent-harness/services` layer and persists the resulting project/task-plan metadata into Studio's database
+- `implement_task` now loads the built CLI runner, emits progress and token events back into Studio, persists task-plan updates through the DB callback, and surfaces budget exhaustion to the stream
+- Added a Studio-specific system prompt in `conversation-agent-prompt.ts` to steer planning, implementation, task-plan reads, and launch flows
+- Added OpenAI provider support alongside Anthropic in `llm-provider.ts` using the OpenAI Responses API with streaming text deltas and function-call mapping into Studio's existing tool protocol
+- Updated the temporary center-panel chat UI so provider selection is no longer hardcoded to Anthropic; the renderer can now send either `claude-sonnet-4-6` or `gpt-5.4`
+- Verified `pnpm --filter @agent-harness/studio run typecheck`, `test`, and `build`
+- Remaining caveat: Phase 3 is compile/test/build verified, but this progress tracker still assumes a follow-up live smoke test with a real OpenAI key and a real Anthropic key if we want explicit runtime validation across both providers
 
 ## Phase 4: LangSmith Tracing
 
-- [ ] Add passive tracer wrapper
-- [ ] Trace conversation turns
-- [ ] Trace tool invocations
-- [ ] Add LangSmith settings storage and toggles
+- [x] Add passive tracer wrapper
+- [x] Trace conversation turns
+- [x] Trace tool invocations
+- [x] Add LangSmith settings storage and toggles
+
+### Notes
+
+- Added `langsmith@^0.2` to `apps/studio` dependencies
+- Created `electron/agent/langsmith/tracer.ts` — `Tracer` class with `wrapConversationTurn` and `wrapToolCall`; completely no-op when disabled or when API key is absent; LangSmith errors are swallowed with `.catch(() => {})` so tracing never disrupts the agent
+- Created `electron/agent/langsmith/spans.ts` — shared span shape types for v2 extension
+- Added `get-langsmith-config` to the DB relay protocol so the isolated utility process can fetch LangSmith settings from the main-process `SettingsService` at turn start
+- `ConversationAgent.sendMessage` now fetches LangSmith config, instantiates a `Tracer`, wraps the entire turn in `wrapConversationTurn`, calls `recordTokens` after each LLM response, and wraps each `tool.execute` call in `wrapToolCall`
+- `LangSmithStatus` (domain + router) now includes the `enabled` flag alongside `configured`/`endpoint`/`projectName`
+- `session-manager.ts` handles the new `get-langsmith-config` dispatch returning `{ enabled, apiKey, projectName, endpoint }`
+- Verified `pnpm --filter @agent-harness/studio run typecheck` — no errors
 
 ## Phase 5: Chat UI
 

@@ -250,6 +250,9 @@ export type AgentDbRequest =
   | {
       action: 'get-api-key';
       provider: 'anthropic' | 'openai';
+    }
+  | {
+      action: 'get-langsmith-config';
     };
 
 export interface UtilityEnvelopeMessage {

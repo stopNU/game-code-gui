@@ -246,6 +246,8 @@ export class SessionManager {
         return { ok: true };
       case 'get-api-key':
         return this.settingsService.getApiKey(request.provider);
+      case 'get-langsmith-config':
+        return this.settingsService.getLangSmithRuntimeConfig();
       default:
         throw new Error(`Unhandled db request ${(request as { action: string }).action}.`);
     }

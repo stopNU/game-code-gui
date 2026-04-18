@@ -142,6 +142,13 @@ const agent = new ConversationAgent({
       action: 'get-api-key',
       provider,
     }),
+  getLangSmithConfig: async () =>
+    await requestDb<{
+      enabled: boolean;
+      apiKey: string | null;
+      projectName: string;
+      endpoint: string | null;
+    }>({ action: 'get-langsmith-config' }),
   createApproval: async (args) =>
     await requestDb<{
       id: string;

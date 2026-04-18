@@ -89,15 +89,27 @@ export class SettingsService {
     };
   }
 
-  public getLangSmithStatus(): LangSmithStatus {
-    const configured = this.getApiKey('langsmith') !== null;
-    const endpoint = this.get('langsmith.endpoint') ?? process.env.LANGSMITH_ENDPOINT;
-    const projectName = this.get('langsmith.project') ?? process.env.LANGSMITH_PROJECT;
-
+  public getLangSmithRuntimeConfig(): {
+    enabled: boolean;
+    apiKey: string | null;
+    projectName: string;
+    endpoint: string | null;
+  } {
     return {
-      configured,
-      ...(endpoint !== undefined && endpoint !== null ? { endpoint } : {}),
-      ...(projectName !== undefined && projectName !== null ? { projectName } : {}),
+      enabled: this.get('langsmith.enabled') === 'true',
+      apiKey: this.getApiKey('langsmith'),
+      projectName: this.get('langsmith.project') ?? process.env.LANGSMITH_PROJECT ?? 'harness-studio',
+      endpoint: this.get('langsmith.endpoint') ?? process.env.LANGSMITH_ENDPOINT ?? null,
+    };
+  }
+
+  public getLangSmithStatus(): LangSmithStatus {
+    const config = this.getLangSmithRuntimeConfig();
+    return {
+      configured: config.apiKey !== null,
+      enabled: config.enabled,
+      projectName: config.projectName,
+      ...(config.endpoint !== null ? { endpoint: config.endpoint } : {}),
     };
   }
 }

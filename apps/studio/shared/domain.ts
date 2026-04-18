@@ -54,6 +54,7 @@ export interface SettingsStatus {
 
 export interface LangSmithStatus {
   configured: boolean;
+  enabled: boolean;
   endpoint?: string;
   projectName?: string;
 }
