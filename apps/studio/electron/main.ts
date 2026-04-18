@@ -172,10 +172,15 @@ async function invokeTrpc(request: TrpcRequest): Promise<unknown> {
   let target: unknown = caller;
 
   for (const segment of request.path.split('.')) {
-    if (typeof target !== 'object' || target === null || !(segment in target)) {
+    if ((typeof target !== 'object' && typeof target !== 'function') || target === null) {
       throw new Error(`Unknown tRPC path: ${request.path}`);
     }
-    target = (target as Record<string, unknown>)[segment];
+
+    const nextTarget = Reflect.get(target as object, segment);
+    if (nextTarget === undefined) {
+      throw new Error(`Unknown tRPC path: ${request.path}`);
+    }
+    target = nextTarget;
   }
 
   if (typeof target !== 'function') {
