@@ -65,7 +65,8 @@
       "Bash(powershell -Command \"Get-ChildItem 'C:\\\\Users\\\\Michael\\\\Desktop\\\\Godot_v4.6.2-stable_win64.exe' -Recurse | Select-Object FullName, Length\")",
       "Bash(powershell -Command ':*)",
       "Bash(powershell -Command \"Get-ChildItem 'D:\\\\dev\\\\agent-harness\\\\apps\\\\cli\\\\slay-the-cats\\\\src' -Recurse -Filter '*.gd' | Select-Object FullName\")",
-      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(find \"D:\\\\dev\\\\game-code-gui\" -name \"package.json\" -type f -exec grep -l \"electron-trpc\\\\|sqlite-vec\\\\|better-sqlite3\" {} \\\\;)"
     ]
   }
 }
