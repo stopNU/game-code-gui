@@ -31,6 +31,8 @@ export function RightPanel(): JSX.Element {
   );
   const godotStatus = useConversationStore((state) => state.godotStatus);
   const godotLogs = useConversationStore((state) => state.godotLogs);
+  const godotDebuggerEnabled = useConversationStore((state) => state.godotDebuggerEnabled);
+  const setGodotDebuggerEnabled = useConversationStore((state) => state.setGodotDebuggerEnabled);
   const updateStatus = useConversationStore((state) => state.updateStatus);
   const hydrateGodotRuntime = useConversationStore((state) => state.hydrateGodotRuntime);
 
@@ -153,6 +155,8 @@ export function RightPanel(): JSX.Element {
         status={godotStatus}
         launching={launchGodot.isPending}
         stopping={stopGodot.isPending}
+        debuggerEnabled={godotDebuggerEnabled}
+        onDebuggerEnabledChange={setGodotDebuggerEnabled}
         onLaunch={async () => {
           if (selectedProjectId === null) {
             return;
@@ -160,6 +164,7 @@ export function RightPanel(): JSX.Element {
 
           const status = await launchGodot.mutateAsync({
             projectId: selectedProjectId,
+            debuggerEnabled: godotDebuggerEnabled,
           });
           hydrateGodotRuntime({
             status,

@@ -59,6 +59,7 @@ export interface ConversationPreferences {
 interface ConversationStore {
   activeConversationId: string | null;
   selectedProjectId: string | null;
+  godotDebuggerEnabled: boolean;
   messages: Record<string, ConversationMessage[]>;
   toolCalls: Record<string, ToolCallRecord[]>;
   approvals: Record<string, ApprovalRequestRecord[]>;
@@ -86,6 +87,7 @@ interface ConversationStore {
   }>;
   setActiveConversationId: (conversationId: string | null) => void;
   setSelectedProjectId: (projectId: string | null) => void;
+  setGodotDebuggerEnabled: (enabled: boolean) => void;
   registerConversations: (conversations: ConversationSummary[]) => void;
   setTheme: (theme: ThemePreference) => void;
   updateConversationPreferences: (
@@ -115,6 +117,7 @@ interface ConversationStore {
 const DEFAULT_STATE = {
   activeConversationId: null,
   selectedProjectId: null,
+  godotDebuggerEnabled: false,
   messages: {} as Record<string, ConversationMessage[]>,
   toolCalls: {} as Record<string, ToolCallRecord[]>,
   approvals: {} as Record<string, ApprovalRequestRecord[]>,
@@ -186,6 +189,11 @@ export const useConversationStore = create<ConversationStore>((set) => ({
   setSelectedProjectId: (projectId) => {
     set({
       selectedProjectId: projectId,
+    });
+  },
+  setGodotDebuggerEnabled: (enabled) => {
+    set({
+      godotDebuggerEnabled: enabled,
     });
   },
   registerConversations: (conversations) => {

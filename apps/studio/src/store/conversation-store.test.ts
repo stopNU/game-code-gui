@@ -99,6 +99,27 @@ describe('conversation store', () => {
     });
   });
 
+  it('keeps the Godot debugger toggle in session state only', () => {
+    const store = useConversationStore.getState();
+
+    expect(store.godotDebuggerEnabled).toBe(false);
+
+    store.setGodotDebuggerEnabled(true);
+    expect(useConversationStore.getState().godotDebuggerEnabled).toBe(true);
+
+    store.hydrateGodotRuntime({
+      status: {
+        status: 'running',
+        projectPath: 'D:/games/dragon-deck',
+      },
+      logs: [],
+    });
+    expect(useConversationStore.getState().godotDebuggerEnabled).toBe(true);
+
+    store.reset();
+    expect(useConversationStore.getState().godotDebuggerEnabled).toBe(false);
+  });
+
   it('appends notice events as complete system messages', () => {
     const store = useConversationStore.getState();
 

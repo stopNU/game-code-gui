@@ -278,6 +278,7 @@ export class SessionManager {
           projectPath: request.projectPath,
           launchedBy: request.launchedBy,
           ...(request.ownerConversationId !== undefined ? { ownerConversationId: request.ownerConversationId } : {}),
+          ...(request.debuggerEnabled !== undefined ? { debuggerEnabled: request.debuggerEnabled } : {}),
         });
       case 'stop-godot':
         return await this.godotManager.stop({

@@ -2,6 +2,7 @@ import { LoaderCircle, Square, Play } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
 import { Badge } from '@renderer/components/ui/badge';
+import { Input } from '@renderer/components/ui/input';
 
 interface GodotLauncherProps {
   projectName: string | null;
@@ -13,6 +14,8 @@ interface GodotLauncherProps {
   };
   launching: boolean;
   stopping: boolean;
+  debuggerEnabled: boolean;
+  onDebuggerEnabledChange: (enabled: boolean) => void;
   onLaunch: () => Promise<void>;
   onStop: () => Promise<void>;
 }
@@ -23,6 +26,8 @@ export function GodotLauncher({
   status,
   launching,
   stopping,
+  debuggerEnabled,
+  onDebuggerEnabledChange,
   onLaunch,
   onStop,
 }: GodotLauncherProps): JSX.Element {
@@ -43,6 +48,15 @@ export function GodotLauncher({
       {status.exitCode !== undefined ? (
         <div className="mt-2 text-xs text-muted-foreground">Last exit code: {status.exitCode}</div>
       ) : null}
+      <label className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+        <Input
+          type="checkbox"
+          checked={debuggerEnabled}
+          onChange={(event) => onDebuggerEnabledChange(event.target.checked)}
+          className="h-4 w-4 rounded border-border bg-background/70 px-0 py-0"
+        />
+        Start with debugger
+      </label>
       <div className="mt-4 flex items-center gap-2">
         <Button onClick={() => void onLaunch()} disabled={projectPath === null || launching || status.status === 'running'}>
           {launching ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}

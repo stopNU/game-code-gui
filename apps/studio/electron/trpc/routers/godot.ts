@@ -8,6 +8,7 @@ export const godotRouter = router({
     .input(
       z.object({
         projectId: z.string(),
+        debuggerEnabled: z.boolean(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -22,6 +23,7 @@ export const godotRouter = router({
       return await ctx.godotManager.launch({
         projectPath: project.path,
         launchedBy: 'ui',
+        debuggerEnabled: input.debuggerEnabled,
       });
     }),
   stop: publicProcedure.mutation(async ({ ctx }) => await ctx.godotManager.stop({ requester: 'ui', force: true })),

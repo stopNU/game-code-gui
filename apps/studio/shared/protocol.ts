@@ -278,6 +278,7 @@ export type AgentDbRequest =
       projectPath: string;
       launchedBy: 'agent' | 'ui';
       ownerConversationId?: string;
+      debuggerEnabled?: boolean;
     }
   | {
       action: 'stop-godot';

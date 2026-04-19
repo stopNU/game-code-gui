@@ -47,6 +47,7 @@ export class GodotManager {
     projectPath: string;
     launchedBy: 'agent' | 'ui';
     ownerConversationId?: string;
+    debuggerEnabled?: boolean;
   }): Promise<GodotStatus> {
     return await this.enqueue(async () => {
       if (this.child !== null) {
@@ -57,7 +58,8 @@ export class GodotManager {
       this.logs.length = 0;
       this.stopping = false;
 
-      const child = spawn(godotBinary, ['--path', args.projectPath], {
+      const launchArgs = args.debuggerEnabled ? ['-d', '--path', args.projectPath] : ['--path', args.projectPath];
+      const child = spawn(godotBinary, launchArgs, {
         cwd: args.projectPath,
         stdio: 'pipe',
       });
