@@ -36,6 +36,29 @@ export function getDefaultConversationConfig(projectId: string | null): {
   };
 }
 
+export function resolveConversationConfig(
+  projectId: string | null,
+  runtimePreference?: {
+    provider: ConversationProvider;
+    model: string;
+  } | null,
+): {
+  title: string;
+  provider: ConversationProvider;
+  model: string;
+} {
+  const defaultConfig = getDefaultConversationConfig(projectId);
+  if (runtimePreference === null || runtimePreference === undefined) {
+    return defaultConfig;
+  }
+
+  return {
+    title: defaultConfig.title,
+    provider: runtimePreference.provider,
+    model: runtimePreference.model,
+  };
+}
+
 export function getAvailableProviders(canUseOpenAI: boolean): readonly ConversationProvider[] {
   return canUseOpenAI ? ['anthropic', 'openai', 'codex'] : ['anthropic', 'codex'];
 }

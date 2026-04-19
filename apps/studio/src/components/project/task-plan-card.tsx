@@ -6,7 +6,7 @@ import { Card } from '@renderer/components/ui/card';
 import { Skeleton } from '@renderer/components/ui/skeleton';
 import { trpc } from '@renderer/lib/trpc';
 import { useConversationStore } from '@renderer/store/conversation-store';
-import { getDefaultConversationConfig } from '@renderer/lib/conversation-defaults';
+import { resolveConversationConfig } from '@renderer/lib/conversation-defaults';
 import type { TaskPlan, PhasePlan, TaskState, TaskStatus } from '@agent-harness/core';
 
 interface TaskPlanCardProps {
@@ -90,6 +90,10 @@ function PhaseSection({
 export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | null {
   const [runningTaskId, setRunningTaskId] = useState<string | null>(null);
   const utils = trpc.useUtils();
+  const activeConversationId = useConversationStore((state) => state.activeConversationId);
+  const activeConversationPreferences = useConversationStore((state) =>
+    activeConversationId === null ? null : (state.conversationPreferences[activeConversationId] ?? null),
+  );
 
   const planQuery = trpc.projects.getPlan.useQuery({ id: projectId });
   const createConversation = trpc.conversations.create.useMutation({
@@ -129,7 +133,7 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
   const handleRunTask = async (task: TaskState): Promise<void> => {
     setRunningTaskId(task.id);
     try {
-      const config = getDefaultConversationConfig(projectId);
+      const config = resolveConversationConfig(projectId, activeConversationPreferences);
       const conversation = await createConversation.mutateAsync({
         projectId,
         title: `Implement: ${task.title}`,
