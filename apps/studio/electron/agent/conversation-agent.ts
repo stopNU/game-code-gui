@@ -170,8 +170,10 @@ export class ConversationAgent {
   private readonly controllers = new Map<string, AbortController>();
   private readonly approvalGate: ApprovalGate;
   private readonly tools: ToolContract[];
+  private readonly log: (msg: string, err?: unknown) => void;
 
-  public constructor(private readonly bridge: ConversationAgentBridge) {
+  public constructor(private readonly bridge: ConversationAgentBridge, log?: (msg: string, err?: unknown) => void) {
+    this.log = log ?? (() => {});
     this.approvalGate = new ApprovalGate({
       requestApprovalRecord: (args) => this.bridge.createApproval(args),
       findReusableDecision: (args) => this.bridge.findApprovalDecision(args),
@@ -215,27 +217,39 @@ export class ConversationAgent {
       contentBlocks: [{ type: 'text', text: args.userMessage }],
     });
 
-    if (args.provider === 'codex') {
-      await this.runCodexConversation(
-        {
-          conversationId: args.conversationId,
-          userMessage: args.userMessage,
-          ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
-          model: args.model,
-          provider: 'codex',
-          signal: args.signal,
-        },
-        project,
-      );
-      return;
-    }
-
     const langSmithCfg = await this.bridge.getLangSmithConfig();
+    this.log(`[LangSmith] config: enabled=${langSmithCfg.enabled}, hasKey=${langSmithCfg.apiKey !== null}, project=${langSmithCfg.projectName}`);
     const tracerConfig: LangSmithConfig | null =
       langSmithCfg.enabled && langSmithCfg.apiKey !== null
         ? { apiKey: langSmithCfg.apiKey, projectName: langSmithCfg.projectName, endpoint: langSmithCfg.endpoint }
         : null;
-    const tracer = new Tracer(langSmithCfg.enabled, tracerConfig);
+    const tracer = new Tracer(langSmithCfg.enabled, tracerConfig, this.log);
+
+    if (args.provider === 'codex') {
+      await tracer.wrapConversationTurn(
+        {
+          conversationId: args.conversationId,
+          model: args.model,
+          provider: args.provider,
+          userMessage: args.userMessage,
+          systemPrompt: buildConversationAgentPrompt({ project }),
+          history: (await this.bridge.listMessages(args.conversationId)).map(toClaudeMessage),
+        },
+        () =>
+          this.runCodexConversation(
+            {
+              conversationId: args.conversationId,
+              userMessage: args.userMessage,
+              ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+              model: args.model,
+              provider: 'codex',
+              signal: args.signal,
+            },
+            project,
+          ),
+      );
+      return;
+    }
 
     const systemPrompt = buildConversationAgentPrompt({ project });
     const initialMessages = await this.bridge.listMessages(args.conversationId);

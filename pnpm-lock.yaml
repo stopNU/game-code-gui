@@ -123,6 +123,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      dotenv:
+        specifier: ^16.4.0
+        version: 16.6.1
       electron:
         specifier: ^41.0.0
         version: 41.2.1

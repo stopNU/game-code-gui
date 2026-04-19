@@ -19,21 +19,30 @@ export interface TurnMeta {
 export class Tracer {
   private readonly client: Client | null;
   private readonly projectName: string;
+  private readonly log: (msg: string, err?: unknown) => void;
   private activeRunId: string | null = null;
   private turnTokens = { input: 0, output: 0, cached: 0 };
   private turnAborted = false;
   private finalOutput = '';
 
-  constructor(private readonly enabled: boolean, config: LangSmithConfig | null) {
+  constructor(
+    private readonly enabled: boolean,
+    config: LangSmithConfig | null,
+    log?: (msg: string, err?: unknown) => void,
+  ) {
+    this.log = log ?? ((msg, err) => { if (err !== undefined) { console.error(msg, err); } else { console.error(msg); } });
     if (enabled && config !== null) {
       this.client = new Client({
         apiKey: config.apiKey,
+        autoBatchTracing: false,
         ...(config.endpoint !== null ? { apiUrl: config.endpoint } : {}),
       });
       this.projectName = config.projectName;
+      this.log(`[LangSmith] tracer enabled, project="${config.projectName}"`);
     } else {
       this.client = null;
       this.projectName = 'harness-studio';
+      this.log(`[LangSmith] tracer disabled (enabled=${enabled}, hasKey=${config !== null})`);
     }
   }
 
@@ -78,7 +87,7 @@ export class Tracer {
         },
         start_time: Date.now(),
       })
-      .catch(() => {});
+      .catch((e: unknown) => { this.log('[LangSmith] createRun failed', e); });
 
     try {
       await fn();
@@ -92,14 +101,14 @@ export class Tracer {
           },
           end_time: Date.now(),
         })
-        .catch(() => {});
+        .catch((e: unknown) => { this.log('[LangSmith] updateRun failed', e); });
     } catch (err) {
       await this.client
         .updateRun(runId, {
           error: String(err),
           end_time: Date.now(),
         })
-        .catch(() => {});
+        .catch((e: unknown) => { this.log('[LangSmith] updateRun (error) failed', e); });
       throw err;
     } finally {
       this.activeRunId = null;
@@ -122,7 +131,7 @@ export class Tracer {
         inputs: { input },
         start_time: Date.now(),
       })
-      .catch(() => {});
+      .catch((e: unknown) => { this.log('[LangSmith] createRun (tool) failed', e); });
 
     try {
       const result = await fn();
@@ -131,7 +140,7 @@ export class Tracer {
           outputs: { result },
           end_time: Date.now(),
         })
-        .catch(() => {});
+        .catch((e: unknown) => { this.log('[LangSmith] updateRun (tool) failed', e); });
       return result;
     } catch (err) {
       await this.client
@@ -139,7 +148,7 @@ export class Tracer {
           error: String(err),
           end_time: Date.now(),
         })
-        .catch(() => {});
+        .catch((e: unknown) => { this.log('[LangSmith] updateRun (tool error) failed', e); });
       throw err;
     }
   }

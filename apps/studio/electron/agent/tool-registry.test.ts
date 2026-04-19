@@ -370,7 +370,7 @@ describe('Studio tool contracts', () => {
     );
 
     expect(runTaskImpl).toHaveBeenCalledTimes(1);
-    const [, taskArg, planArg] = runTaskImpl.mock.calls[0] as [string, TaskState, TaskPlan];
+    const [, taskArg, planArg] = runTaskImpl.mock.calls[0] as unknown as [string, TaskState, TaskPlan];
     expect(taskArg.acceptanceCriteria).toEqual([]);
     expect(taskArg.dependencies).toEqual([]);
     expect(taskArg.toolsAllowed).toEqual(['project', 'asset']);

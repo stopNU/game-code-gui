@@ -1,7 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { dirname, join, resolve } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
 import type { OpenDialogOptions } from 'electron';
 import { autoUpdater } from 'electron-updater';
@@ -58,7 +58,44 @@ function resolveWorkspaceRoot(): string {
   return process.cwd();
 }
 
+function loadWorkspaceEnvFile(envPath: string): void {
+  const source = readFileSync(envPath, 'utf8');
+
+  for (const rawLine of source.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.startsWith('#')) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf('=');
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    if (key.length === 0 || process.env[key] !== undefined) {
+      continue;
+    }
+
+    let value = line.slice(separatorIndex + 1).trim();
+    if (
+      value.length >= 2
+      && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('\'') && value.endsWith('\'')))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value;
+  }
+}
+
 const workspaceRoot = resolveWorkspaceRoot();
+for (const envFile of ['.env.local', '.env']) {
+  const envPath = join(workspaceRoot, envFile);
+  if (existsSync(envPath)) {
+    loadWorkspaceEnvFile(envPath);
+  }
+}
 const execFileAsync = promisify(execFile);
 
 let browserWindow: BrowserWindow | null = null;

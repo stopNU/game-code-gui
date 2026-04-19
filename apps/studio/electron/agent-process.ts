@@ -232,7 +232,7 @@ const agent = new ConversationAgent({
       ...(args.scope !== undefined ? { scope: args.scope } : {}),
     });
   },
-});
+}, (msg, err) => { if (err !== undefined) { logger.error({ err }, msg); } else { logger.info(msg); } });
 
 process.parentPort?.on('message', (event) => {
   if (event.data?.type !== 'connect') {
