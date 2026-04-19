@@ -29,12 +29,24 @@ export async function runCodexLoop(
 
   await ensureCodexAuth();
 
-  const codex = new Codex();
+  const codex = new Codex({
+    config: {
+      features: {
+        personality: false,
+        multi_agent: false,
+        child_agents_md: false,
+        shell_snapshot: false,
+      },
+    },
+  });
   const thread = codex.startThread({
     model: ctx.config.model,
     workingDirectory: ctx.task.context.projectPath,
     sandboxMode: 'workspace-write',
     approvalPolicy: 'never',
+    modelReasoningEffort: 'medium',
+    webSearchEnabled: false,
+    networkAccessEnabled: false,
   });
 
   let toolCallCount = 0;

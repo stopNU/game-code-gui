@@ -79,7 +79,7 @@ export function CenterPanel(): JSX.Element {
   }, [activeConversationId, hydrateMessages, messagesQuery.data]);
 
   const sending = sendMutation.isPending;
-  const visibleToolCalls = useMemo(() => toolCalls.slice(-6), [toolCalls]);
+  const visibleToolCalls = useMemo(() => toolCalls.slice(-4), [toolCalls]);
 
   const handleSend = async (content: string): Promise<void> => {
     if (activeConversationId === null) {
