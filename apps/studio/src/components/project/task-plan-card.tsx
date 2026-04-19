@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, ClipboardList, Play } from 'lucide-react';
+import { ChevronDown, ChevronRight, ClipboardList, Maximize2, Play, X } from 'lucide-react';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
@@ -119,8 +119,106 @@ function PhaseSection({
   );
 }
 
+function TaskPlanModal({
+  plan,
+  projectId,
+  runningTaskId,
+  onRunTask,
+  onClose,
+}: {
+  plan: TaskPlan;
+  projectId: string;
+  runningTaskId: string | null;
+  onRunTask: (task: TaskState) => Promise<void>;
+  onClose: () => void;
+}): JSX.Element {
+  const allTasks = plan.phases.flatMap((p) => p.tasks);
+  const completeCount = allTasks.filter((t) => getTaskStatus(t) === 'complete').length;
+  const totalCount = allTasks.length;
+  const progressPct = totalCount > 0 ? Math.round((completeCount / totalCount) * 100) : 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="relative flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-border bg-card shadow-glow mx-4">
+        <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
+          <ClipboardList className="h-4 w-4 text-primary" />
+          <span className="flex-1 text-sm font-semibold text-foreground">Task Plan</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{completeCount}/{totalCount} complete</span>
+          <Button variant="ghost" className="h-6 w-6 shrink-0 p-0" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="shrink-0 px-5 py-3">
+          <div className="flex items-center gap-3">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
+            </div>
+            <span className="text-xs tabular-nums text-muted-foreground">{progressPct}%</span>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+          {plan.phases.map((phase) => {
+            const phaseComplete = phase.tasks.filter((t) => getTaskStatus(t) === 'complete').length;
+            const phaseLabel = phase.label ?? `Phase ${phase.phase}`;
+            return (
+              <div key={phase.phase} className="mb-4 last:mb-0">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
+                    Phase {phase.phase}
+                  </span>
+                  <span className="flex-1 text-xs font-medium text-foreground">{phaseLabel}</span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground">
+                    {phaseComplete}/{phase.tasks.length}
+                  </span>
+                </div>
+                <div className="rounded-lg border border-border">
+                  {phase.tasks.map((task, i) => {
+                    const taskLabel = getTaskLabel(task);
+                    const taskStatus = getTaskStatus(task);
+                    return (
+                      <div
+                        key={task.id}
+                        className={`flex items-start gap-3 px-3 py-2.5 ${i < phase.tasks.length - 1 ? 'border-b border-border' : ''}`}
+                      >
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">{taskLabel}</span>
+                          <span className="text-[10px] text-muted-foreground">{task.id}</span>
+                        </div>
+                        <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[taskStatus]}`}>
+                          {taskStatus}
+                        </span>
+                        {RUNNABLE_STATUSES.has(taskStatus) && (
+                          <Button
+                            variant="ghost"
+                            className="mt-0.5 h-5 w-5 shrink-0 p-0"
+                            disabled={runningTaskId !== null}
+                            onClick={() => void onRunTask(task)}
+                            title={`Implement: ${taskLabel}`}
+                          >
+                            <Play className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | null {
   const [runningTaskId, setRunningTaskId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const utils = trpc.useUtils();
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
   const activeConversationPreferences = useConversationStore((state) =>
@@ -210,11 +308,29 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
   };
 
   return (
+    <>
+    {modalOpen && (
+      <TaskPlanModal
+        plan={plan}
+        projectId={projectId}
+        runningTaskId={runningTaskId}
+        onRunTask={handleRunTask}
+        onClose={() => setModalOpen(false)}
+      />
+    )}
     <Card className="flex flex-col p-4">
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
         <ClipboardList className="h-4 w-4 text-primary" />
         Task Plan
         <Badge className="ml-auto">{completeCount}/{totalCount}</Badge>
+        <Button
+          variant="ghost"
+          className="h-5 w-5 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+          onClick={() => setModalOpen(true)}
+          title="Expand task plan"
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+        </Button>
       </div>
 
       <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -236,5 +352,6 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
         ))}
       </div>
     </Card>
+    </>
   );
 }
