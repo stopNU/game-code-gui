@@ -1,6 +1,6 @@
 import { readFile } from 'fs/promises';
 import { join, resolve } from 'path';
-import type { TaskPlan, TaskState } from '@agent-harness/core';
+import { normalizeTaskPlan, type TaskPlan, type TaskState } from '@agent-harness/core';
 import {
   formatTokenBreakdownLines,
   formatTokenCount,
@@ -29,7 +29,10 @@ export async function implementTask(opts: ImplementTaskOptions): Promise<void> {
   const concurrency = Math.max(1, opts.concurrency ?? 3);
 
   if (opts.resume) {
-    const plan: TaskPlan = JSON.parse(await readFile(tasksPath, 'utf8')) as TaskPlan;
+    const plan: TaskPlan = normalizeTaskPlan(
+      JSON.parse(await readFile(tasksPath, 'utf8')),
+      projectPath,
+    );
     const allTasks = plan.phases.flatMap((phase) => phase.tasks);
     const completedBefore = allTasks.filter((task) => task.status === 'complete').length;
     const remaining = allTasks.length - completedBefore;
@@ -75,7 +78,10 @@ export async function implementTask(opts: ImplementTaskOptions): Promise<void> {
     throw new Error('Either --task <id> or --resume is required.');
   }
 
-  const plan: TaskPlan = JSON.parse(await readFile(tasksPath, 'utf8')) as TaskPlan;
+  const plan: TaskPlan = normalizeTaskPlan(
+    JSON.parse(await readFile(tasksPath, 'utf8')),
+    projectPath,
+  );
   let task: TaskState | undefined;
   let phaseIdx = -1;
   let taskIdx = -1;

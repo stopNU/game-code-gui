@@ -637,3 +637,252 @@ export const TaskPlanSchema = z.object({
   contentManifest: z.array(ContentEntrySchema).optional(),
   architecture: ArchitectureContractSchema.optional(),
 });
+
+const VALID_TASK_STATUSES = new Set<TaskStatus>([
+  'pending',
+  'planning',
+  'in-progress',
+  'blocked',
+  'review',
+  'complete',
+  'failed',
+]);
+
+const VALID_AGENT_ROLES = new Set<AgentRole>([
+  'designer',
+  'gameplay',
+  'asset',
+  'qa',
+  'evaluator',
+  'systems',
+  'integration-verifier',
+  'balance',
+]);
+
+const VALID_TOOL_GROUPS = new Set<ToolGroupName>([
+  'project',
+  'code',
+  'asset',
+  'playtest',
+  'eval',
+  'npm',
+  'git',
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function toFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function defaultToolsForRole(role: AgentRole): ToolGroupName[] {
+  switch (role) {
+    case 'asset':
+      return ['project', 'asset'];
+    case 'integration-verifier':
+      return ['project', 'code', 'npm', 'playtest'];
+    case 'qa':
+      return ['project', 'code', 'npm', 'playtest'];
+    case 'evaluator':
+      return ['project', 'eval'];
+    case 'balance':
+      return ['project', 'code', 'npm', 'eval'];
+    case 'designer':
+      return ['project', 'code'];
+    case 'systems':
+    case 'gameplay':
+    default:
+      return ['project', 'code', 'npm'];
+  }
+}
+
+function normalizeTaskContext(
+  rawContext: unknown,
+  projectPath: string,
+): TaskContext {
+  const context = isRecord(rawContext) ? rawContext : {};
+  const canvasWidth = toFiniteNumber(context['canvasWidth']);
+  const canvasHeight = toFiniteNumber(context['canvasHeight']);
+
+  return {
+    projectPath: typeof context['projectPath'] === 'string' ? context['projectPath'] : projectPath,
+    gameSpec: typeof context['gameSpec'] === 'string' ? context['gameSpec'] : '',
+    relevantFiles: toStringArray(context['relevantFiles']),
+    memoryKeys: toStringArray(context['memoryKeys']),
+    dependencySummaries: toStringArray(context['dependencySummaries']),
+    previousTaskSummaries: toStringArray(context['previousTaskSummaries']),
+    ...(canvasWidth !== undefined ? { canvasWidth } : {}),
+    ...(canvasHeight !== undefined ? { canvasHeight } : {}),
+    ...(typeof context['visualStyle'] === 'string' ? { visualStyle: context['visualStyle'] } : {}),
+    ...(Array.isArray(context['scenesNeedingBackgrounds'])
+      ? { scenesNeedingBackgrounds: toStringArray(context['scenesNeedingBackgrounds']) }
+      : {}),
+    ...(Array.isArray(context['plannedEntities'])
+      ? { plannedEntities: toStringArray(context['plannedEntities']) }
+      : {}),
+    ...(Array.isArray(context['plannedAssets'])
+      ? { plannedAssets: toStringArray(context['plannedAssets']) }
+      : {}),
+    ...(typeof context['subsystemId'] === 'string' ? { subsystemId: context['subsystemId'] } : {}),
+    ...(Array.isArray(context['dataSchemaRefs'])
+      ? { dataSchemaRefs: toStringArray(context['dataSchemaRefs']) }
+      : {}),
+    ...(typeof context['architectureNotes'] === 'string'
+      ? { architectureNotes: context['architectureNotes'] }
+      : {}),
+    ...(typeof context['architecturePath'] === 'string'
+      ? { architecturePath: context['architecturePath'] }
+      : {}),
+    ...(isRecord(context['architectureContract'])
+      ? { architectureContract: context['architectureContract'] as unknown as ArchitectureContract }
+      : {}),
+    ...(typeof context['advancedContextPath'] === 'string'
+      ? { advancedContextPath: context['advancedContextPath'] }
+      : {}),
+    ...(isRecord(context['advancedSharedContext'])
+      ? { advancedSharedContext: context['advancedSharedContext'] as unknown as AdvancedSharedContext }
+      : {}),
+    ...(typeof context['gameSpecPath'] === 'string' ? { gameSpecPath: context['gameSpecPath'] } : {}),
+    ...(typeof context['runtimeManifestPath'] === 'string'
+      ? { runtimeManifestPath: context['runtimeManifestPath'] }
+      : {}),
+    ...(isRecord(context['runtimeManifest'])
+      ? { runtimeManifest: context['runtimeManifest'] as unknown as RuntimeFileManifest }
+      : {}),
+    ...(typeof context['reconciliationReportPath'] === 'string'
+      ? { reconciliationReportPath: context['reconciliationReportPath'] }
+      : {}),
+    ...(isRecord(context['reconciliationReport'])
+      ? { reconciliationReport: context['reconciliationReport'] as unknown as RuntimeReconciliationReport }
+      : {}),
+  };
+}
+
+function normalizeTaskResult(rawResult: unknown): TaskResult | undefined {
+  if (!isRecord(rawResult)) {
+    return undefined;
+  }
+
+  const tokensUsed = isRecord(rawResult['tokensUsed']) ? rawResult['tokensUsed'] : undefined;
+  if (
+    typeof rawResult['success'] !== 'boolean'
+    || typeof rawResult['summary'] !== 'string'
+    || !Array.isArray(rawResult['filesModified'])
+    || typeof rawResult['toolCallCount'] !== 'number'
+    || tokensUsed === undefined
+    || typeof tokensUsed['input'] !== 'number'
+    || typeof tokensUsed['output'] !== 'number'
+    || typeof tokensUsed['cached'] !== 'number'
+  ) {
+    return undefined;
+  }
+
+  const result: TaskResult = {
+    success: rawResult['success'],
+    summary: rawResult['summary'],
+    filesModified: toStringArray(rawResult['filesModified']),
+    toolCallCount: rawResult['toolCallCount'],
+    tokensUsed: {
+      input: tokensUsed['input'],
+      output: tokensUsed['output'],
+      cached: tokensUsed['cached'],
+    },
+  };
+
+  return result;
+}
+
+function normalizeTaskState(
+  rawTask: unknown,
+  phase: number,
+  projectPath: string,
+  now: string,
+  index: number,
+): TaskState {
+  const task = isRecord(rawTask) ? rawTask : {};
+  const role = VALID_AGENT_ROLES.has(task['role'] as AgentRole)
+    ? task['role'] as AgentRole
+    : 'gameplay';
+  const toolsAllowed = Array.isArray(task['toolsAllowed'])
+    ? task['toolsAllowed'].filter((tool): tool is ToolGroupName => VALID_TOOL_GROUPS.has(tool as ToolGroupName))
+    : [];
+  const id = typeof task['id'] === 'string' && task['id'].trim().length > 0
+    ? task['id']
+    : `phase-${phase}-task-${index + 1}`;
+  const description = typeof task['description'] === 'string' ? task['description'] : '';
+
+  const result = normalizeTaskResult(task['result']);
+
+  return {
+    id,
+    phase: typeof task['phase'] === 'number' ? task['phase'] : phase,
+    role,
+    status: VALID_TASK_STATUSES.has(task['status'] as TaskStatus)
+      ? task['status'] as TaskStatus
+      : 'pending',
+    title: typeof task['title'] === 'string' && task['title'].trim().length > 0
+      ? task['title']
+      : id,
+    description,
+    brief: typeof task['brief'] === 'string' && task['brief'].trim().length > 0
+      ? task['brief']
+      : description,
+    acceptanceCriteria: toStringArray(task['acceptanceCriteria']),
+    dependencies: toStringArray(task['dependencies']),
+    toolsAllowed: toolsAllowed.length > 0 ? toolsAllowed : defaultToolsForRole(role),
+    retries: typeof task['retries'] === 'number' && Number.isFinite(task['retries']) ? task['retries'] : 0,
+    maxRetries: typeof task['maxRetries'] === 'number' && Number.isFinite(task['maxRetries']) ? task['maxRetries'] : 3,
+    context: normalizeTaskContext(task['context'], projectPath),
+    ...(result !== undefined ? { result } : {}),
+    ...(typeof task['error'] === 'string' ? { error: task['error'] } : {}),
+    createdAt: typeof task['createdAt'] === 'string' ? task['createdAt'] : now,
+    updatedAt: typeof task['updatedAt'] === 'string' ? task['updatedAt'] : now,
+    ...(typeof task['completedAt'] === 'string' ? { completedAt: task['completedAt'] } : {}),
+  };
+}
+
+export function normalizeTaskPlan(rawPlan: unknown, projectPath = ''): TaskPlan {
+  const plan = isRecord(rawPlan) ? rawPlan : {};
+  const now = new Date().toISOString();
+  const phases = Array.isArray(plan['phases']) ? plan['phases'] : [];
+
+  const normalized = TaskPlanSchema.parse({
+    gameTitle: typeof plan['gameTitle'] === 'string' ? plan['gameTitle'] : 'Untitled Game',
+    gameBrief: typeof plan['gameBrief'] === 'string' ? plan['gameBrief'] : '',
+    genre: typeof plan['genre'] === 'string' ? plan['genre'] : 'Deckbuilder roguelike',
+    coreLoop: typeof plan['coreLoop'] === 'string' ? plan['coreLoop'] : '',
+    controls: toStringArray(plan['controls']),
+    scenes: toStringArray(plan['scenes']),
+    milestoneScenes: Array.isArray(plan['milestoneScenes']) ? plan['milestoneScenes'] : [],
+    entities: toStringArray(plan['entities']),
+    assets: toStringArray(plan['assets']),
+    phases: phases.map((rawPhase, phaseIndex) => {
+      const phase = isRecord(rawPhase) ? rawPhase : {};
+      const phaseNumber = typeof phase['phase'] === 'number' ? phase['phase'] : phaseIndex + 1;
+      return {
+        phase: phaseNumber,
+        ...(typeof phase['label'] === 'string' ? { label: phase['label'] } : {}),
+        tasks: (Array.isArray(phase['tasks']) ? phase['tasks'] : []).map((rawTask, taskIndex) =>
+          normalizeTaskState(rawTask, phaseNumber, projectPath, now, taskIndex),
+        ),
+      };
+    }),
+    verificationSteps: Array.isArray(plan['verificationSteps']) ? plan['verificationSteps'] : [],
+    ...(Array.isArray(plan['subsystems']) ? { subsystems: plan['subsystems'] } : {}),
+    ...(Array.isArray(plan['dataSchemas']) ? { dataSchemas: plan['dataSchemas'] } : {}),
+    ...(Array.isArray(plan['contentManifest']) ? { contentManifest: plan['contentManifest'] } : {}),
+    ...(isRecord(plan['architecture']) ? { architecture: plan['architecture'] } : {}),
+  });
+
+  return normalized as unknown as TaskPlan;
+}

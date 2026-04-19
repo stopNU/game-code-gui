@@ -1,6 +1,7 @@
 // Types  (MODELS + ModelId are included via export *)
 export * from './types/agent.js';
 export * from './types/task.js';
+export { normalizeTaskPlan } from './types/task.js';
 export * from './types/tool.js';
 export * from './types/trace.js';
 export * from './types/memory.js';

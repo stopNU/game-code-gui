@@ -51,6 +51,35 @@ function createPlan(taskOverrides: Partial<TaskState> = {}): TaskPlan {
   };
 }
 
+function createLegacyPlan(): Record<string, unknown> {
+  return {
+    gameTitle: 'Legacy Dragon Deck',
+    gameBrief: 'Fight dragons in a legacy deckbuilder.',
+    genre: 'Deckbuilder roguelike',
+    coreLoop: 'Battle dragons, earn rewards, upgrade deck.',
+    controls: ['Mouse'],
+    scenes: ['MainMenu', 'Battle'],
+    entities: ['Player', 'Dragon'],
+    assets: ['Cards'],
+    phases: [
+      {
+        phase: 1,
+        tasks: [
+          {
+            id: 'task-1',
+            phase: 1,
+            role: 'asset',
+            status: 'pending',
+            title: 'Generate assets',
+            description: 'Create placeholder art.',
+            context: {},
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function createBridge(overrides: Record<string, unknown> = {}) {
   const events: unknown[] = [];
   const bridge = {
@@ -307,6 +336,54 @@ describe('Studio tool contracts', () => {
     });
   });
 
+  it('implement_task hydrates legacy plans before invoking runTask', async () => {
+    const runTaskImpl = vi.fn(async (_projectPath: string, task: TaskState) => ({
+      success: true,
+      summary: `Ran ${task.id}`,
+      filesModified: [],
+      toolCallCount: 0,
+      tokensUsed: { input: 0, output: 0, cached: 0 },
+    }));
+    const { bridge } = createBridge({
+      getTaskPlan: vi.fn(async () => ({
+        projectId: 'project-1',
+        planJson: JSON.stringify(createLegacyPlan()),
+        updatedAt: Date.now(),
+      })),
+    });
+    const tool = getTool('implement_task', {
+      runTaskImpl,
+    });
+
+    await tool.execute(
+      {
+        projectId: 'project-1',
+        taskId: 'task-1',
+      },
+      buildToolExecutionContext({
+        conversationId: 'conversation-legacy',
+        projectId: 'project-1',
+        toolCallId: 'tool-legacy',
+        signal: new AbortController().signal,
+        bridge: bridge as never,
+      }),
+    );
+
+    expect(runTaskImpl).toHaveBeenCalledTimes(1);
+    const [, taskArg, planArg] = runTaskImpl.mock.calls[0] as [string, TaskState, TaskPlan];
+    expect(taskArg.acceptanceCriteria).toEqual([]);
+    expect(taskArg.dependencies).toEqual([]);
+    expect(taskArg.toolsAllowed).toEqual(['project', 'asset']);
+    expect(taskArg.context.relevantFiles).toEqual([]);
+    expect(taskArg.context.previousTaskSummaries).toEqual([]);
+    expect(planArg.milestoneScenes).toEqual([]);
+    expect(planArg.verificationSteps).toEqual([]);
+    expect(bridge.upsertTaskPlan).toHaveBeenCalledWith({
+      projectId: 'project-1',
+      planJson: JSON.stringify(planArg),
+    });
+  });
+
   it('implement_task returns a failure-first summary when verification fails after writing files', async () => {
     const runTaskImpl = vi.fn(async () => ({
       success: false,
@@ -386,6 +463,63 @@ describe('Studio tool contracts', () => {
 
     expect(presentResult).toEqual({
       plan: createPlan(),
+    });
+  });
+
+  it('read_task_plan hydrates missing arrays in legacy plans', async () => {
+    const legacyBridge = createBridge({
+      getTaskPlan: vi.fn(async () => ({
+        projectId: 'project-1',
+        planJson: JSON.stringify(createLegacyPlan()),
+        updatedAt: Date.now(),
+      })),
+    }).bridge;
+    const tool = getTool('read_task_plan');
+
+    const result = await tool.execute(
+      {
+        projectId: 'project-1',
+      },
+      buildToolExecutionContext({
+        conversationId: 'conversation-legacy-read',
+        toolCallId: 'tool-legacy-read',
+        signal: new AbortController().signal,
+        bridge: legacyBridge as never,
+      }),
+    );
+
+    expect(result).toEqual({
+      plan: {
+        gameTitle: 'Legacy Dragon Deck',
+        gameBrief: 'Fight dragons in a legacy deckbuilder.',
+        genre: 'Deckbuilder roguelike',
+        coreLoop: 'Battle dragons, earn rewards, upgrade deck.',
+        controls: ['Mouse'],
+        scenes: ['MainMenu', 'Battle'],
+        milestoneScenes: [],
+        entities: ['Player', 'Dragon'],
+        assets: ['Cards'],
+        phases: [
+          {
+            phase: 1,
+            tasks: [
+              expect.objectContaining({
+                id: 'task-1',
+                acceptanceCriteria: [],
+                dependencies: [],
+                toolsAllowed: ['project', 'asset'],
+                context: expect.objectContaining({
+                  relevantFiles: [],
+                  memoryKeys: [],
+                  dependencySummaries: [],
+                  previousTaskSummaries: [],
+                }),
+              }),
+            ],
+          },
+        ],
+        verificationSteps: [],
+      },
     });
   });
 

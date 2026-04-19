@@ -1,5 +1,5 @@
 import { resolve, isAbsolute } from 'path';
-import { preprocessBrief, createAdvancedPlan, type PreprocessedBrief, type TaskPlan, type TaskState, type ToolContract } from '@agent-harness/core';
+import { preprocessBrief, createAdvancedPlan, normalizeTaskPlan, type PreprocessedBrief, type TaskPlan, type TaskState, type ToolContract } from '@agent-harness/core';
 import { scaffoldGame } from '@agent-harness/game-adapter';
 import { planGameService, runTask } from '@agent-harness/services';
 import { normalizePath } from '../db/normalize-path.js';
@@ -250,8 +250,9 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
         };
       }
 
+      const plan = normalizeTaskPlan(planRecord.planJson ? JSON.parse(planRecord.planJson) : null);
       return {
-        plan: JSON.parse(planRecord.planJson) as unknown,
+        plan,
       };
     },
   };
@@ -301,7 +302,11 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
         throw new Error(`Project ${toolInput.projectId} does not have a persisted task plan.`);
       }
 
-      const plan = JSON.parse(taskPlanRecord.planJson) as TaskPlan;
+      const plan = normalizeTaskPlan(JSON.parse(taskPlanRecord.planJson), project.displayPath);
+      await ctx.bridge.upsertTaskPlan({
+        projectId: toolInput.projectId,
+        planJson: JSON.stringify(plan),
+      });
       const task = plan.phases
         .flatMap((phase: TaskPlan['phases'][number]) => phase.tasks)
         .find((candidate: TaskState) => candidate.id === toolInput.taskId);
