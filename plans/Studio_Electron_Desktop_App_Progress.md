@@ -197,6 +197,7 @@ This document turns the architecture plan into a working checklist so progress i
 
 - [ ] Add `run_evals`, `iterate_project`, `generate_assets`, `read_file`, `list_files`, `write_file`, and `bash` tools
 - [ ] Add nested tool-call rendering
+- [ ] Stream intermediary Codex conversation updates separately from the final assistant response instead of concatenating the whole turn into one message
 - [ ] Add budget exhaustion UI choices
 - [ ] Add long-term memory and embeddings
 - [ ] Add full LangSmith sub-agent tracing

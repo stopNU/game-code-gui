@@ -32,6 +32,12 @@ export interface MessageCompleteEvent {
   completedAt: string;
 }
 
+export interface NoticeEvent {
+  type: 'notice';
+  conversationId: string;
+  message: string;
+}
+
 export interface ToolCallEvent {
   type: 'tool-call';
   conversationId: string;
@@ -142,6 +148,7 @@ export type StreamEvent =
   | MessageStartEvent
   | TextDeltaEvent
   | MessageCompleteEvent
+  | NoticeEvent
   | ToolCallEvent
   | ToolResultEvent
   | ToolProgressEvent

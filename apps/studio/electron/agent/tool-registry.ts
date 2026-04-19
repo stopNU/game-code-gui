@@ -69,6 +69,19 @@ function formatImplementTaskResult(result: Awaited<ReturnType<typeof runTask>>) 
   };
 }
 
+function buildImplementTaskNotice(task: TaskState, result: Awaited<ReturnType<typeof runTask>>): string {
+  if (result.success || task.status === 'complete') {
+    return `Task complete: ${task.title}`;
+  }
+
+  const trimmedSummary = result.summary.trim();
+  if (trimmedSummary.length === 0) {
+    return `Task failed: ${task.title}`;
+  }
+
+  return `Task failed: ${task.title}. ${trimmedSummary}`;
+}
+
 function toAbortError(signal: AbortSignal): Error {
   const reason = signal.reason;
   if (reason instanceof Error) {
@@ -343,6 +356,12 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
           };
         },
       );
+
+      ctx.bridge.emit({
+        type: 'notice',
+        conversationId: ctx.conversationId,
+        message: buildImplementTaskNotice(task, result),
+      });
 
       return formatImplementTaskResult(result);
     },

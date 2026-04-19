@@ -122,6 +122,50 @@ function getToolRiskLevel(toolName: string): ToolRiskLevel {
   return 'high';
 }
 
+function getTaskLabelFromUserMessage(userMessage: string): string | null {
+  const match = /implement task\s+([^\s:]+)(?::\s*([^\n\r]+))?/i.exec(userMessage);
+  if (match === null) {
+    return null;
+  }
+
+  const title = match[2]?.trim();
+  if (title !== undefined && title.length > 0) {
+    return title;
+  }
+
+  const taskId = match[1]?.trim();
+  return taskId !== undefined && taskId.length > 0 ? taskId : null;
+}
+
+function truncateNoticeSummary(summary: string, maxLength = 240): string {
+  const trimmed = summary.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, maxLength - 3)}...`;
+}
+
+function buildCodexTaskNotice(args: {
+  userMessage: string;
+  success: boolean;
+  summary: string;
+}): string | null {
+  const taskLabel = getTaskLabelFromUserMessage(args.userMessage);
+  if (taskLabel === null) {
+    return null;
+  }
+
+  if (args.success) {
+    return `Task complete: ${taskLabel}`;
+  }
+
+  const detail = truncateNoticeSummary(args.summary);
+  return detail.length > 0
+    ? `Task failed: ${taskLabel}. ${detail}`
+    : `Task failed: ${taskLabel}`;
+}
+
 export class ConversationAgent {
   private readonly controllers = new Map<string, AbortController>();
   private readonly approvalGate: ApprovalGate;
@@ -531,6 +575,19 @@ export class ConversationAgent {
             ? `Codex completed ${toolCall.name}.`
             : `Codex ended with an error while running ${toolCall.name}.`,
         },
+      });
+    }
+
+    const completionNotice = buildCodexTaskNotice({
+      userMessage: args.userMessage,
+      success: result.success,
+      summary: result.summary,
+    });
+    if (completionNotice !== null) {
+      this.bridge.emit({
+        type: 'notice',
+        conversationId: args.conversationId,
+        message: completionNotice,
       });
     }
 

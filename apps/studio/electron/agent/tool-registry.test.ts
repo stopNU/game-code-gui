@@ -293,6 +293,11 @@ describe('Studio tool contracts', () => {
       output: 34,
       cached: 5,
     });
+    expect(events).toContainEqual({
+      type: 'notice',
+      conversationId: 'conversation-1',
+      message: 'Task complete: Implement combat',
+    });
     expect(result).toEqual({
       success: true,
       summary: 'D:/games/dragon-deck :: task-1 :: Dragon Deck :: claude-sonnet-4-6',
@@ -336,6 +341,11 @@ describe('Studio tool contracts', () => {
       filesModified: ['project.godot', 'src/scenes/BootScene.tscn'],
       toolCallCount: 4,
       tokensUsed: { input: 100, output: 50, cached: 25 },
+    });
+    expect(bridge.emit).toHaveBeenCalledWith({
+      type: 'notice',
+      conversationId: 'conversation-1',
+      message: 'Task failed: Implement combat. Scaffold files were created. Fix pass: 2 type error(s) remain',
     });
   });
 

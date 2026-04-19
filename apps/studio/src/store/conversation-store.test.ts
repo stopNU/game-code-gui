@@ -98,4 +98,21 @@ describe('conversation store', () => {
       message: 'Update ready. Restart to install.',
     });
   });
+
+  it('appends notice events as complete system messages', () => {
+    const store = useConversationStore.getState();
+
+    store.applyEvent({
+      type: 'notice',
+      conversationId: 'c1',
+      message: 'Task complete: Implement combat',
+    });
+
+    const message = useConversationStore.getState().messages.c1?.[0];
+    expect(message).toMatchObject({
+      role: 'system',
+      content: 'Task complete: Implement combat',
+      status: 'complete',
+    });
+  });
 });

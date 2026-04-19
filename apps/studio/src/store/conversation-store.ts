@@ -395,6 +395,10 @@ export const useConversationStore = create<ConversationStore>((set) => ({
         return appendNoticeMessage(state, event.conversationId, `Retry ${event.attempt}: ${event.reason}`);
       }
 
+      if (event.type === 'notice') {
+        return appendNoticeMessage(state, event.conversationId, event.message);
+      }
+
       if (event.type === 'budget-exhausted') {
         return appendNoticeMessage(
           state,
