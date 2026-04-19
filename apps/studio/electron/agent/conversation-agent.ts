@@ -480,7 +480,8 @@ export class ConversationAgent {
         projectPath: project?.displayPath ?? this.bridge.workspaceRoot,
         systemPrompt,
         model: args.model,
-        transcript: buildCodexTranscript(storedMessages),
+        latestUserMessage: args.userMessage,
+        priorHistory: buildCondensedCodexHistory(storedMessages.slice(0, -1)),
       }),
       {
         maxIterations: 1,
@@ -563,8 +564,13 @@ export class ConversationAgent {
   }
 }
 
-function buildCodexTranscript(messages: DbMessageRecord[]): string {
-  return messages
+function buildCondensedCodexHistory(messages: DbMessageRecord[], limit = 6): string {
+  const tail = messages.slice(-limit);
+  if (tail.length === 0) {
+    return '';
+  }
+
+  return tail
     .map((message) => {
       const content = extractTranscriptContent(message.contentBlocks as ClaudeContentBlock[]);
       const label = message.role === 'assistant' || message.role === 'system' || message.role === 'error' ? 'Assistant' : 'User';
@@ -595,7 +601,8 @@ function buildCodexAgentContext(args: {
   projectPath: string;
   systemPrompt: string;
   model: string;
-  transcript: string;
+  latestUserMessage: string;
+  priorHistory: string;
 }): AgentContext {
   const task: TaskState = {
     id: `studio-${args.conversationId}`,
@@ -606,11 +613,8 @@ function buildCodexAgentContext(args: {
     description: [
       'Continue this Harness Studio conversation.',
       'Respect prior context, make workspace changes when needed, and answer the latest user request directly.',
-      '',
-      'Conversation transcript:',
-      args.transcript,
     ].join('\n'),
-    brief: args.transcript,
+    brief: args.latestUserMessage,
     acceptanceCriteria: [
       'Respond to the latest user request.',
       'Carry forward relevant prior conversation context.',
@@ -622,7 +626,10 @@ function buildCodexAgentContext(args: {
     maxRetries: 0,
     context: {
       projectPath: args.projectPath,
-      gameSpec: '',
+      gameSpec:
+        args.priorHistory.trim().length > 0
+          ? ['Recent conversation history:', args.priorHistory].join('\n\n')
+          : '',
       relevantFiles: [],
       memoryKeys: [],
       dependencySummaries: [],

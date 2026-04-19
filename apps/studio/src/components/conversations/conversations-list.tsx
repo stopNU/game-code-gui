@@ -1,4 +1,4 @@
-import { MessageCircleMore, Sparkles, Trash2 } from 'lucide-react';
+import { MessageCircleMore, Plus, Sparkles, Trash2 } from 'lucide-react';
 import type { ConversationSummary } from '@shared/domain';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
@@ -11,8 +11,10 @@ interface ConversationsListProps {
   activeConversationId: string | null;
   loading?: boolean;
   deletingConversationId?: string | null;
+  creatingConversation?: boolean;
   onSelect: (conversationId: string) => void;
   onDelete: (conversation: ConversationSummary) => void;
+  onNew: () => void;
 }
 
 export function ConversationsList({
@@ -20,14 +22,25 @@ export function ConversationsList({
   activeConversationId,
   loading,
   deletingConversationId,
+  creatingConversation,
   onSelect,
   onDelete,
+  onNew,
 }: ConversationsListProps): JSX.Element {
   return (
     <Card className="flex min-h-0 flex-1 flex-col p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
         <MessageCircleMore className="h-4 w-4 text-primary" />
-        Conversations
+        <span className="flex-1">Conversations</span>
+        <Button
+          variant="ghost"
+          className="h-6 w-6 rounded-full p-0"
+          onClick={onNew}
+          disabled={creatingConversation}
+          aria-label="New conversation"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
         {loading ? (

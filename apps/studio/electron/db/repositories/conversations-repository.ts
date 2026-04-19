@@ -83,6 +83,7 @@ export class ConversationsRepository {
   private readonly nextSeqStatement: StatementSync;
   private readonly insertMessageStatement: StatementSync;
   private readonly touchStatement: StatementSync;
+  private readonly setProjectStatement: StatementSync;
 
   public constructor(private readonly db: DatabaseConnection) {
     this.listAllStatement = db.prepare('SELECT * FROM conversations ORDER BY updated_at DESC');
@@ -119,6 +120,7 @@ export class ConversationsRepository {
       `,
     );
     this.touchStatement = db.prepare('UPDATE conversations SET updated_at = @updatedAt WHERE id = @id');
+    this.setProjectStatement = db.prepare('UPDATE conversations SET project_id = @projectId WHERE id = @id');
   }
 
   public list(projectId?: string): ConversationRecord[] {
@@ -189,6 +191,11 @@ export class ConversationsRepository {
 
   public delete(id: string): void {
     this.deleteStatement.run(id);
+  }
+
+  public setProject(id: string, projectId: string | null): ConversationRecord | null {
+    this.setProjectStatement.run({ id, projectId });
+    return this.getById(id);
   }
 
   public rename(id: string, title: string): ConversationRecord | null {

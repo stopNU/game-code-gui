@@ -80,6 +80,28 @@ export const conversationsRouter = router({
       ctx.database.conversations.delete(input.id);
       return { deleted: true };
     }),
+  setProject: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        projectId: z.string().nullable(),
+      }),
+    )
+    .mutation(({ ctx, input }) => {
+      const conversation = ctx.database.conversations.setProject(input.id, input.projectId);
+      if (conversation === null) {
+        return null;
+      }
+      return {
+        id: conversation.id,
+        projectId: conversation.projectId,
+        title: conversation.title,
+        ...(conversation.model !== null ? { model: conversation.model } : {}),
+        provider: conversation.provider,
+        archived: conversation.archived,
+        updatedAt: new Date(conversation.updatedAt).toISOString(),
+      };
+    }),
   rename: publicProcedure
     .input(
       z.object({

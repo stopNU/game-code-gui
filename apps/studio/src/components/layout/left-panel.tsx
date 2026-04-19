@@ -5,7 +5,6 @@ import { getDefaultConversationConfig } from '@renderer/lib/conversation-default
 import { useConversationStore } from '@renderer/store/conversation-store';
 import { ConversationsList } from '@renderer/components/conversations/conversations-list';
 import { DeleteConversationDialog } from '@renderer/components/conversations/delete-conversation-dialog';
-import { NewConversationButton } from '@renderer/components/conversations/new-conversation-button';
 import { ProjectList } from '@renderer/components/project/project-list';
 
 export function LeftPanel(): JSX.Element {
@@ -21,6 +20,7 @@ export function LeftPanel(): JSX.Element {
     },
   });
   const deleteConversation = trpc.conversations.delete.useMutation();
+  const setProject = trpc.conversations.setProject.useMutation();
 
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
   const selectedProjectId = useConversationStore((state) => state.selectedProjectId);
@@ -28,13 +28,29 @@ export function LeftPanel(): JSX.Element {
   const setSelectedProjectId = useConversationStore((state) => state.setSelectedProjectId);
   const registerConversations = useConversationStore((state) => state.registerConversations);
 
-  const visibleConversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data]);
+  const visibleConversations = useMemo(() => {
+    const all = conversationsQuery.data ?? [];
+    if (!selectedProjectId) return all;
+    return all.filter((c) => c.projectId === selectedProjectId);
+  }, [conversationsQuery.data, selectedProjectId]);
 
   useEffect(() => {
     if (conversationsQuery.data !== undefined) {
       registerConversations(conversationsQuery.data);
     }
   }, [conversationsQuery.data, registerConversations]);
+
+  const handleSelectConversation = (conversationId: string): void => {
+    setActiveConversationId(conversationId);
+    if (selectedProjectId !== null) {
+      const conversation = visibleConversations.find((c) => c.id === conversationId);
+      if (conversation !== undefined && conversation.projectId !== selectedProjectId) {
+        void setProject.mutateAsync({ id: conversationId, projectId: selectedProjectId }).then(() => {
+          void utils.conversations.list.invalidate();
+        });
+      }
+    }
+  };
 
   const handleCreateConversation = (): void => {
     void createConversation.mutateAsync({
@@ -56,10 +72,11 @@ export function LeftPanel(): JSX.Element {
         activeConversationId={activeConversationId}
         loading={conversationsQuery.isLoading}
         deletingConversationId={deleteConversation.variables?.id ?? null}
-        onSelect={setActiveConversationId}
+        creatingConversation={createConversation.isPending}
+        onSelect={handleSelectConversation}
         onDelete={(conversation) => setConversationToDelete(conversation)}
+        onNew={handleCreateConversation}
       />
-      <NewConversationButton disabled={createConversation.isPending} onCreate={handleCreateConversation} />
 
       <DeleteConversationDialog
         conversation={conversationToDelete}
