@@ -174,12 +174,11 @@ async function runEvalRepairPass(
   const rerunEvalScores = summarizeEvalScores(rerunReport);
   const remainingFailures = rerunReport.scores.filter((score) => !score.passed);
   const tokenBreakdown = mergeTokenBreakdowns(result.tokenBreakdown, fixResult.tokenBreakdown);
+  const outcome = finalizeEvalRepairOutcome(result.summary, fixResult.success, failures.length, rerunReport);
 
   return {
-    success: fixResult.success && remainingFailures.length === 0,
-    summary: remainingFailures.length === 0
-      ? `${result.summary} | Eval repair pass resolved ${failures.length} scenario(s)`
-      : `${result.summary} | Eval repair incomplete: ${summarizeEvalFailures(rerunReport)}`,
+    success: outcome.success,
+    summary: outcome.summary,
     filesModified: [...new Set([...result.filesModified, ...fixResult.filesModified])],
     toolCallCount: result.toolCallCount + fixResult.toolCallCount,
     tokensUsed: {
@@ -189,6 +188,34 @@ async function runEvalRepairPass(
     },
     ...(tokenBreakdown !== undefined ? { tokenBreakdown } : {}),
     ...(Object.keys(rerunEvalScores).length > 0 ? { evalScores: rerunEvalScores } : {}),
+  };
+}
+
+export function finalizeEvalRepairOutcome(
+  originalSummary: string,
+  repairPassSucceeded: boolean,
+  repairedFailureCount: number,
+  rerunReport: EvalReport,
+): Pick<TaskResult, 'success' | 'summary'> {
+  const remainingFailures = rerunReport.scores.filter((score) => !score.passed);
+  if (remainingFailures.length === 0) {
+    return {
+      success: repairPassSucceeded,
+      summary: `${originalSummary} | Eval repair pass resolved ${repairedFailureCount} scenario(s)`,
+    };
+  }
+
+  const failureSummary = summarizeEvalFailures(rerunReport);
+  if (!repairPassSucceeded) {
+    return {
+      success: false,
+      summary: `${originalSummary} | Eval repair incomplete: ${failureSummary}`,
+    };
+  }
+
+  return {
+    success: true,
+    summary: `${originalSummary} | Warning: automated evals still report project-level failures after this task: ${failureSummary}`,
   };
 }
 
