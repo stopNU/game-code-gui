@@ -11,9 +11,11 @@ interface ConversationsListProps {
   activeConversationId: string | null;
   loading?: boolean;
   deletingConversationId?: string | null;
+  deletingAll?: boolean;
   creatingConversation?: boolean;
   onSelect: (conversationId: string) => void;
   onDelete: (conversation: ConversationSummary) => void;
+  onDeleteAll: () => void;
   onNew: () => void;
 }
 
@@ -22,9 +24,11 @@ export function ConversationsList({
   activeConversationId,
   loading,
   deletingConversationId,
+  deletingAll,
   creatingConversation,
   onSelect,
   onDelete,
+  onDeleteAll,
   onNew,
 }: ConversationsListProps): JSX.Element {
   return (
@@ -32,6 +36,18 @@ export function ConversationsList({
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
         <MessageCircleMore className="h-4 w-4 text-primary" />
         <span className="flex-1">Conversations</span>
+        {conversations.length > 0 && (
+          <Button
+            variant="ghost"
+            className="h-6 w-6 rounded-full p-0"
+            onClick={onDeleteAll}
+            disabled={deletingAll}
+            aria-label="Delete all conversations"
+            title="Delete all conversations"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           className="h-6 w-6 rounded-full p-0"

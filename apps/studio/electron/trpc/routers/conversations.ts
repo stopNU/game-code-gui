@@ -80,6 +80,16 @@ export const conversationsRouter = router({
       ctx.database.conversations.delete(input.id);
       return { deleted: true };
     }),
+  deleteAll: publicProcedure
+    .input(
+      z.object({
+        projectId: z.string().optional(),
+      }).optional(),
+    )
+    .mutation(({ ctx, input }) => {
+      ctx.database.conversations.deleteAll(input?.projectId);
+      return { deleted: true };
+    }),
   setProject: publicProcedure
     .input(
       z.object({

@@ -78,6 +78,8 @@ export class ConversationsRepository {
   private readonly insertStatement: StatementSync;
   private readonly ensureStatement: StatementSync;
   private readonly deleteStatement: StatementSync;
+  private readonly deleteAllStatement: StatementSync;
+  private readonly deleteAllByProjectStatement: StatementSync;
   private readonly renameStatement: StatementSync;
   private readonly getMessagesStatement: StatementSync;
   private readonly nextSeqStatement: StatementSync;
@@ -108,6 +110,8 @@ export class ConversationsRepository {
       `,
     );
     this.deleteStatement = db.prepare('DELETE FROM conversations WHERE id = ?');
+    this.deleteAllStatement = db.prepare('DELETE FROM conversations');
+    this.deleteAllByProjectStatement = db.prepare('DELETE FROM conversations WHERE project_id = ?');
     this.renameStatement = db.prepare(
       'UPDATE conversations SET title = @title, updated_at = @updatedAt WHERE id = @id',
     );
@@ -191,6 +195,14 @@ export class ConversationsRepository {
 
   public delete(id: string): void {
     this.deleteStatement.run(id);
+  }
+
+  public deleteAll(projectId?: string): void {
+    if (projectId !== undefined) {
+      this.deleteAllByProjectStatement.run(projectId);
+    } else {
+      this.deleteAllStatement.run();
+    }
   }
 
   public setProject(id: string, projectId: string | null): ConversationRecord | null {

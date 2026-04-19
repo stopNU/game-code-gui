@@ -435,6 +435,7 @@ export class ConversationAgent {
                   buildToolExecutionContext({
                     conversationId: args.conversationId,
                     ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+                    ...(project?.displayPath !== undefined ? { projectPath: project.displayPath } : {}),
                     toolCallId: block.id as string,
                     signal: args.signal,
                     bridge: {

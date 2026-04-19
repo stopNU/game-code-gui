@@ -1,4 +1,5 @@
-import { resolve, isAbsolute } from 'path';
+import { existsSync } from 'fs';
+import { basename, isAbsolute, join, resolve } from 'path';
 import { preprocessBrief, createAdvancedPlan, normalizeTaskPlan, type PreprocessedBrief, type TaskPlan, type TaskState, type ToolContract } from '@agent-harness/core';
 import { scaffoldGame } from '@agent-harness/game-adapter';
 import { planGameService, runTask } from '@agent-harness/services';
@@ -24,6 +25,13 @@ interface ToolBridge {
   launchGodot(args: { projectPath: string; ownerConversationId?: string }): Promise<unknown>;
   stopGodot(args: { ownerConversationId?: string; force?: boolean }): Promise<unknown>;
   getAnthropicApiKey(): Promise<string | null>;
+}
+
+interface StudioProjectRecord {
+  id: string;
+  normalizedPath: string;
+  displayPath: string;
+  title: string | null;
 }
 
 interface StudioToolContext {
@@ -95,6 +103,44 @@ function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) {
     throw toAbortError(signal);
   }
+}
+
+function resolveWorkspaceProjectPath(workspaceRoot: string, projectId: string): string | null {
+  const candidatePath = resolve(workspaceRoot, 'apps', 'studio', 'projects', projectId);
+  return existsSync(join(candidatePath, 'project.godot')) ? candidatePath : null;
+}
+
+async function getProjectOrRecoverFromWorkspace(
+  bridge: ToolBridge,
+  projectId: string,
+): Promise<StudioProjectRecord | null> {
+  const project = await bridge.getProject(projectId);
+  if (project !== null) {
+    return project;
+  }
+
+  const recoveredPath = resolveWorkspaceProjectPath(bridge.workspaceRoot, projectId);
+  if (recoveredPath === null) {
+    return null;
+  }
+
+  return bridge.upsertProject({
+    normalizedPath: normalizePath(recoveredPath),
+    displayPath: recoveredPath,
+    title: basename(recoveredPath),
+  }).then(async (upsertedProject) => {
+    const persistedProject = await bridge.getProject(upsertedProject.id);
+    if (persistedProject !== null) {
+      return persistedProject;
+    }
+
+    return {
+      id: upsertedProject.id,
+      normalizedPath: normalizePath(recoveredPath),
+      displayPath: recoveredPath,
+      title: upsertedProject.title,
+    };
+  });
 }
 
 export function createStudioTools(dependencies: Partial<StudioToolDependencies> = {}): ToolContract[] {
@@ -292,7 +338,7 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
         process.env['ANTHROPIC_API_KEY'] = apiKey;
       }
 
-      const project = await ctx.bridge.getProject(toolInput.projectId);
+      const project = await getProjectOrRecoverFromWorkspace(ctx.bridge, toolInput.projectId);
       if (project === null) {
         throw new Error(`Unknown project ${toolInput.projectId}.`);
       }
@@ -397,7 +443,7 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
       const ctx = rawCtx as StudioToolContext;
       const toolInput = input as { projectId: string; headless?: boolean };
       throwIfAborted(ctx.signal);
-      const project = await ctx.bridge.getProject(toolInput.projectId);
+      const project = await getProjectOrRecoverFromWorkspace(ctx.bridge, toolInput.projectId);
       if (project === null) {
         throw new Error(`Unknown project ${toolInput.projectId}.`);
       }
@@ -463,6 +509,7 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
 export function buildToolExecutionContext(args: {
   conversationId: string;
   projectId?: string;
+  projectPath?: string;
   toolCallId: string;
   signal: AbortSignal;
   bridge: ToolBridge;
@@ -473,7 +520,7 @@ export function buildToolExecutionContext(args: {
     toolCallId: args.toolCallId,
     signal: args.signal,
     bridge: args.bridge,
-    projectPath: args.projectId ?? '',
+    projectPath: args.projectPath ?? args.bridge.workspaceRoot,
     taskId: args.toolCallId,
     traceId: args.toolCallId,
     permissions: { allowed: ['fs:read', 'fs:write', 'npm:run', 'browser:launch'], denied: [] },

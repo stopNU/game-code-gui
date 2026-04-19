@@ -6,10 +6,12 @@ import { useConversationStore } from '@renderer/store/conversation-store';
 import { ConversationsList } from '@renderer/components/conversations/conversations-list';
 import { DeleteConversationDialog } from '@renderer/components/conversations/delete-conversation-dialog';
 import { ProjectList } from '@renderer/components/project/project-list';
+import { Button } from '@renderer/components/ui/button';
 
 export function LeftPanel(): JSX.Element {
   const utils = trpc.useUtils();
   const [conversationToDelete, setConversationToDelete] = useState<ConversationSummary | null>(null);
+  const [deleteAllPending, setDeleteAllPending] = useState(false);
   const projectsQuery = trpc.projects.list.useQuery(undefined);
   const conversationsQuery = trpc.conversations.list.useQuery(undefined);
   const createConversation = trpc.conversations.create.useMutation({
@@ -20,6 +22,7 @@ export function LeftPanel(): JSX.Element {
     },
   });
   const deleteConversation = trpc.conversations.delete.useMutation();
+  const deleteAllConversations = trpc.conversations.deleteAll.useMutation();
   const setProject = trpc.conversations.setProject.useMutation();
 
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
@@ -52,6 +55,20 @@ export function LeftPanel(): JSX.Element {
     }
   };
 
+  const handleDeleteAll = (): void => {
+    setDeleteAllPending(true);
+  };
+
+  const handleDeleteAllConfirm = async (): Promise<void> => {
+    await deleteAllConversations.mutateAsync(
+      selectedProjectId !== null ? { projectId: selectedProjectId } : undefined,
+    );
+    registerConversations([]);
+    setActiveConversationId(null);
+    setDeleteAllPending(false);
+    await utils.conversations.list.invalidate();
+  };
+
   const handleCreateConversation = (): void => {
     void createConversation.mutateAsync({
       projectId: selectedProjectId,
@@ -72,9 +89,11 @@ export function LeftPanel(): JSX.Element {
         activeConversationId={activeConversationId}
         loading={conversationsQuery.isLoading}
         deletingConversationId={deleteConversation.variables?.id ?? null}
+        deletingAll={deleteAllConversations.isPending}
         creatingConversation={createConversation.isPending}
         onSelect={handleSelectConversation}
         onDelete={(conversation) => setConversationToDelete(conversation)}
+        onDeleteAll={handleDeleteAll}
         onNew={handleCreateConversation}
       />
 
@@ -93,6 +112,28 @@ export function LeftPanel(): JSX.Element {
           await utils.conversations.list.invalidate();
         }}
       />
+
+      {deleteAllPending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="w-full max-w-lg rounded-[28px] border border-border bg-card p-6 shadow-glow">
+            <div className="text-xs uppercase tracking-[0.26em] text-primary">Delete all conversations</div>
+            <h3 className="mt-2 text-xl font-semibold text-foreground">
+              {selectedProjectId !== null ? 'Delete project conversations' : 'Delete all conversations'}
+            </h3>
+            <p className="mt-3 text-sm text-muted-foreground">
+              This removes {selectedProjectId !== null ? 'all conversations in this project' : 'all conversations'} and their message history from Studio. This action cannot be undone.
+            </p>
+            <div className="mt-6 flex gap-2">
+              <Button variant="outline" onClick={() => setDeleteAllPending(false)} disabled={deleteAllConversations.isPending}>
+                Cancel
+              </Button>
+              <Button onClick={() => void handleDeleteAllConfirm()} disabled={deleteAllConversations.isPending}>
+                Delete all
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

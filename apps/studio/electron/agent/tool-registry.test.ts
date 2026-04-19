@@ -555,6 +555,46 @@ describe('Studio tool contracts', () => {
     });
   });
 
+  it('launch_game auto-registers a workspace project when the id matches an on-disk Studio project', async () => {
+    const { bridge } = createBridge({
+      workspaceRoot: 'D:/dev/game-code-gui',
+      getProject: vi.fn(async () => null),
+      upsertProject: vi.fn(async (args: { normalizedPath: string; displayPath: string; title?: string | null }) => ({
+        id: 'cat-pong',
+        displayPath: args.displayPath,
+        title: args.title ?? null,
+      })),
+    });
+    const tool = getTool('launch_game');
+
+    const result = await tool.execute(
+      {
+        projectId: 'cat-pong',
+      },
+      buildToolExecutionContext({
+        conversationId: 'conversation-recover',
+        projectId: 'cat-pong',
+        projectPath: 'D:/dev/game-code-gui/apps/studio/projects/cat-pong',
+        toolCallId: 'tool-recover',
+        signal: new AbortController().signal,
+        bridge: bridge as never,
+      }),
+    );
+
+    expect(bridge.upsertProject).toHaveBeenCalledWith({
+      normalizedPath: 'd:/dev/game-code-gui/apps/studio/projects/cat-pong',
+      displayPath: 'D:\\dev\\game-code-gui\\apps\\studio\\projects\\cat-pong',
+      title: 'cat-pong',
+    });
+    expect(bridge.launchGodot).toHaveBeenCalledWith({
+      projectPath: 'D:\\dev\\game-code-gui\\apps\\studio\\projects\\cat-pong',
+      ownerConversationId: 'conversation-recover',
+    });
+    expect(result).toEqual({
+      launched: true,
+    });
+  });
+
   it('launch_game honours cancellation by stopping the owned Godot session', async () => {
     let resolveLaunch: (() => void) | undefined;
     const { bridge } = createBridge({
@@ -589,5 +629,27 @@ describe('Studio tool contracts', () => {
       force: true,
     });
     resolveLaunch?.();
+  });
+
+  it('buildToolExecutionContext prefers an explicit project path and falls back to the workspace root', () => {
+    const { bridge } = createBridge();
+
+    const explicit = buildToolExecutionContext({
+      conversationId: 'conversation-context',
+      projectId: 'project-1',
+      projectPath: 'D:/games/dragon-deck',
+      toolCallId: 'tool-context-explicit',
+      signal: new AbortController().signal,
+      bridge: bridge as never,
+    });
+    const fallback = buildToolExecutionContext({
+      conversationId: 'conversation-context',
+      toolCallId: 'tool-context-fallback',
+      signal: new AbortController().signal,
+      bridge: bridge as never,
+    });
+
+    expect(explicit.projectPath).toBe('D:/games/dragon-deck');
+    expect(fallback.projectPath).toBe('D:/dev/game-code-gui');
   });
 });
