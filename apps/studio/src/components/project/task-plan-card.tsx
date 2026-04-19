@@ -56,21 +56,24 @@ function PhaseSection({
   phase,
   projectId,
   onRunTask,
-  runningTaskId,
+  onRunPhase,
+  isRunning,
 }: {
   phase: PhasePlan;
   projectId: string;
   onRunTask: (task: TaskState) => Promise<void>;
-  runningTaskId: string | null;
+  onRunPhase: (phase: PhasePlan) => Promise<void>;
+  isRunning: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const completeCount = phase.tasks.filter((t) => getTaskStatus(t) === 'complete').length;
   const label = phase.label ?? `Phase ${phase.phase}`;
+  const runnableCount = phase.tasks.filter((t) => RUNNABLE_STATUSES.has(getTaskStatus(t))).length;
 
   return (
     <div className="border-b border-border last:border-0">
-      <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+      <div
+        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         onClick={() => setOpen((v) => !v)}
       >
         {open ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
@@ -78,7 +81,21 @@ function PhaseSection({
         <span className="shrink-0 tabular-nums">
           {completeCount}/{phase.tasks.length}
         </span>
-      </button>
+        {runnableCount > 0 && (
+          <Button
+            variant="ghost"
+            className="h-5 w-5 shrink-0 p-0"
+            disabled={isRunning}
+            onClick={(e) => {
+              e.stopPropagation();
+              void onRunPhase(phase);
+            }}
+            title={`Run remaining ${runnableCount} task(s) in ${label}`}
+          >
+            <Play className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
 
       {open && (
         <div className="pb-1">
@@ -103,7 +120,7 @@ function PhaseSection({
                   <Button
                     variant="ghost"
                     className="h-5 w-5 shrink-0 p-0"
-                    disabled={runningTaskId !== null}
+                    disabled={isRunning}
                     onClick={() => void onRunTask(task)}
                     title={`Implement: ${taskLabel}`}
                   >
@@ -122,14 +139,16 @@ function PhaseSection({
 function TaskPlanModal({
   plan,
   projectId,
-  runningTaskId,
+  isRunning,
   onRunTask,
+  onRunPhase,
   onClose,
 }: {
   plan: TaskPlan;
   projectId: string;
-  runningTaskId: string | null;
+  isRunning: boolean;
   onRunTask: (task: TaskState) => Promise<void>;
+  onRunPhase: (phase: PhasePlan) => Promise<void>;
   onClose: () => void;
 }): JSX.Element {
   const allTasks = plan.phases.flatMap((p) => p.tasks);
@@ -165,6 +184,7 @@ function TaskPlanModal({
           {plan.phases.map((phase) => {
             const phaseComplete = phase.tasks.filter((t) => getTaskStatus(t) === 'complete').length;
             const phaseLabel = phase.label ?? `Phase ${phase.phase}`;
+            const phaseRunnable = phase.tasks.filter((t) => RUNNABLE_STATUSES.has(getTaskStatus(t))).length;
             return (
               <div key={phase.phase} className="mb-4 last:mb-0">
                 <div className="mb-2 flex items-center gap-2">
@@ -175,6 +195,17 @@ function TaskPlanModal({
                   <span className="text-[10px] tabular-nums text-muted-foreground">
                     {phaseComplete}/{phase.tasks.length}
                   </span>
+                  {phaseRunnable > 0 && (
+                    <Button
+                      variant="ghost"
+                      className="h-5 w-5 shrink-0 p-0"
+                      disabled={isRunning}
+                      onClick={() => void onRunPhase(phase)}
+                      title={`Run remaining ${phaseRunnable} task(s) in ${phaseLabel}`}
+                    >
+                      <Play className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
                 <div className="rounded-lg border border-border">
                   {phase.tasks.map((task, i) => {
@@ -196,7 +227,7 @@ function TaskPlanModal({
                           <Button
                             variant="ghost"
                             className="mt-0.5 h-5 w-5 shrink-0 p-0"
-                            disabled={runningTaskId !== null}
+                            disabled={isRunning}
                             onClick={() => void onRunTask(task)}
                             title={`Implement: ${taskLabel}`}
                           >
@@ -218,6 +249,7 @@ function TaskPlanModal({
 
 export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | null {
   const [runningTaskId, setRunningTaskId] = useState<string | null>(null);
+  const [runningPhaseId, setRunningPhaseId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const utils = trpc.useUtils();
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
@@ -283,6 +315,8 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
   const totalCount = allTasks.length;
   const progressPct = totalCount > 0 ? Math.round((completeCount / totalCount) * 100) : 0;
 
+  const isRunning = runningTaskId !== null || runningPhaseId !== null;
+
   const handleRunTask = async (task: TaskState): Promise<void> => {
     setRunningTaskId(task.id);
     try {
@@ -307,14 +341,46 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
     }
   };
 
+  const handleRunPhase = async (phase: PhasePlan): Promise<void> => {
+    const runnable = phase.tasks.filter((t) => RUNNABLE_STATUSES.has(getTaskStatus(t)));
+    if (runnable.length === 0) return;
+    setRunningPhaseId(phase.phase);
+    try {
+      const phaseLabel = phase.label ?? `Phase ${phase.phase}`;
+      const config = resolveConversationConfig(projectId, activeConversationPreferences);
+      const conversation = await createConversation.mutateAsync({
+        projectId,
+        title: `Implement phase ${phase.phase}: ${phaseLabel}`,
+        provider: config.provider,
+        model: config.model,
+      });
+      useConversationStore.getState().setActiveConversationId(conversation.id);
+      const taskLines = runnable
+        .map((t) => `- ${t.id}: ${getTaskLabel(t)}`)
+        .join('\n');
+      const userMessage =
+        `Please implement the following remaining tasks in phase ${phase.phase} ("${phaseLabel}"), one after another in this order, respecting their dependencies. After each task, update the plan and continue to the next:\n${taskLines}\n\nThe project ID is ${projectId}.`;
+      await sendMessage.mutateAsync({
+        conversationId: conversation.id,
+        userMessage,
+        projectId,
+        model: config.model,
+        provider: config.provider,
+      });
+    } finally {
+      setRunningPhaseId(null);
+    }
+  };
+
   return (
     <>
     {modalOpen && (
       <TaskPlanModal
         plan={plan}
         projectId={projectId}
-        runningTaskId={runningTaskId}
+        isRunning={isRunning}
         onRunTask={handleRunTask}
+        onRunPhase={handleRunPhase}
         onClose={() => setModalOpen(false)}
       />
     )}
@@ -347,7 +413,8 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
             phase={phase}
             projectId={projectId}
             onRunTask={handleRunTask}
-            runningTaskId={runningTaskId}
+            onRunPhase={handleRunPhase}
+            isRunning={isRunning}
           />
         ))}
       </div>

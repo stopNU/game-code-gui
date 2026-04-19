@@ -2,7 +2,7 @@ import type { ConversationSummary } from '@shared/domain';
 
 export type ConversationProvider = NonNullable<ConversationSummary['provider']>;
 
-export const DEFAULT_CONVERSATION_PROVIDER: ConversationProvider = 'anthropic';
+export const DEFAULT_CONVERSATION_PROVIDER: ConversationProvider = 'codex';
 export const DEFAULT_CONVERSATION_TITLE = 'New conversation';
 export const DEFAULT_PROJECT_CONVERSATION_TITLE = 'Project conversation';
 

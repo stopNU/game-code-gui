@@ -81,7 +81,8 @@
       "Bash(node D:/dev/game-code-gui/fix-project-path.mjs)",
       "Bash(find \"D:\\\\dev\\\\game-code-gui\\\\apps\\\\studio\\\\src\\\\components\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec grep -l \"getPlan\\\\|plan\\\\.\\\\|phases\\\\|tasks\" {} \\\\;)",
       "Bash(git stash *)",
-      "Bash(pnpm --filter @agent-harness/studio run typecheck)"
+      "Bash(pnpm --filter @agent-harness/studio run typecheck)",
+      "Bash(pnpm --filter @agent-harness/studio run build)"
     ]
   }
 }

@@ -246,6 +246,7 @@ export class ConversationAgent {
               signal: args.signal,
             },
             project,
+            tracer,
           ),
       );
       return;
@@ -517,6 +518,7 @@ export class ConversationAgent {
       signal: AbortSignal;
     },
     project: { id: string; normalizedPath: string; displayPath: string; title: string | null } | null,
+    tracer: Tracer,
   ): Promise<void> {
     const storedMessages = await this.bridge.listMessages(args.conversationId);
     const systemPrompt = buildConversationAgentPrompt({ project });
@@ -564,6 +566,7 @@ export class ConversationAgent {
             toolName: call.name,
             input: call.input,
           });
+          void tracer.wrapToolCall(call.name, call.input, () => Promise.resolve(call.input));
         },
         onTokens: (tokens) => {
           this.bridge.emit({
@@ -610,6 +613,8 @@ export class ConversationAgent {
     }
 
     const finalText = streamedText.trim().length > 0 ? streamedText : result.summary;
+    tracer.recordTokens(result.tokensUsed);
+    tracer.setFinalOutput(finalText);
     await this.bridge.addConversationTokens({
       conversationId: args.conversationId,
       inputTokens: result.tokensUsed.input,
