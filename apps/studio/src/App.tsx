@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Settings2 } from 'lucide-react';
+import { Settings2 } from 'lucide-react';
 import { LeftPanel } from '@renderer/components/layout/left-panel';
 import { CenterPanel } from '@renderer/components/layout/center-panel';
 import { RightPanel } from '@renderer/components/layout/right-panel';
@@ -163,37 +163,18 @@ export function App(): JSX.Element {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(199,102,43,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(28,179,138,0.12),transparent_22%)]" />
       <div className="absolute inset-0 bg-grid bg-[size:48px_48px] opacity-20" />
       <main className="relative mx-auto flex h-full max-w-[1880px] flex-col gap-5 overflow-hidden p-4 lg:p-6">
-        <header className="shrink-0 rounded-[28px] border border-border bg-card/85 px-6 py-5 shadow-glow">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.32em] text-primary">Harness Studio</p>
-              <h1 className="mt-3 text-3xl font-semibold text-foreground">Conversational control room for the harness</h1>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                Phase 8 brings the desktop shell together with workspace-aware settings, keyboard shortcuts, inline
-                conversation polish, token budgeting, and light-theme support.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSettingsOpen(true);
-                }}
-              >
-                <Settings2 className="mr-2 h-4 w-4" />
-                Settings
-              </Button>
-              <Button
-                onClick={() => {
-                  createConversationFromCurrentContext();
-                }}
-                disabled={createConversation.isPending}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                New Conversation
-              </Button>
-            </div>
-          </div>
+        <header className="shrink-0 flex items-center justify-between rounded-[28px] border border-border bg-card/85 px-6 py-2.5 shadow-glow">
+          <p className="text-xs uppercase tracking-[0.32em] text-primary">Harness Studio</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSettingsOpen(true);
+            }}
+          >
+            <Settings2 className="mr-2 h-4 w-4" />
+            Settings
+          </Button>
         </header>
 
         <section className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[340px_minmax(0,1fr)_320px]">

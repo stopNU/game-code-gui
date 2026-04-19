@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, ClipboardList, Play } from 'lucide-react';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
@@ -25,6 +25,33 @@ const STATUS_STYLES: Record<TaskStatus, string> = {
 
 const RUNNABLE_STATUSES = new Set<TaskStatus>(['pending', 'failed', 'blocked']);
 
+function getTaskStatus(task: TaskState): TaskStatus {
+  switch (task.status) {
+    case 'pending':
+    case 'planning':
+    case 'in-progress':
+    case 'blocked':
+    case 'review':
+    case 'complete':
+    case 'failed':
+      return task.status;
+    default:
+      return 'pending';
+  }
+}
+
+function getTaskLabel(task: TaskState): string {
+  if (typeof task.title === 'string' && task.title.trim().length > 0) {
+    return task.title;
+  }
+
+  return task.id
+    .split('-')
+    .filter((part) => part.length > 0)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function PhaseSection({
   phase,
   projectId,
@@ -37,7 +64,7 @@ function PhaseSection({
   runningTaskId: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const completeCount = phase.tasks.filter((t) => t.status === 'complete').length;
+  const completeCount = phase.tasks.filter((t) => getTaskStatus(t) === 'complete').length;
   const label = phase.label ?? `Phase ${phase.phase}`;
 
   return (
@@ -55,32 +82,37 @@ function PhaseSection({
 
       {open && (
         <div className="pb-1">
-          {phase.tasks.map((task) => (
-            <div
-              key={task.id}
-              className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/40 transition-colors"
-            >
-              <span className="flex-1 truncate text-xs text-foreground" title={task.title}>
-                {task.title}
-              </span>
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[task.status]}`}
+          {phase.tasks.map((task) => {
+            const taskLabel = getTaskLabel(task);
+            const taskStatus = getTaskStatus(task);
+
+            return (
+              <div
+                key={task.id}
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/40 transition-colors"
               >
-                {task.status}
-              </span>
-              {RUNNABLE_STATUSES.has(task.status) && (
-                <Button
-                  variant="ghost"
-                  className="h-5 w-5 shrink-0 p-0"
-                  disabled={runningTaskId !== null}
-                  onClick={() => void onRunTask(task)}
-                  title={`Implement: ${task.title}`}
+                <span className="flex-1 truncate text-xs text-foreground" title={taskLabel}>
+                  {taskLabel}
+                </span>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[taskStatus]}`}
                 >
-                  <Play className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          ))}
+                  {taskStatus}
+                </span>
+                {RUNNABLE_STATUSES.has(taskStatus) && (
+                  <Button
+                    variant="ghost"
+                    className="h-5 w-5 shrink-0 p-0"
+                    disabled={runningTaskId !== null}
+                    onClick={() => void onRunTask(task)}
+                    title={`Implement: ${taskLabel}`}
+                  >
+                    <Play className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -94,8 +126,19 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
   const activeConversationPreferences = useConversationStore((state) =>
     activeConversationId === null ? null : (state.conversationPreferences[activeConversationId] ?? null),
   );
+  const activeConversationRunning = useConversationStore((state) =>
+    activeConversationId === null ? false : (state.isRunning[activeConversationId] ?? false),
+  );
+  const shouldPollPlan =
+    activeConversationRunning && activeConversationPreferences?.projectId === projectId;
+  const wasPollingRef = useRef(shouldPollPlan);
 
-  const planQuery = trpc.projects.getPlan.useQuery({ id: projectId });
+  const planQuery = trpc.projects.getPlan.useQuery(
+    { id: projectId },
+    {
+      refetchInterval: shouldPollPlan ? 2000 : false,
+    },
+  );
   const createConversation = trpc.conversations.create.useMutation({
     onSuccess: async (conversation) => {
       useConversationStore.getState().registerConversations([conversation]);
@@ -103,6 +146,18 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
     },
   });
   const sendMessage = trpc.agent.send.useMutation();
+
+  useEffect(() => {
+    if (!shouldPollPlan && wasPollingRef.current) {
+      void Promise.all([
+        utils.projects.getPlan.invalidate({ id: projectId }),
+        utils.projects.getInfo.invalidate({ id: projectId }),
+        utils.projects.list.invalidate(),
+      ]);
+    }
+
+    wasPollingRef.current = shouldPollPlan;
+  }, [projectId, shouldPollPlan, utils.projects.getInfo, utils.projects.getPlan, utils.projects.list]);
 
   if (planQuery.isLoading) {
     return (
@@ -126,24 +181,25 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
   }
 
   const allTasks = plan.phases.flatMap((p) => p.tasks);
-  const completeCount = allTasks.filter((t) => t.status === 'complete').length;
+  const completeCount = allTasks.filter((t) => getTaskStatus(t) === 'complete').length;
   const totalCount = allTasks.length;
   const progressPct = totalCount > 0 ? Math.round((completeCount / totalCount) * 100) : 0;
 
   const handleRunTask = async (task: TaskState): Promise<void> => {
     setRunningTaskId(task.id);
     try {
+      const taskLabel = getTaskLabel(task);
       const config = resolveConversationConfig(projectId, activeConversationPreferences);
       const conversation = await createConversation.mutateAsync({
         projectId,
-        title: `Implement: ${task.title}`,
+        title: `Implement: ${taskLabel}`,
         provider: config.provider,
         model: config.model,
       });
       useConversationStore.getState().setActiveConversationId(conversation.id);
       await sendMessage.mutateAsync({
         conversationId: conversation.id,
-        userMessage: `Please implement task ${task.id}: ${task.title}. The project ID is ${projectId}.`,
+        userMessage: `Please implement task ${task.id}: ${taskLabel}. The project ID is ${projectId}.`,
         projectId,
         model: config.model,
         provider: config.provider,
