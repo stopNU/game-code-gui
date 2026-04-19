@@ -27,7 +27,7 @@ export function Message({ message }: MessageProps): JSX.Element {
   return (
     <div
       className={cn(
-        'max-w-3xl rounded-[24px] px-4 py-3 shadow-glow/50',
+        'min-w-0 max-w-3xl rounded-[24px] px-4 py-3 shadow-glow/50',
         message.role === 'user'
           ? 'ml-auto bg-primary text-primary-foreground'
           : message.role === 'assistant'
@@ -45,10 +45,10 @@ export function Message({ message }: MessageProps): JSX.Element {
       ) : (
         <div
           className={cn(
-            'max-w-none text-sm',
+            'min-w-0 max-w-none overflow-y-auto text-sm break-words [&_*]:max-w-full [&_code]:break-words [&_li]:break-words [&_p]:break-words [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:whitespace-pre-wrap [&_pre]:break-words',
             systemTone === 'success' || systemTone === 'error'
-              ? 'leading-6'
-              : 'prose prose-invert prose-p:my-2 prose-pre:rounded-xl prose-pre:bg-black/30 prose-code:text-[0.9em]',
+              ? 'max-h-64 leading-6'
+              : 'max-h-64 prose prose-invert prose-p:my-2 prose-pre:max-h-64 prose-pre:overflow-auto prose-pre:rounded-xl prose-pre:bg-black/30 prose-code:text-[0.9em]',
           )}
         >
           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize, rehypeHighlight]}>

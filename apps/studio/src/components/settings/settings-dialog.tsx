@@ -336,7 +336,7 @@ export function SettingsDialog({
               {activeTab === 'langsmith' ? (
                 <Section
                   title="Tracing"
-                  description="LangSmith stays passive in v1. When enabled, Studio wraps conversation turns and tool calls."
+                  description="Records every conversation turn and tool call to LangSmith so you can inspect inputs, outputs, and token usage in the LangSmith dashboard."
                 >
                   <label className="flex items-center gap-3 rounded-2xl border border-border bg-card/60 px-4 py-3 text-sm text-foreground">
                     <input

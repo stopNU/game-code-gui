@@ -108,7 +108,7 @@ export function CenterPanel(): JSX.Element {
   };
 
   return (
-    <Card className="flex h-full min-h-0 flex-col overflow-hidden">
+    <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <ConversationHeader
         preferences={preferences}
         sessionStatus={sessionStatus}

@@ -95,6 +95,58 @@ describe('studio phase 2 database', () => {
     database.close();
   });
 
+  it('counts only phase tasks in project summaries when task metadata contains nested ids', () => {
+    const tempDir = createTempDir();
+    const workspaceRoot = path.join(tempDir, 'workspace');
+    const projectDir = path.join(workspaceRoot, 'cat-pong');
+    mkdirSync(projectDir, { recursive: true });
+
+    const database = openStudioDatabase(path.join(tempDir, 'studio.sqlite3'));
+    const project = database.projects.upsert({
+      normalizedPath: normalizePath(projectDir),
+      displayPath: projectDir,
+      title: 'Cat Pong',
+    });
+    database.taskPlans.upsert({
+      projectId: project.id,
+      planJson: JSON.stringify({
+        gameTitle: 'Cat Pong',
+        phases: [
+          {
+            phase: 1,
+            tasks: [
+              {
+                id: 'setup-project-structure',
+                status: 'complete',
+                result: {
+                  audit: {
+                    id: 'nested-result-id',
+                  },
+                },
+              },
+              {
+                id: 'event-bus-autoload',
+                status: 'pending',
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const scanner = new ProjectScanner(database.projects, database.taskPlans);
+    const projects = scanner.list(workspaceRoot);
+
+    expect(projects).toHaveLength(1);
+    expect(projects[0]).toMatchObject({
+      id: project.id,
+      taskCount: 2,
+      completeCount: 1,
+    });
+
+    database.close();
+  });
+
   it('encrypts and decrypts stored API keys through the settings service', () => {
     const tempDir = createTempDir();
     const database = openStudioDatabase(path.join(tempDir, 'studio.sqlite3'));

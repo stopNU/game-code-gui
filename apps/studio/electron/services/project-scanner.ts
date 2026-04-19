@@ -41,35 +41,24 @@ function normalizeTaskStatus(status: unknown): TaskStatus {
 
 function summarizePlan(planJson: string): ProjectPlanSummary {
   const parsed = JSON.parse(planJson) as Record<string, unknown>;
-  let taskCount = 0;
-  let completeCount = 0;
-
-  const visit = (value: unknown): void => {
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        visit(item);
-      }
-      return;
+  const phases = Array.isArray(parsed['phases']) ? parsed['phases'] : [];
+  const tasks = phases.flatMap((phase) => {
+    if (typeof phase !== 'object' || phase === null) {
+      return [];
     }
 
-    if (typeof value !== 'object' || value === null) {
-      return;
+    const phaseTasks = (phase as Record<string, unknown>)['tasks'];
+    if (!Array.isArray(phaseTasks)) {
+      return [];
     }
 
-    const candidate = value as TaskLike & Record<string, unknown>;
-    if (typeof candidate.id === 'string') {
-      taskCount += 1;
-      if (normalizeTaskStatus(candidate.status) === 'complete') {
-        completeCount += 1;
-      }
-    }
+    return phaseTasks.filter((task): task is TaskLike & Record<string, unknown> => {
+      return typeof task === 'object' && task !== null && typeof (task as TaskLike).id === 'string';
+    });
+  });
 
-    for (const nestedValue of Object.values(candidate)) {
-      visit(nestedValue);
-    }
-  };
-
-  visit(parsed);
+  const taskCount = tasks.length;
+  const completeCount = tasks.filter((task) => normalizeTaskStatus(task.status) === 'complete').length;
 
   return {
     title: typeof parsed.gameTitle === 'string' ? parsed.gameTitle : null,

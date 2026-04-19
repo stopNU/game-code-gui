@@ -18,7 +18,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps): JSX.Element {
     );
 
   return (
-    <details className="rounded-2xl border border-border bg-secondary/20 p-3">
+    <details className="min-w-0 rounded-2xl border border-border bg-secondary/20 p-3">
       <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -30,7 +30,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps): JSX.Element {
         <Badge>{toolCall.status}</Badge>
       </summary>
       <div className="mt-3 space-y-3">
-        <pre className="overflow-auto rounded-xl bg-background/60 p-3 text-xs text-muted-foreground">
+        <pre className="max-h-64 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background/60 p-3 text-xs text-muted-foreground">
           {stringifyJson(toolCall.input)}
         </pre>
         {toolCall.progress.length > 0 ? (
@@ -41,7 +41,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps): JSX.Element {
           </div>
         ) : null}
         {toolCall.output !== undefined ? (
-          <pre className="overflow-auto rounded-xl bg-background/60 p-3 text-xs text-muted-foreground">
+          <pre className="max-h-64 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background/60 p-3 text-xs text-muted-foreground">
             {stringifyJson(toolCall.output)}
           </pre>
         ) : null}

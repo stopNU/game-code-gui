@@ -10,8 +10,8 @@ interface MessageListProps {
 
 export function MessageList({ messages, toolCalls }: MessageListProps): JSX.Element {
   return (
-    <ScrollArea className="flex-1 px-5 py-4">
-      <div className="space-y-4">
+    <ScrollArea className="min-w-0 flex-1 px-5 py-4">
+      <div className="min-w-0 space-y-4">
         {messages.length === 0 && toolCalls.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-background/30 p-6 text-sm text-muted-foreground">
             Start with a brief like &quot;plan a cat deckbuilder with two playable archetypes&quot; and the agent will
