@@ -1,0 +1,451 @@
+import { useEffect, useState } from 'react';
+import { trpc } from '@renderer/lib/trpc';
+
+interface NewProjectWizardProps {
+  onBack: () => void;
+  onCreate: (details: { name: string; path: string; engine: EngineId }) => void;
+}
+
+const STEP_LABELS = ['Project', 'Engine', 'AI', 'Template', 'Review'] as const;
+const STEP_TITLES = [
+  'Name your project',
+  'Choose an engine',
+  'Set up AI',
+  'Pick a template',
+  'Review & create',
+];
+
+const ENGINES = [
+  { id: 'godot42', label: 'Godot 4.2', sub: 'GDScript · C# · open source',      icon: '◆', disabled: true  },
+  { id: 'godot43', label: 'Godot 4.3', sub: 'Latest stable · GDScript · C#',    icon: '◆', disabled: false },
+  { id: 'unity6',  label: 'Unity 6',   sub: 'C# · HDRP / URP pipelines',        icon: '◇', disabled: true  },
+  { id: 'custom',  label: 'Custom',    sub: 'Point to any project root',         icon: '○', disabled: false },
+] as const;
+
+type EngineId = typeof ENGINES[number]['id'];
+
+const T = {
+  bg0: '#080a0f',
+  bg2: '#11141f',
+  bg3: '#161b28',
+  bg4: '#1c2133',
+  border: '#1a1f30',
+  border2: '#242b3d',
+  text0: '#eceef5',
+  text1: '#9aa0bc',
+  text2: '#545c7a',
+  text3: '#363d57',
+  accent: '#4d9eff',
+  accentLo: '#1a3a6e',
+  mono: "'IBM Plex Mono', monospace" as const,
+  sans: "'IBM Plex Sans', sans-serif" as const,
+};
+
+function SelectCard({
+  item,
+  selected,
+  onSelect,
+  wide,
+}: {
+  item: { id: string; label: string; sub: string; icon: string; disabled?: boolean };
+  selected: string;
+  onSelect: (id: string) => void;
+  wide?: boolean;
+}): JSX.Element {
+  const [hov, setHov] = useState(false);
+  const active = selected === item.id;
+  const disabled = item.disabled === true;
+  return (
+    <div
+      onClick={() => { if (!disabled) onSelect(item.id); }}
+      onMouseEnter={() => { if (!disabled) setHov(true); }}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        padding: wide ? '12px 14px' : '14px 14px',
+        borderRadius: 5,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
+        background: active ? T.accentLo : hov ? T.bg3 : T.bg2,
+        border: `1px solid ${active ? T.accent + '77' : hov ? T.border2 : T.border}`,
+        display: 'flex',
+        alignItems: wide ? 'center' : 'flex-start',
+        gap: 12,
+        transition: 'all 0.12s',
+      }}
+    >
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 4,
+          flexShrink: 0,
+          background: active ? T.accentLo : T.bg4,
+          border: `1px solid ${active ? T.accent + '55' : T.border2}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 13,
+          color: active ? T.accent : T.text2,
+        }}
+      >
+        {item.icon}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 500, color: active ? T.text0 : T.text1, marginBottom: 2 }}>
+          {item.label}
+        </div>
+        <div style={{ fontSize: 10, color: T.text2, fontFamily: T.mono, lineHeight: 1.4 }}>
+          {item.sub}
+        </div>
+      </div>
+      {disabled && (
+        <span style={{ fontSize: 9, fontFamily: T.mono, color: T.text3, border: `1px solid ${T.border2}`, borderRadius: 3, padding: '2px 6px', flexShrink: 0 }}>
+          soon
+        </span>
+      )}
+      {active && !disabled && (
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.accent, flexShrink: 0 }} />
+      )}
+    </div>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }): JSX.Element {
+  return (
+    <div
+      style={{
+        fontSize: 10,
+        fontFamily: T.mono,
+        color: T.text2,
+        textTransform: 'uppercase',
+        letterSpacing: '0.1em',
+        marginBottom: 7,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function TextInput({
+  value,
+  onChange,
+  placeholder,
+  mono,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  mono?: boolean;
+}): JSX.Element {
+  const [focused, setFocused] = useState(false);
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        width: '100%',
+        background: T.bg2,
+        border: `1px solid ${focused ? T.accent + '99' : T.border2}`,
+        borderRadius: 4,
+        padding: '9px 12px',
+        outline: 'none',
+        fontFamily: mono ? T.mono : T.sans,
+        fontSize: 12,
+        color: T.text0,
+        transition: 'border-color 0.15s',
+      }}
+    />
+  );
+}
+
+export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): JSX.Element {
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState('');
+  const [path, setPath] = useState('~/dev/');
+  const [pathManuallyEdited, setPathManuallyEdited] = useState(false);
+  const [engine, setEngine] = useState<EngineId>('godot43');
+
+  const chooseDirectory = trpc.runtime.chooseDirectory.useMutation();
+
+  useEffect(() => {
+    if (!pathManuallyEdited) {
+      setPath(name.trim() ? `~/dev/${name.trim().toLowerCase().replace(/\s+/g, '-')}` : '~/dev/');
+    }
+  }, [name, pathManuallyEdited]);
+
+  const canNext = [
+    name.trim().length > 0,
+    true,
+    true,
+    true,
+    true,
+  ][step];
+
+  const handleBrowse = async (): Promise<void> => {
+    const chosen = await chooseDirectory.mutateAsync({});
+    if (chosen !== null) {
+      setPath(chosen);
+      setPathManuallyEdited(true);
+    }
+  };
+
+  const stepContent = [
+    // Step 0: Name & path
+    <div key="s0" style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+      <div>
+        <FieldLabel>Project Name</FieldLabel>
+        <TextInput value={name} onChange={setName} placeholder="My Awesome Game" />
+      </div>
+      <div>
+        <FieldLabel>Directory</FieldLabel>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <TextInput
+              value={path}
+              onChange={(v) => { setPath(v); setPathManuallyEdited(true); }}
+              placeholder="~/dev/my-game"
+              mono
+            />
+          </div>
+          <button
+            onClick={() => void handleBrowse()}
+            disabled={chooseDirectory.isPending}
+            style={{
+              padding: '0 14px',
+              background: T.bg3,
+              border: `1px solid ${T.border2}`,
+              borderRadius: 4,
+              color: T.text1,
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: T.mono,
+              whiteSpace: 'nowrap',
+              opacity: chooseDirectory.isPending ? 0.6 : 1,
+            }}
+          >
+            Browse…
+          </button>
+        </div>
+        <div style={{ fontSize: 10, fontFamily: T.mono, color: T.text2, marginTop: 5 }}>
+          The folder will be created if it doesn't exist.
+        </div>
+      </div>
+    </div>,
+
+    // Step 1: Engine
+    <div key="s1" style={{ display: 'flex', flexDirection: 'column', gap: 8, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+      {ENGINES.map((e) => (
+        <SelectCard key={e.id} item={e} selected={engine} onSelect={(id) => setEngine(id as EngineId)} wide />
+      ))}
+    </div>,
+
+    // Steps 2–4: stubs (to be implemented)
+    ...([2, 3, 4] as const).map((i) => (
+      <div
+        key={`s${i}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 240,
+          color: T.text3,
+          fontFamily: T.mono,
+          fontSize: 11,
+          animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both',
+        }}
+      >
+        {STEP_TITLES[i]} — coming soon
+      </div>
+    )),
+  ];
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        background: T.bg0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+      }}
+    >
+      {/* Grid background */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          backgroundImage: `linear-gradient(${T.border} 1px, transparent 1px), linear-gradient(90deg, ${T.border} 1px, transparent 1px)`,
+          backgroundSize: '48px 48px',
+          opacity: 0.35,
+          maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
+        }}
+      />
+
+      <div style={{ width: 520, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
+        <div style={{ marginBottom: 28, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+          <button
+            onClick={onBack}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              color: T.text2,
+              fontSize: 11,
+              fontFamily: T.mono,
+              marginBottom: 18,
+              padding: 0,
+            }}
+          >
+            ← Back
+          </button>
+          <div
+            style={{
+              fontFamily: T.mono,
+              fontSize: 10,
+              letterSpacing: '0.28em',
+              color: T.accent,
+              marginBottom: 8,
+              textTransform: 'uppercase',
+            }}
+          >
+            New Game Project
+          </div>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 300,
+              color: T.text0,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            {STEP_TITLES[step]}
+          </div>
+        </div>
+
+        {/* Step indicator */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 24, alignItems: 'center' }}>
+          {STEP_LABELS.map((label, i) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: i < STEP_LABELS.length - 1 ? 'none' : undefined }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    background: i < step ? T.accentLo : i === step ? T.accent : T.bg3,
+                    border: `1px solid ${i <= step ? T.accent : T.border2}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 9,
+                    fontFamily: T.mono,
+                    fontWeight: 600,
+                    color: i < step ? T.accent : i === step ? '#fff' : T.text3,
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {i < step ? '✓' : i + 1}
+                </div>
+                <span style={{ fontSize: 10, fontFamily: T.mono, color: i === step ? T.text1 : T.text3 }}>
+                  {label}
+                </span>
+              </div>
+              {i < STEP_LABELS.length - 1 && (
+                <div
+                  style={{
+                    flex: 1,
+                    width: 28,
+                    height: 1,
+                    background: i < step ? T.accent + '44' : T.border,
+                    marginLeft: 6,
+                  }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Step content */}
+        <div style={{ minHeight: 240 }}>{stepContent[step]}</div>
+
+        {/* Navigation */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28 }}>
+          <button
+            onClick={() => (step > 0 ? setStep((s) => s - 1) : onBack())}
+            style={{
+              padding: '8px 18px',
+              background: 'transparent',
+              color: T.text2,
+              border: `1px solid ${T.border2}`,
+              borderRadius: 4,
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: T.sans,
+            }}
+          >
+            {step === 0 ? 'Cancel' : '← Back'}
+          </button>
+
+          {step < 4 ? (
+            <button
+              onClick={() => setStep((s) => s + 1)}
+              disabled={!canNext}
+              style={{
+                padding: '8px 22px',
+                background: canNext ? T.accent : T.bg4,
+                color: canNext ? '#fff' : T.text3,
+                border: 'none',
+                borderRadius: 4,
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: canNext ? 'pointer' : 'default',
+                fontFamily: T.sans,
+                transition: 'background 0.15s',
+              }}
+            >
+              Continue →
+            </button>
+          ) : (
+            <button
+              onClick={() => onCreate({ name, path, engine })}
+              style={{
+                padding: '8px 22px',
+                background: T.accent,
+                color: '#fff',
+                border: 'none',
+                borderRadius: 4,
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: T.sans,
+              }}
+            >
+              Create Project
+            </button>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}

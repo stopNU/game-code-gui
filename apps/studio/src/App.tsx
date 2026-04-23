@@ -7,6 +7,7 @@ import { CommandPalette } from '@renderer/components/command-palette';
 import { ApprovalDialog } from '@renderer/components/approvals/approval-dialog';
 import { SettingsDialog } from '@renderer/components/settings/settings-dialog';
 import { StartScreen } from '@renderer/components/screens/start-screen';
+import { NewProjectWizard } from '@renderer/components/screens/new-project-wizard';
 import { Button } from '@renderer/components/ui/button';
 import { Badge } from '@renderer/components/ui/badge';
 import { useConversationStream } from '@renderer/hooks/useConversationStream';
@@ -18,7 +19,7 @@ const THEME_STORAGE_KEY = 'harness-studio.theme';
 const PAGE_STORAGE_KEY = 'harness-studio.page';
 const PROJECT_STORAGE_KEY = 'harness-studio.project';
 
-type AppPage = 'home' | 'workspace';
+type AppPage = 'home' | 'workspace' | 'new-project';
 
 export function App(): JSX.Element {
   useConversationStream();
@@ -106,6 +107,11 @@ export function App(): JSX.Element {
   };
 
   const handleNewGame = (): void => {
+    setPage('new-project');
+    try { localStorage.setItem(PAGE_STORAGE_KEY, 'new-project'); } catch { /* ignore */ }
+  };
+
+  const handleProjectCreated = (_details: { name: string; path: string; engine: string }): void => {
     setSelectedProjectId(null);
     setPage('workspace');
     try { localStorage.setItem(PAGE_STORAGE_KEY, 'workspace'); } catch { /* ignore */ }
@@ -215,6 +221,14 @@ export function App(): JSX.Element {
         </div>
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} theme={theme} onThemeChange={setTheme} />
       </>
+    );
+  }
+
+  if (page === 'new-project') {
+    return (
+      <div className="h-screen overflow-hidden bg-background text-foreground">
+        <NewProjectWizard onBack={goHome} onCreate={handleProjectCreated} />
+      </div>
     );
   }
 

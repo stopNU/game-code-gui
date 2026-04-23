@@ -95,7 +95,12 @@
       "mcp__Claude_in_Chrome__tabs_context_mcp",
       "Bash(gunzip -c /c/Users/Michael/.claude/projects/D--dev-game-code-gui/9aa43879-f04f-45f5-9f6a-45c1dfae248b/tool-results/webfetch-1776969352321-ypd1eh.bin)",
       "Bash(tar -xO \"code-gui/project/Harness Studio Prototype.html\")",
-      "Bash(find /d/dev/game-code-gui/apps/studio/electron -name \"*.ts\" -exec grep -l \"ipcMain\\\\|ipcRenderer\\\\|handle\\\\|invoke\" {} \\\\;)"
+      "Bash(find /d/dev/game-code-gui/apps/studio/electron -name \"*.ts\" -exec grep -l \"ipcMain\\\\|ipcRenderer\\\\|handle\\\\|invoke\" {} \\\\;)",
+      "Bash(gunzip -c \"C:\\\\Users\\\\Michael\\\\.claude\\\\projects\\\\D--dev-game-code-gui\\\\00384489-6cd0-41d8-aa46-895b23ca4581\\\\tool-results\\\\webfetch-1776971269157-5152go.bin\")",
+      "Bash(tar -t)",
+      "Bash(tar -xO \"code-gui/README.md\")",
+      "Bash(tar -xO \"code-gui/chats/chat1.md\")",
+      "Bash(gunzip -c \"C:\\\\Users\\\\Michael\\\\.claude\\\\projects\\\\D--dev-game-code-gui\\\\00384489-6cd0-41d8-aa46-895b23ca4581\\\\tool-results\\\\webfetch-1776971727786-gqt8vj.bin\")"
     ]
   }
 }
