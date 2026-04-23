@@ -13,7 +13,7 @@ interface GodotLogProps {
 
 export function GodotLog({ logs }: GodotLogProps): JSX.Element {
   return (
-    <Card className="flex min-h-0 flex-1 flex-col p-4">
+    <Card className="flex min-h-48 flex-1 flex-col p-4">
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
         <ScrollText className="h-4 w-4 text-primary" />
         Godot Log

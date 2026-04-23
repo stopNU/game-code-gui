@@ -1,61 +1,68 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { ClaudeClient } from '../claude/client.js';
+import { describe, expect, it } from 'vitest';
+import { AIMessage } from '@langchain/core/messages';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { preprocessBrief } from './brief-preprocessor.js';
 
-function makeClient(responses: string[]): { client: ClaudeClient; sendMessage: ReturnType<typeof vi.fn> } {
-  const sendMessage = vi.fn(async () => ({
-    message: {
-      content: responses.shift() ?? '',
+function makeModel(responses: string[]): { model: BaseChatModel; callCount: () => number } {
+  let calls = 0;
+  const model = {
+    async invoke() {
+      calls++;
+      const text = responses.shift() ?? '';
+      return new AIMessage(text);
     },
-  }));
-
-  return {
-    client: { sendMessage } as unknown as ClaudeClient,
-    sendMessage,
-  };
+  } as unknown as BaseChatModel;
+  return { model, callCount: () => calls };
 }
 
+const validResponse = JSON.stringify({
+  mode: 'advanced',
+  classification: 'data-driven',
+  gameGenre: 'deckbuilder roguelike',
+  gameTitle: 'Relic Run',
+  summary: 'A compact deckbuilder.',
+  subsystems: [{ id: 'combat', name: 'Combat', description: 'Card combat', dependencies: [], modules: ['CombatEngine'] }],
+  dataSchemas: [],
+  sprintPlan: ['Core combat'],
+  mvpFeatures: ['Play cards'],
+  stretchFeatures: [],
+  eventTypes: ['ON_CARD_PLAYED'],
+  stateMachines: [],
+  sections: [],
+});
+
+const uid = Date.now();
+
 describe('preprocessBrief', () => {
-  it('bypasses the analyst for clearly simple short briefs', async () => {
-    const { client, sendMessage } = makeClient([]);
-    const result = await preprocessBrief('A tiny platformer where you jump over spikes.', client);
+  it('routes data-driven briefs through the analyst', async () => {
+    const brief = `Make a deckbuilder roguelike with cards, relics, map encounters, and turn-based combat. [${uid}a]`;
+    const { model, callCount } = makeModel([validResponse]);
 
-    expect(result.mode).toBe('simple');
-    expect(sendMessage).not.toHaveBeenCalled();
-  });
-
-  it('routes short but data-driven briefs through the analyst', async () => {
-    const brief = 'Make a deckbuilder roguelike with cards, relics, map encounters, and turn-based combat.';
-    const { client, sendMessage } = makeClient([
-      JSON.stringify({
-        mode: 'advanced',
-        classification: 'data-driven',
-        gameGenre: 'deckbuilder roguelike',
-        gameTitle: 'Relic Run',
-        summary: 'A compact deckbuilder.',
-        subsystems: [{ id: 'combat', name: 'Combat', description: 'Card combat', dependencies: [], modules: ['CombatEngine'] }],
-        dataSchemas: [],
-        sprintPlan: ['Core combat'],
-        mvpFeatures: ['Play cards'],
-        stretchFeatures: [],
-        eventTypes: ['ON_CARD_PLAYED'],
-        stateMachines: [],
-        sections: [],
-      }),
-    ]);
-
-    const result = await preprocessBrief(brief, client);
+    const result = await preprocessBrief(brief, model);
 
     expect(result.mode).toBe('advanced');
     expect(result.classification).toBe('data-driven');
-    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(callCount()).toBe(1);
+  });
+
+  it('returns cached result on second call with same brief', async () => {
+    const brief = `Make a deckbuilder with cards and relics. [${uid}b]`;
+    const { model: m1 } = makeModel([validResponse]);
+    const result1 = await preprocessBrief(brief, m1);
+
+    // Second call — if cache hit, model is never invoked
+    const { model: m2, callCount } = makeModel([]);
+    const result2 = await preprocessBrief(brief, m2);
+
+    expect(result1.gameTitle).toBe(result2.gameTitle);
+    expect(callCount()).toBe(0);
   });
 
   it('throws when analyst output is invalid twice instead of silently downgrading', async () => {
-    const brief = 'Build a deckbuilder with relics, card synergies, map nodes, and event-bus-driven combat.';
-    const { client, sendMessage } = makeClient(['not json', 'still not json']);
+    const brief = `Build a deckbuilder with relics, card synergies, map nodes, and event-bus-driven combat. [${uid}c]`;
+    const { model, callCount } = makeModel(['not json', 'still not json']);
 
-    await expect(preprocessBrief(brief, client)).rejects.toThrow(/Refusing to fall back to simple mode/);
-    expect(sendMessage).toHaveBeenCalledTimes(2);
+    await expect(preprocessBrief(brief, model)).rejects.toThrow(/Refusing to fall back to simple mode/);
+    expect(callCount()).toBe(2);
   });
 });

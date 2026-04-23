@@ -48,13 +48,3 @@ export interface ToolGroup {
   tools: ToolContract[];
 }
 
-/** Convert a ToolContract array to Anthropic SDK tool definitions */
-export function toAnthropicTools(
-  tools: ToolContract[],
-): Array<{ name: string; description: string; input_schema: JsonSchema }> {
-  return tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    input_schema: t.inputSchema,
-  }));
-}

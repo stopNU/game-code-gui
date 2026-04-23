@@ -1,18 +1,59 @@
 import { useEffect } from 'react';
-import { Cpu, Download, FileText, PlugZap, RadioTower } from 'lucide-react';
-import { Badge } from '@renderer/components/ui/badge';
-import { Button } from '@renderer/components/ui/button';
-import { Card } from '@renderer/components/ui/card';
-import { Skeleton } from '@renderer/components/ui/skeleton';
 import { trpc } from '@renderer/lib/trpc';
 import { useConversationStore } from '@renderer/store/conversation-store';
-import { GodotLauncher } from '@renderer/components/godot/godot-launcher';
-import { GodotLog } from '@renderer/components/godot/godot-log';
-import { TaskPlanCard } from '@renderer/components/project/task-plan-card';
+
+const S = {
+  bg1: '#0d1018',
+  bg3: '#161b28',
+  bg4: '#1c2133',
+  border: '#1a1f30',
+  border2: '#242b3d',
+  text0: '#eceef5',
+  text1: '#9aa0bc',
+  text2: '#545c7a',
+  text3: '#363d57',
+  accent: '#4d9eff',
+  accentLo: '#1a3a6e',
+  green: '#3dca7e',
+  greenLo: '#14311f',
+  amber: '#f5a83a',
+  red: '#e05252',
+  mono: "'IBM Plex Mono', monospace",
+};
+
+function Section({ title, children }: { title: string; children: React.ReactNode }): JSX.Element {
+  return (
+    <div style={{ padding: '12px 14px', borderBottom: `1px solid ${S.border}` }}>
+      <div style={{ fontSize: 10, fontFamily: S.mono, color: S.text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 7 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Row({ label, value, valueColor }: { label: string; value: string; valueColor?: string }): JSX.Element {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+      <span style={{ fontSize: 11, fontFamily: S.mono, color: S.text2 }}>{label}</span>
+      <span style={{ fontSize: 10, fontFamily: S.mono, color: valueColor ?? S.text1 }}>{value}</span>
+    </div>
+  );
+}
 
 export function RightPanel(): JSX.Element {
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
   const selectedProjectId = useConversationStore((state) => state.selectedProjectId);
+  const sessionStatus = useConversationStore((state) => state.sessionStatus);
+  const tokenUsage = useConversationStore((state) =>
+    activeConversationId === null ? undefined : state.tokenUsage[activeConversationId],
+  );
+  const godotStatus = useConversationStore((state) => state.godotStatus);
+  const godotDebuggerEnabled = useConversationStore((state) => state.godotDebuggerEnabled);
+  const setGodotDebuggerEnabled = useConversationStore((state) => state.setGodotDebuggerEnabled);
+  const updateStatus = useConversationStore((state) => state.updateStatus);
+  const hydrateGodotRuntime = useConversationStore((state) => state.hydrateGodotRuntime);
+
   const settingsQuery = trpc.settings.getStatus.useQuery();
   const langsmithQuery = trpc.langsmith.getStatus.useQuery();
   const runtimeQuery = trpc.runtime.getStatus.useQuery();
@@ -23,194 +64,167 @@ export function RightPanel(): JSX.Element {
   const stopGodot = trpc.godot.stop.useMutation();
   const openLogFile = trpc.runtime.openLogFile.useMutation();
   const restartToInstallUpdate = trpc.runtime.restartToInstallUpdate.useMutation();
-  const sessionStatus = useConversationStore((state) => state.sessionStatus);
-  const sessionDetail = useConversationStore((state) => state.sessionDetail);
-  const latestToolCall = useConversationStore((state) => state.latestToolCall);
-  const tokenUsage = useConversationStore((state) =>
-    activeConversationId === null ? undefined : state.tokenUsage[activeConversationId],
-  );
-  const godotStatus = useConversationStore((state) => state.godotStatus);
-  const godotLogs = useConversationStore((state) => state.godotLogs);
-  const godotDebuggerEnabled = useConversationStore((state) => state.godotDebuggerEnabled);
-  const setGodotDebuggerEnabled = useConversationStore((state) => state.setGodotDebuggerEnabled);
-  const updateStatus = useConversationStore((state) => state.updateStatus);
-  const hydrateGodotRuntime = useConversationStore((state) => state.hydrateGodotRuntime);
 
   useEffect(() => {
     if (runtimeQuery.data !== undefined) {
-      useConversationStore.setState({
-        updateStatus: runtimeQuery.data.updateState,
-      });
+      useConversationStore.setState({ updateStatus: runtimeQuery.data.updateState });
     }
   }, [runtimeQuery.data]);
 
   useEffect(() => {
     if (godotStatusQuery.data !== undefined && godotLogsQuery.data !== undefined) {
-      hydrateGodotRuntime({
-        status: godotStatusQuery.data,
-        logs: godotLogsQuery.data,
-      });
+      hydrateGodotRuntime({ status: godotStatusQuery.data, logs: godotLogsQuery.data });
     }
   }, [godotLogsQuery.data, godotStatusQuery.data, hydrateGodotRuntime]);
 
-  const selectedProject = projectsQuery.data?.find((project) => project.id === selectedProjectId) ?? null;
-  const loadingSummary = settingsQuery.isLoading || langsmithQuery.isLoading || runtimeQuery.isLoading || projectsQuery.isLoading;
+  const selectedProject = projectsQuery.data?.find((p) => p.id === selectedProjectId) ?? null;
+
+  const sessionColor = sessionStatus === 'ready' ? S.green : sessionStatus === 'error' ? S.red : S.amber;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto">
-      <Card className="p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <RadioTower className="h-4 w-4 text-primary" />
-          Session
+    <div
+      style={{
+        width: 220,
+        flexShrink: 0,
+        background: S.bg1,
+        borderLeft: `1px solid ${S.border}`,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'auto',
+      }}
+    >
+      {/* Session */}
+      <Section title="Session">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: sessionColor, flexShrink: 0 }} />
+          <span style={{ fontSize: 11, fontFamily: S.mono, color: sessionColor }}>{sessionStatus}</span>
         </div>
-        <Badge className="mb-3">{sessionStatus}</Badge>
-        <p className="text-sm text-muted-foreground">{sessionDetail}</p>
-      </Card>
+      </Section>
 
-      <Card className="p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <PlugZap className="h-4 w-4 text-accent" />
-          Providers
+      {/* Providers */}
+      <Section title="Providers">
+        <Row
+          label="Anthropic"
+          value={settingsQuery.data?.anthropicConfigured ? 'configured' : 'missing'}
+          valueColor={settingsQuery.data?.anthropicConfigured ? S.green : S.red}
+        />
+        <Row
+          label="OpenAI"
+          value={settingsQuery.data?.openaiConfigured ? 'configured' : 'missing'}
+          valueColor={settingsQuery.data?.openaiConfigured ? S.green : S.red}
+        />
+        <Row
+          label="LangSmith"
+          value={langsmithQuery.data?.configured ? 'configured' : 'inactive'}
+          valueColor={langsmithQuery.data?.configured ? S.green : S.text2}
+        />
+        <Row
+          label="Godot"
+          value={godotStatus.status}
+          valueColor={godotStatus.status === 'running' ? S.green : S.text2}
+        />
+      </Section>
+
+      {/* Runtime + Godot */}
+      <Section title="Runtime">
+        <Row label="Version" value={runtimeQuery.data?.appVersion ?? '—'} />
+        <Row label="Updates" value={updateStatus.status} />
+        <div style={{ height: 1, background: S.border, margin: '8px 0' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 10, fontFamily: S.mono, color: S.text2 }}>Godot Runtime</span>
+          <span style={{ fontSize: 10, fontFamily: S.mono, color: godotStatus.status === 'running' ? S.green : S.text2 }}>
+            {godotStatus.status}
+          </span>
         </div>
-        {loadingSummary ? (
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-full" />
-          </div>
-        ) : (
-        <div className="space-y-2 text-sm text-muted-foreground">
-          <div className="flex items-center justify-between">
-            <span>Anthropic</span>
-            <Badge>{settingsQuery.data?.anthropicConfigured ? 'configured' : 'missing'}</Badge>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>OpenAI</span>
-            <Badge>{settingsQuery.data?.openaiConfigured ? 'configured' : 'missing'}</Badge>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>LangSmith</span>
-            <Badge>{langsmithQuery.data?.configured ? 'configured' : 'inactive'}</Badge>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Godot</span>
-            <Badge>{godotStatus.status}</Badge>
-          </div>
+        <div style={{ fontSize: 10, fontFamily: S.mono, color: S.text2, marginBottom: 8 }}>
+          {selectedProject?.title ?? selectedProject?.name ?? (selectedProjectId !== null ? 'loading…' : 'No project')}
         </div>
-        )}
-      </Card>
-
-      <Card className="p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Download className="h-4 w-4 text-primary" />
-          Runtime
+        {/* Debugger toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 10, fontFamily: S.mono, color: S.text2 }}>Debugger</span>
+          <button
+            onClick={() => setGodotDebuggerEnabled(!godotDebuggerEnabled)}
+            style={{
+              fontSize: 10, fontFamily: S.mono,
+              color: godotDebuggerEnabled ? S.accent : S.text2,
+              background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+            }}
+          >
+            {godotDebuggerEnabled ? 'on' : 'off'}
+          </button>
         </div>
-        {runtimeQuery.isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        ) : (
-        <div className="space-y-2 text-sm text-muted-foreground">
-          <div className="flex items-center justify-between">
-            <span>Version</span>
-            <span>{runtimeQuery.data?.appVersion ?? 'loading'}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Updates</span>
-            <Badge>{updateStatus.status}</Badge>
-          </div>
-          <p className="text-xs leading-5 text-muted-foreground">
-            {updateStatus.message ?? 'No update activity reported yet.'}
-          </p>
-          {updateStatus.downloadedVersion !== undefined ? (
-            <div className="text-xs text-foreground">Ready to install: {updateStatus.downloadedVersion}</div>
-          ) : null}
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button
-              variant="outline"
-              onClick={() => void openLogFile.mutateAsync()}
-              disabled={openLogFile.isPending || runtimeQuery.data === undefined}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Open Log File
-            </Button>
-            <Button
-              onClick={() => void restartToInstallUpdate.mutateAsync()}
-              disabled={restartToInstallUpdate.isPending || updateStatus.status !== 'downloaded'}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Restart to Update
-            </Button>
-          </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => {
+              if (selectedProjectId === null) return;
+              void launchGodot.mutateAsync({ projectId: selectedProjectId, debuggerEnabled: godotDebuggerEnabled }).then((status) => {
+                hydrateGodotRuntime({ status, logs: [] });
+              });
+            }}
+            disabled={godotStatus.status === 'running' || selectedProjectId === null || launchGodot.isPending}
+            style={{
+              flex: 1, padding: '5px 0',
+              background: godotStatus.status === 'running' ? S.bg4 : S.green,
+              color: godotStatus.status === 'running' ? S.text2 : '#fff',
+              border: 'none', borderRadius: 3,
+              fontSize: 10, cursor: godotStatus.status === 'running' ? 'default' : 'pointer',
+              fontFamily: S.mono,
+              opacity: selectedProjectId === null ? 0.4 : 1,
+            }}
+          >
+            ▶ Launch
+          </button>
+          <button
+            onClick={() => {
+              void stopGodot.mutateAsync().then((status) => {
+                hydrateGodotRuntime({ status, logs: useConversationStore.getState().godotLogs });
+              });
+            }}
+            disabled={stopGodot.isPending}
+            style={{
+              padding: '5px 10px', background: S.bg4, color: S.text2,
+              border: `1px solid ${S.border}`, borderRadius: 3,
+              fontSize: 10, cursor: 'pointer', fontFamily: S.mono,
+            }}
+          >
+            Stop
+          </button>
         </div>
-        )}
-      </Card>
+      </Section>
 
-      <GodotLauncher
-        projectName={selectedProject?.title ?? selectedProject?.name ?? null}
-        projectPath={selectedProject?.path ?? null}
-        status={godotStatus}
-        launching={launchGodot.isPending}
-        stopping={stopGodot.isPending}
-        debuggerEnabled={godotDebuggerEnabled}
-        onDebuggerEnabledChange={setGodotDebuggerEnabled}
-        onLaunch={async () => {
-          if (selectedProjectId === null) {
-            return;
-          }
+      {/* Live Usage */}
+      <Section title="Live Usage">
+        <Row label="Input tokens" value={(tokenUsage?.input ?? 0).toLocaleString()} />
+        <Row label="Output tokens" value={(tokenUsage?.output ?? 0).toLocaleString()} />
+        <Row label="Cached tokens" value={(tokenUsage?.cached ?? 0).toLocaleString()} />
+      </Section>
 
-          const status = await launchGodot.mutateAsync({
-            projectId: selectedProjectId,
-            debuggerEnabled: godotDebuggerEnabled,
-          });
-          hydrateGodotRuntime({
-            status,
-            logs: [],
-          });
-        }}
-        onStop={async () => {
-          const status = await stopGodot.mutateAsync();
-          hydrateGodotRuntime({
-            status,
-            logs: useConversationStore.getState().godotLogs,
-          });
-        }}
-      />
-
-      {selectedProjectId !== null && <TaskPlanCard projectId={selectedProjectId} />}
-
-      <Card className="p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Cpu className="h-4 w-4 text-primary" />
-          Live Usage
-        </div>
-        <div className="space-y-2 text-sm text-muted-foreground">
-          <div className="flex items-center justify-between">
-            <span>Input tokens</span>
-            <span>{tokenUsage?.input ?? 0}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Output tokens</span>
-            <span>{tokenUsage?.output ?? 0}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Cached tokens</span>
-            <span>{tokenUsage?.cached ?? 0}</span>
-          </div>
-        </div>
-        {latestToolCall !== null ? (
-          <div className="mt-4 rounded-2xl border border-border bg-background/50 p-3">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">Latest tool</div>
-            <div className="mt-2 text-sm font-medium text-foreground">{latestToolCall.toolName}</div>
-            <div className="mt-1 text-xs text-muted-foreground">{latestToolCall.status}</div>
-          </div>
-        ) : null}
-      </Card>
-
-      <GodotLog logs={godotLogs} />
+      {/* Actions */}
+      <div style={{ padding: '10px 14px' }}>
+        <button
+          onClick={() => void openLogFile.mutateAsync()}
+          disabled={openLogFile.isPending}
+          style={{
+            width: '100%', background: S.bg3, border: `1px solid ${S.border2}`,
+            borderRadius: 3, padding: '7px 0', fontSize: 10, fontFamily: S.mono,
+            color: S.text1, cursor: 'pointer', marginBottom: 6,
+          }}
+        >
+          ⊡ Open Log File
+        </button>
+        <button
+          onClick={() => void restartToInstallUpdate.mutateAsync()}
+          disabled={restartToInstallUpdate.isPending || updateStatus.status !== 'downloaded'}
+          style={{
+            width: '100%', background: S.bg3, border: `1px solid ${S.border2}`,
+            borderRadius: 3, padding: '7px 0', fontSize: 10, fontFamily: S.mono,
+            color: updateStatus.status === 'downloaded' ? S.text0 : S.text2,
+            cursor: updateStatus.status === 'downloaded' ? 'pointer' : 'default',
+          }}
+        >
+          ↺ Restart to Update
+        </button>
+      </div>
     </div>
   );
 }

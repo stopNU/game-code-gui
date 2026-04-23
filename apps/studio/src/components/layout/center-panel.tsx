@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from 'react';
 import type { ConversationMessage } from '@renderer/store/conversation-store';
-import { Card } from '@renderer/components/ui/card';
 import { Separator } from '@renderer/components/ui/separator';
 import { Skeleton } from '@renderer/components/ui/skeleton';
 import { trpc } from '@renderer/lib/trpc';
@@ -108,7 +107,7 @@ export function CenterPanel(): JSX.Element {
   };
 
   return (
-    <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <ConversationHeader
         preferences={preferences}
         sessionStatus={sessionStatus}
@@ -156,6 +155,6 @@ export function CenterPanel(): JSX.Element {
       )}
       <Separator />
       <ChatComposer disabled={activeConversationId === null} sending={running || sending} onSend={handleSend} onAbort={handleAbort} />
-    </Card>
+    </div>
   );
 }

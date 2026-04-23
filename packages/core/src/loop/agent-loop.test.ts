@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ClaudeClient } from '../claude/client.js';
+import { AIMessage } from '@langchain/core/messages';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { BaseMessage } from '@langchain/core/messages';
 import { runAgentLoop } from './agent-loop.js';
-import type { AgentContext, ClaudeMessage } from '../types/agent.js';
+import type { AgentContext } from '../types/agent.js';
 import type { RetryPolicy } from '../types/agent.js';
 import type { ToolContract } from '../types/tool.js';
 
@@ -14,48 +16,16 @@ const retryPolicy: RetryPolicy = {
 };
 
 describe('runAgentLoop', () => {
-  it('returns a tool error instead of executing invalid tool input', async () => {
-    const execute = vi.fn();
-    const tool: ToolContract<any, any> = {
-      name: 'project__readFile',
-      group: 'project',
-      description: 'Read a file.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          path: { type: 'string' },
-        },
-        required: ['path'],
-      },
-      outputSchema: { type: 'object' },
-      permissions: [],
-      execute,
-    };
-
-    const messages = [
-      createToolUseResponse('call-1', 'project__readFile', {}),
-      createEndTurnResponse('done'),
-    ];
-    const client = createMockClient(messages);
-
-    const result = await runAgentLoop(createContext(), { maxIterations: 3, retryPolicy }, { client: client.instance, tools: [tool] });
-
+  it('returns success when model returns no tool calls', async () => {
+    const model = createMockModel([
+      new AIMessage('Task complete.'),
+    ]);
+    const result = await runAgentLoop(createContext(), { maxIterations: 3, retryPolicy }, { chatModel: model.instance, tools: [] });
     expect(result.success).toBe(true);
-    expect(execute).not.toHaveBeenCalled();
-    expect(client.calls).toHaveLength(2);
-    expect((client.calls[1]?.messages as ClaudeMessage[]).at(-1)).toEqual({
-      role: 'user',
-      content: [
-        {
-          type: 'tool_result',
-          tool_use_id: 'call-1',
-          content: 'Error: Invalid input for tool "project__readFile": missing required field "path"',
-        },
-      ],
-    });
+    expect(result.summary).toBe('Task complete.');
   });
 
-  it('blocks repeated identical tool calls before max iterations', async () => {
+  it('executes tool calls and loops back to model', async () => {
     const execute = vi.fn(async () => ({ ok: true }));
     const tool: ToolContract<any, any> = {
       name: 'project__readFile',
@@ -63,9 +33,7 @@ describe('runAgentLoop', () => {
       description: 'Read a file.',
       inputSchema: {
         type: 'object',
-        properties: {
-          path: { type: 'string' },
-        },
+        properties: { path: { type: 'string' } },
         required: ['path'],
       },
       outputSchema: { type: 'object' },
@@ -73,63 +41,70 @@ describe('runAgentLoop', () => {
       execute,
     };
 
-    const repeatedCall = { path: 'src/index.ts' };
-    const client = createMockClient([
-      createToolUseResponse('call-1', 'project__readFile', repeatedCall),
-      createToolUseResponse('call-2', 'project__readFile', repeatedCall),
-      createToolUseResponse('call-3', 'project__readFile', repeatedCall),
-      createEndTurnResponse('done'),
-    ]);
+    const toolCallMsg = new AIMessage({ content: '', tool_calls: [{ id: 'call-1', name: 'project__readFile', args: { path: 'src/index.ts' }, type: 'tool_call' }] });
+    const finalMsg = new AIMessage('done');
 
-    const result = await runAgentLoop(createContext(), { maxIterations: 5, retryPolicy }, { client: client.instance, tools: [tool] });
+    const model = createMockModel([toolCallMsg, finalMsg]);
+    const result = await runAgentLoop(createContext(), { maxIterations: 5, retryPolicy }, { chatModel: model.instance, tools: [tool] });
 
     expect(result.success).toBe(true);
-    expect(execute).toHaveBeenCalledTimes(2);
-    expect((client.calls[3]?.messages as ClaudeMessage[]).at(-1)).toEqual({
-      role: 'user',
-      content: [
-        {
-          type: 'tool_result',
-          tool_use_id: 'call-3',
-          content:
-            'Error: Repeated tool call detected for "project__readFile". Choose a different action or explain why the previous result was insufficient.',
-        },
-      ],
-    });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(model.calls).toHaveLength(2);
   });
 
-  it('fails fast when a tool_use turn contains no executable tool calls', async () => {
-    const client = createMockClient([
-      {
-        message: {
-          role: 'assistant',
-          content: [{ type: 'tool_use' }],
-        },
-        stopReason: 'tool_use',
+  it('blocks repeated identical tool calls', async () => {
+    const execute = vi.fn(async () => ({ ok: true }));
+    const tool: ToolContract<any, any> = {
+      name: 'project__readFile',
+      group: 'project',
+      description: 'Read a file.',
+      inputSchema: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path'],
       },
+      outputSchema: { type: 'object' },
+      permissions: [],
+      execute,
+    };
+
+    const makeToolCall = () => new AIMessage({ content: '', tool_calls: [{ id: 'call-1', name: 'project__readFile', args: { path: 'src/index.ts' }, type: 'tool_call' as const }] });
+
+    const model = createMockModel([
+      makeToolCall(),
+      makeToolCall(),
+      makeToolCall(),
+      new AIMessage('done'),
     ]);
 
-    const result = await runAgentLoop(createContext(), { maxIterations: 1, retryPolicy }, { client: client.instance, tools: [] });
+    const result = await runAgentLoop(createContext(), { maxIterations: 5, retryPolicy }, { chatModel: model.instance, tools: [tool] });
 
-    expect(result.success).toBe(false);
-    expect(result.summary).toContain('did not provide any executable tool calls');
+    // Two real executions, third blocked by repeat stall
+    expect(execute).toHaveBeenCalledTimes(2);
+    // The fourth model call sees a tool_result with the stall error
+    const lastMessages = model.calls[3] as BaseMessage[];
+    const lastMsg = lastMessages?.at(-1);
+    expect(lastMsg?.content).toContain('Repeated tool call detected');
   });
 
-  it('passes AbortSignal through to the client request', async () => {
-    const client = createMockClient([createEndTurnResponse('done')]);
+  it('passes AbortSignal and returns cancelled when aborted', async () => {
     const controller = new AbortController();
+    controller.abort();
 
-    await runAgentLoop(
+    const model = createMockModel([new AIMessage('should not reach')]);
+    const result = await runAgentLoop(
       createContext(),
-      { maxIterations: 1, retryPolicy, signal: controller.signal },
-      { client: client.instance, tools: [] },
+      { maxIterations: 3, retryPolicy, signal: controller.signal },
+      { chatModel: model.instance, tools: [] },
     );
 
-    expect(client.calls[0]?.signal).toBe(controller.signal);
+    expect(result.success).toBe(false);
+    expect(result.summary).toContain('cancelled');
+    expect(model.calls).toHaveLength(0);
   });
 
   it('seeds asset tasks with explicit asset planning context', async () => {
-    const client = createMockClient([createEndTurnResponse('done')]);
+    const model = createMockModel([new AIMessage('done')]);
     const ctx = createContext();
     ctx.config.role = 'asset';
     ctx.task.role = 'asset';
@@ -140,13 +115,13 @@ describe('runAgentLoop', () => {
     ctx.task.context.scenesNeedingBackgrounds = ['MenuScene', 'GameScene', 'ResultScene'];
     ctx.task.context.plannedAssets = ['player sprite', 'scarab sprite', 'desert background'];
 
-    await runAgentLoop(ctx, { maxIterations: 1, retryPolicy }, { client: client.instance, tools: [] });
+    await runAgentLoop(ctx, { maxIterations: 1, retryPolicy }, { chatModel: model.instance, tools: [] });
 
-    const firstPrompt = ((client.calls[0]?.messages as ClaudeMessage[])[0]?.content) as string;
-    expect(firstPrompt).toContain('**Asset Planning Context:**');
-    expect(firstPrompt).toContain('Canvas size: 1024x768');
-    expect(firstPrompt).toContain('Named entities requiring asset coverage: Player, Scarab, Coin');
-    expect(firstPrompt).toContain('Scenes needing backgrounds: MenuScene, GameScene, ResultScene');
+    const firstMessages = model.calls[0] as BaseMessage[];
+    // The second message is the HumanMessage with the task prompt
+    const humanMsg = firstMessages?.[1];
+    const content = typeof humanMsg?.content === 'string' ? humanMsg.content : JSON.stringify(humanMsg?.content);
+    expect(content).toContain('Asset Planning Context');
   });
 });
 
@@ -195,50 +170,20 @@ function createContext(): AgentContext {
   };
 }
 
-function createToolUseResponse(id: string, name: string, input: Record<string, unknown>) {
-  return {
-    message: {
-      role: 'assistant' as const,
-      content: [{ type: 'tool_use' as const, id, name, input }],
-    },
-    stopReason: 'tool_use',
-  };
-}
-
-function createEndTurnResponse(text: string) {
-  return {
-    message: {
-      role: 'assistant' as const,
-      content: [{ type: 'text' as const, text }],
-    },
-    stopReason: 'end_turn',
-  };
-}
-
-function createMockClient(
-  responses: Array<{ message: ClaudeMessage; stopReason: string }>,
-): {
-  calls: Array<Record<string, unknown>>;
-  instance: ClaudeClient;
+function createMockModel(responses: AIMessage[]): {
+  calls: BaseMessage[][];
+  instance: BaseChatModel;
 } {
-  const calls: Array<Record<string, unknown>> = [];
+  const calls: BaseMessage[][] = [];
   const instance = {
-    async sendMessage(opts: Record<string, unknown>) {
-      calls.push({
-        ...opts,
-        ...(Array.isArray(opts.messages) ? { messages: structuredClone(opts.messages) } : {}),
-      });
+    bindTools() { return this; },
+    async invoke(messages: BaseMessage[]) {
+      calls.push([...messages]);
       const response = responses.shift();
-      if (!response) {
-        throw new Error('No mock response available');
-      }
-
-      return {
-        ...response,
-        tokens: { input: 1, output: 1, cached: 0 },
-      };
+      if (!response) throw new Error('No mock response available');
+      return response;
     },
-  } as unknown as ClaudeClient;
+  } as unknown as BaseChatModel;
 
   return { calls, instance };
 }

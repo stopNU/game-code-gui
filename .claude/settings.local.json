@@ -82,7 +82,20 @@
       "Bash(find \"D:\\\\dev\\\\game-code-gui\\\\apps\\\\studio\\\\src\\\\components\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec grep -l \"getPlan\\\\|plan\\\\.\\\\|phases\\\\|tasks\" {} \\\\;)",
       "Bash(git stash *)",
       "Bash(pnpm --filter @agent-harness/studio run typecheck)",
-      "Bash(pnpm --filter @agent-harness/studio run build)"
+      "Bash(pnpm --filter @agent-harness/studio run build)",
+      "Bash(pnpm --filter @agent-harness/core add @langchain/core @langchain/anthropic @langchain/openai @langchain/langgraph)",
+      "Bash(pnpm --filter @agent-harness/studio add langchain)",
+      "Bash(pnpm --filter @agent-harness/studio add @langchain/core @langchain/anthropic @langchain/openai)",
+      "Bash(pnpm --filter @agent-harness/core run test)",
+      "Bash(pnpm --filter @agent-harness/services run build)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(xxd)",
+      "Bash(tar -xf /tmp/design_output.html -C /tmp/design_bundle)",
+      "Bash(wslpath -w /tmp/prototype.html)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(gunzip -c /c/Users/Michael/.claude/projects/D--dev-game-code-gui/9aa43879-f04f-45f5-9f6a-45c1dfae248b/tool-results/webfetch-1776969352321-ypd1eh.bin)",
+      "Bash(tar -xO \"code-gui/project/Harness Studio Prototype.html\")",
+      "Bash(find /d/dev/game-code-gui/apps/studio/electron -name \"*.ts\" -exec grep -l \"ipcMain\\\\|ipcRenderer\\\\|handle\\\\|invoke\" {} \\\\;)"
     ]
   }
 }

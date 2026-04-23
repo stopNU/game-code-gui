@@ -1,4 +1,4 @@
-import { ClaudeClient, createAdvancedPlan, preprocessBrief } from '@agent-harness/core';
+import { createChatModel, createAdvancedPlan, preprocessBrief } from '@agent-harness/core';
 import type { PreprocessedBrief, TaskPlan } from '@agent-harness/core';
 import { scaffoldGame } from '@agent-harness/game-adapter';
 import { installDeps } from '@agent-harness/tools';
@@ -17,7 +17,7 @@ export interface PlanGameArgs {
 }
 
 export async function planGameService(args: PlanGameArgs): Promise<TaskPlan> {
-  const client = new ClaudeClient();
+  const client = createChatModel('claude-sonnet-4-5', 'designer');
 
   args.onStageChange?.('preprocessing');
   const preprocessedBrief = await preprocessBrief(args.brief, client);

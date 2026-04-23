@@ -3,7 +3,9 @@ import { createHash } from 'crypto';
 import { mkdir, readFile as fsReadFile, writeFile as fsWriteFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { ClaudeClient } from '../claude/client.js';
+import { ChatAnthropic } from '@langchain/anthropic';
+import { SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { DEFAULT_MODEL } from '../types/agent.js';
 import { BRIEF_ANALYST_SYSTEM_PROMPT } from '../claude/roles/brief-analyst.js';
 import type { SubsystemDef, DataSchemaDef, StateMachineDef as TaskStateMachineDef } from '../types/task.js';
@@ -146,7 +148,7 @@ async function writeBriefCache(key: string, result: PreprocessedBrief): Promise<
  */
 export async function preprocessBrief(
   brief: string,
-  client?: ClaudeClient,
+  chatModel?: BaseChatModel,
   onText?: (delta: string) => void,
 ): Promise<PreprocessedBrief> {
   // Cache hit — avoid redundant LLM call for identical briefs
@@ -156,27 +158,31 @@ export async function preprocessBrief(
     return { ...cached, rawBrief: brief };
   }
 
-  const c = client ?? new ClaudeClient();
+  const apiKey = process.env['ANTHROPIC_API_KEY'];
+  const model = chatModel ?? new ChatAnthropic({
+    model: DEFAULT_MODEL,
+    maxTokens: 16000,
+    temperature: 0.3,
+    ...(apiKey !== undefined ? { apiKey } : {}),
+  });
 
   const userPrompt =
     `Analyze the following game design document and return the structured JSON as specified.\n\n` +
     `Document:\n${brief}`;
 
-  const result = await c.sendMessage({
-    model: DEFAULT_MODEL,
-    maxTokens: 16000,
-    temperature: 0.3,
-    systemPrompt: BRIEF_ANALYST_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
-    ...(onText !== undefined ? { onText } : {}),
-  });
+  const callbacks = onText ? [{ handleLLMNewToken: (token: string) => onText(token) }] : [];
 
-  const text = extractText(result.message.content);
+  const firstResponse = await model.invoke(
+    [new SystemMessage(BRIEF_ANALYST_SYSTEM_PROMPT), new HumanMessage(userPrompt)],
+    { callbacks },
+  );
+
+  const text = extractText(typeof firstResponse.content === 'string' ? firstResponse.content : JSON.stringify(firstResponse.content));
   const analysisResult = parseAnalystResponse(text);
 
   if (analysisResult.success) {
     const result = toPreprocessedBrief(brief, analysisResult.data);
-    void writeBriefCache(cacheKey, result);
+    await writeBriefCache(cacheKey, result);
     return result;
   }
 
@@ -186,28 +192,22 @@ export async function preprocessBrief(
     .map((i) => `  ${i.path.join('.')}: ${i.message}`)
     .join('\n');
 
-  const retry = await c.sendMessage({
-    model: DEFAULT_MODEL,
-    maxTokens: 16000,
-    systemPrompt: BRIEF_ANALYST_SYSTEM_PROMPT,
-    messages: [
-      { role: 'user', content: userPrompt },
-      { role: 'assistant', content: text },
-      {
-        role: 'user',
-        content:
-          `Your response failed schema validation. Fix these errors and return corrected JSON only:\n` +
-          errorSummary,
-      },
-    ],
-  });
+  const retryResponse = await model.invoke([
+    new SystemMessage(BRIEF_ANALYST_SYSTEM_PROMPT),
+    new HumanMessage(userPrompt),
+    new AIMessage(text),
+    new HumanMessage(
+      `Your response failed schema validation. Fix these errors and return corrected JSON only:\n` +
+      errorSummary,
+    ),
+  ]);
 
-  const retryText = extractText(retry.message.content);
+  const retryText = extractText(typeof retryResponse.content === 'string' ? retryResponse.content : JSON.stringify(retryResponse.content));
   const retryResult = parseAnalystResponse(retryText);
 
   if (retryResult.success) {
     const result = toPreprocessedBrief(brief, retryResult.data);
-    void writeBriefCache(cacheKey, result);
+    await writeBriefCache(cacheKey, result);
     return result;
   }
 

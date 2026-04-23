@@ -3,42 +3,42 @@
 @tailwind utilities;
 
 :root {
-  --background: 222 30% 7%;
-  --foreground: 210 24% 92%;
-  --card: 224 26% 10%;
-  --card-foreground: 210 24% 92%;
-  --primary: 192 83% 66%;
-  --primary-foreground: 222 30% 10%;
-  --muted: 220 18% 14%;
-  --muted-foreground: 215 16% 68%;
-  --accent: 156 64% 57%;
-  --accent-foreground: 222 30% 10%;
-  --border: 215 18% 18%;
-  --input: 215 18% 18%;
-  --ring: 192 83% 66%;
-  --destructive: 0 72% 58%;
+  --background: 220 32% 5%;
+  --foreground: 225 30% 94%;
+  --card: 221 30% 8%;
+  --card-foreground: 225 30% 94%;
+  --primary: 213 100% 65%;
+  --primary-foreground: 220 32% 5%;
+  --muted: 221 28% 11%;
+  --muted-foreground: 221 18% 68%;
+  --accent: 147 55% 51%;
+  --accent-foreground: 220 32% 5%;
+  --border: 221 28% 14%;
+  --input: 221 28% 14%;
+  --ring: 213 100% 65%;
+  --destructive: 0 58% 60%;
   --destructive-foreground: 0 0% 98%;
   color-scheme: dark;
-  font-family: "Segoe UI Variable", Bahnschrift, "Trebuchet MS", sans-serif;
+  font-family: "IBM Plex Sans", "Segoe UI Variable", sans-serif;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
 }
 
 html.light {
-  --background: 38 33% 96%;
+  --background: 220 20% 97%;
   --foreground: 220 30% 12%;
   --card: 0 0% 100%;
   --card-foreground: 220 30% 12%;
-  --primary: 197 83% 38%;
+  --primary: 213 85% 45%;
   --primary-foreground: 0 0% 100%;
-  --muted: 35 23% 90%;
-  --muted-foreground: 220 12% 38%;
-  --accent: 154 54% 42%;
+  --muted: 220 15% 92%;
+  --muted-foreground: 220 12% 40%;
+  --accent: 147 55% 38%;
   --accent-foreground: 0 0% 100%;
-  --border: 32 18% 82%;
-  --input: 32 18% 82%;
-  --ring: 197 83% 38%;
-  --destructive: 0 72% 46%;
+  --border: 220 18% 84%;
+  --input: 220 18% 84%;
+  --ring: 213 85% 45%;
+  --destructive: 0 58% 46%;
   --destructive-foreground: 0 0% 100%;
   color-scheme: light;
 }
@@ -56,10 +56,7 @@ body,
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(230, 175, 76, 0.08), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(24, 140, 118, 0.08), transparent 22%),
-    hsl(var(--background));
+  background: hsl(var(--background));
 }
 
 button,
@@ -69,13 +66,13 @@ textarea {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(135, 164, 188, 0.28);
-  border-radius: 999px;
+  background: #1f2438;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-track {

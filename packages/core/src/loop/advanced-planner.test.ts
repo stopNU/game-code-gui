@@ -1,16 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { ClaudeClient } from '../claude/client.js';
+import { AIMessage } from '@langchain/core/messages';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { PreprocessedBrief } from './brief-preprocessor.js';
 import { createAdvancedPlan } from './advanced-planner.js';
 
-function makeClient(response: unknown): ClaudeClient {
+function makeClient(response: unknown): BaseChatModel {
   return {
-    sendMessage: async () => ({
-      message: {
-        content: JSON.stringify(response),
-      },
-    }),
-  } as unknown as ClaudeClient;
+    async invoke() {
+      return new AIMessage(JSON.stringify(response));
+    },
+  } as unknown as BaseChatModel;
 }
 
 describe('createAdvancedPlan', () => {
@@ -342,12 +341,10 @@ describe('createAdvancedPlan', () => {
     ].join('\n');
 
     const client = {
-      sendMessage: async () => ({
-        message: {
-          content: response,
-        },
-      }),
-    } as unknown as ClaudeClient;
+      async invoke() {
+        return new AIMessage(response);
+      },
+    } as unknown as BaseChatModel;
 
     const plan = await createAdvancedPlan(preprocessed, client);
 

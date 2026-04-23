@@ -12,7 +12,7 @@ import { buildConversationAgentPrompt } from './conversation-agent-prompt.js';
 import { ApprovalGate, type ToolRiskLevel } from './approval-gate.js';
 import { AnthropicProvider, OpenAIProvider, type LLMProvider } from './llm-provider.js';
 import { buildToolExecutionContext, createStudioTools, summarizeToolResult } from './tool-registry.js';
-import { Tracer, type LangSmithConfig } from './langsmith/tracer.js';
+import { applyLangSmithEnv } from './langsmith/env.js';
 import type { StreamEvent } from '../../shared/protocol.js';
 
 interface DbMessageRecord {
@@ -219,35 +219,19 @@ export class ConversationAgent {
 
     const langSmithCfg = await this.bridge.getLangSmithConfig();
     this.log(`[LangSmith] config: enabled=${langSmithCfg.enabled}, hasKey=${langSmithCfg.apiKey !== null}, project=${langSmithCfg.projectName}`);
-    const tracerConfig: LangSmithConfig | null =
-      langSmithCfg.enabled && langSmithCfg.apiKey !== null
-        ? { apiKey: langSmithCfg.apiKey, projectName: langSmithCfg.projectName, endpoint: langSmithCfg.endpoint }
-        : null;
-    const tracer = new Tracer(langSmithCfg.enabled, tracerConfig, this.log);
+    applyLangSmithEnv(langSmithCfg);
 
     if (args.provider === 'codex') {
-      await tracer.wrapConversationTurn(
+      await this.runCodexConversation(
         {
           conversationId: args.conversationId,
-          model: args.model,
-          provider: args.provider,
           userMessage: args.userMessage,
-          systemPrompt: buildConversationAgentPrompt({ project }),
-          history: (await this.bridge.listMessages(args.conversationId)).map(toClaudeMessage),
+          ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+          model: args.model,
+          provider: 'codex',
+          signal: args.signal,
         },
-        () =>
-          this.runCodexConversation(
-            {
-              conversationId: args.conversationId,
-              userMessage: args.userMessage,
-              ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
-              model: args.model,
-              provider: 'codex',
-              signal: args.signal,
-            },
-            project,
-            tracer,
-          ),
+        project,
       );
       return;
     }
@@ -260,225 +244,208 @@ export class ConversationAgent {
     const startedAt = Date.now();
     let toolCallCount = 0;
 
-    await tracer.wrapConversationTurn(
-      {
+    while (!args.signal.aborted) {
+      if (Date.now() - startedAt > 15 * 60 * 1000) {
+        this.bridge.emit({
+          type: 'cap-exceeded',
+          conversationId: args.conversationId,
+          cap: 'wall-clock',
+        });
+        return;
+      }
+
+      if (toolCallCount > 50) {
+        this.bridge.emit({
+          type: 'cap-exceeded',
+          conversationId: args.conversationId,
+          cap: 'tool-calls',
+        });
+        return;
+      }
+
+      const storedMessages = await this.bridge.listMessages(args.conversationId);
+      const history = storedMessages.map(toClaudeMessage);
+      const messageId = randomUUID();
+      let streamedText = '';
+
+      this.bridge.emit({
+        type: 'message-start',
         conversationId: args.conversationId,
+        messageId,
+        role: 'assistant',
+        createdAt: new Date().toISOString(),
+      });
+
+      const llmResult = await provider.streamMessage({
+        messages: history.map((message) =>
+          message.role === 'user' ? message : { ...message, content: truncateToolResultBlocks(message.content as ClaudeContentBlock[]) },
+        ),
+        tools: this.tools,
+        system: buildConversationAgentPrompt({ project }),
         model: args.model,
-        provider: args.provider,
-        userMessage: args.userMessage,
-        systemPrompt,
-        history: initialHistory,
-      },
-      async () => {
-        while (!args.signal.aborted) {
-          if (Date.now() - startedAt > 15 * 60 * 1000) {
+        signal: args.signal,
+        onEvent: (event) => {
+          if (event.type === 'text-delta') {
+            streamedText += event.delta;
             this.bridge.emit({
-              type: 'cap-exceeded',
+              type: 'text-delta',
               conversationId: args.conversationId,
-              cap: 'wall-clock',
+              messageId,
+              delta: event.delta,
             });
             return;
           }
 
-          if (toolCallCount > 50) {
-            this.bridge.emit({
-              type: 'cap-exceeded',
-              conversationId: args.conversationId,
-              cap: 'tool-calls',
-            });
-            return;
-          }
-
-          const storedMessages = await this.bridge.listMessages(args.conversationId);
-          const history = storedMessages.map(toClaudeMessage);
-          const messageId = randomUUID();
-          let streamedText = '';
-
           this.bridge.emit({
-            type: 'message-start',
+            type: 'retrying',
             conversationId: args.conversationId,
-            messageId,
-            role: 'assistant',
-            createdAt: new Date().toISOString(),
+            attempt: event.attempt,
+            reason: event.reason,
           });
+        },
+      });
 
-          const llmResult = await provider.streamMessage({
-            messages: history.map((message) =>
-              message.role === 'user' ? message : { ...message, content: truncateToolResultBlocks(message.content as ClaudeContentBlock[]) },
-            ),
-            tools: this.tools,
-            system: buildConversationAgentPrompt({ project }),
-            model: args.model,
-            signal: args.signal,
-            onEvent: (event) => {
-              if (event.type === 'text-delta') {
-                streamedText += event.delta;
-                this.bridge.emit({
-                  type: 'text-delta',
-                  conversationId: args.conversationId,
-                  messageId,
-                  delta: event.delta,
-                });
-                return;
-              }
+      await this.bridge.addConversationTokens({
+        conversationId: args.conversationId,
+        inputTokens: llmResult.tokens.input,
+        outputTokens: llmResult.tokens.output,
+        cachedTokens: llmResult.tokens.cached,
+      });
+      this.bridge.emit({
+        type: 'tokens',
+        conversationId: args.conversationId,
+        input: llmResult.tokens.input,
+        output: llmResult.tokens.output,
+        cached: llmResult.tokens.cached,
+      });
 
-              this.bridge.emit({
-                type: 'retrying',
-                conversationId: args.conversationId,
-                attempt: event.attempt,
-                reason: event.reason,
-              });
-            },
-          });
+      await this.bridge.createMessage({
+        conversationId: args.conversationId,
+        role: 'assistant',
+        contentBlocks: llmResult.message.content as unknown[],
+      });
+      this.bridge.emit({
+        type: 'message-complete',
+        conversationId: args.conversationId,
+        messageId,
+        fullText: streamedText.length > 0 ? streamedText : getTextFromContent(llmResult.message.content),
+        completedAt: new Date().toISOString(),
+      });
 
-          tracer.recordTokens(llmResult.tokens);
-          await this.bridge.addConversationTokens({
-            conversationId: args.conversationId,
-            inputTokens: llmResult.tokens.input,
-            outputTokens: llmResult.tokens.output,
-            cachedTokens: llmResult.tokens.cached,
-          });
-          this.bridge.emit({
-            type: 'tokens',
-            conversationId: args.conversationId,
-            input: llmResult.tokens.input,
-            output: llmResult.tokens.output,
-            cached: llmResult.tokens.cached,
-          });
+      const toolBlocks = (llmResult.message.content as ClaudeContentBlock[]).filter((block) => block.type === 'tool_use');
+      if (toolBlocks.length === 0) {
+        this.bridge.emit({
+          type: 'done',
+          conversationId: args.conversationId,
+        });
+        return;
+      }
 
+      for (const block of toolBlocks) {
+        if (block.id === undefined || block.name === undefined || block.input === undefined) {
+          continue;
+        }
+
+        toolCallCount += 1;
+        const tool = this.tools.find((candidate) => candidate.name === block.name);
+        if (tool === undefined) {
+          throw new Error(`Unknown Studio tool "${block.name}".`);
+        }
+
+        this.bridge.emit({
+          type: 'tool-call',
+          conversationId: args.conversationId,
+          toolCallId: block.id,
+          toolName: block.name,
+          input: block.input,
+        });
+
+        const approvalDecision = await this.approvalGate.ensureApproved({
+          conversationId: args.conversationId,
+          toolCallId: block.id,
+          toolName: block.name,
+          input: block.input,
+          ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+          riskLevel: getToolRiskLevel(block.name),
+          rationale: `This tool can modify code, generate a project, or launch external processes.`,
+          signal: args.signal,
+        });
+        if (approvalDecision !== 'approved') {
+          const output = {
+            ok: false,
+            message: `Tool ${block.name} was ${approvalDecision}.`,
+          };
           await this.bridge.createMessage({
             conversationId: args.conversationId,
-            role: 'assistant',
-            contentBlocks: llmResult.message.content as unknown[],
+            role: 'user',
+            contentBlocks: [
+              {
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: JSON.stringify(output),
+              },
+            ],
           });
           this.bridge.emit({
-            type: 'message-complete',
+            type: 'tool-result',
             conversationId: args.conversationId,
-            messageId,
-            fullText: streamedText.length > 0 ? streamedText : getTextFromContent(llmResult.message.content),
-            completedAt: new Date().toISOString(),
+            toolCallId: block.id,
+            success: false,
+            output,
           });
-
-          const toolBlocks = (llmResult.message.content as ClaudeContentBlock[]).filter((block) => block.type === 'tool_use');
-          if (toolBlocks.length === 0) {
-            const finalText = streamedText.length > 0 ? streamedText : getTextFromContent(llmResult.message.content);
-            tracer.setFinalOutput(finalText);
-            this.bridge.emit({
-              type: 'done',
-              conversationId: args.conversationId,
-            });
-            return;
-          }
-
-          for (const block of toolBlocks) {
-            if (block.id === undefined || block.name === undefined || block.input === undefined) {
-              continue;
-            }
-
-            toolCallCount += 1;
-            const tool = this.tools.find((candidate) => candidate.name === block.name);
-            if (tool === undefined) {
-              throw new Error(`Unknown Studio tool "${block.name}".`);
-            }
-
-            this.bridge.emit({
-              type: 'tool-call',
-              conversationId: args.conversationId,
-              toolCallId: block.id,
-              toolName: block.name,
-              input: block.input,
-            });
-
-            const approvalDecision = await this.approvalGate.ensureApproved({
-              conversationId: args.conversationId,
-              toolCallId: block.id,
-              toolName: block.name,
-              input: block.input,
-              ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
-              riskLevel: getToolRiskLevel(block.name),
-              rationale: `This tool can modify code, generate a project, or launch external processes.`,
-              signal: args.signal,
-            });
-            if (approvalDecision !== 'approved') {
-              const output = {
-                ok: false,
-                message: `Tool ${block.name} was ${approvalDecision}.`,
-              };
-              await this.bridge.createMessage({
-                conversationId: args.conversationId,
-                role: 'user',
-                contentBlocks: [
-                  {
-                    type: 'tool_result',
-                    tool_use_id: block.id,
-                    content: JSON.stringify(output),
-                  },
-                ],
-              });
-              this.bridge.emit({
-                type: 'tool-result',
-                conversationId: args.conversationId,
-                toolCallId: block.id,
-                success: false,
-                output,
-              });
-              continue;
-            }
-
-            let toolOutput: unknown;
-            let toolSuccess = true;
-
-            try {
-              toolOutput = await tracer.wrapToolCall(block.name, block.input, () =>
-                tool.execute(
-                  block.input,
-                  buildToolExecutionContext({
-                    conversationId: args.conversationId,
-                    ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
-                    ...(project?.displayPath !== undefined ? { projectPath: project.displayPath } : {}),
-                    toolCallId: block.id as string,
-                    signal: args.signal,
-                    bridge: {
-                      workspaceRoot: this.bridge.workspaceRoot,
-                      emit: (event) => this.bridge.emit(event),
-                      getProject: (projectId) => this.bridge.getProject(projectId),
-                      upsertProject: (toolArgs) => this.bridge.upsertProject(toolArgs),
-                      getTaskPlan: (projectId) => this.bridge.getTaskPlan(projectId),
-                      upsertTaskPlan: (toolArgs) => this.bridge.upsertTaskPlan(toolArgs),
-                      launchGodot: (toolArgs) => this.bridge.launchGodot(toolArgs),
-                      stopGodot: (toolArgs) => this.bridge.stopGodot(toolArgs),
-                      getAnthropicApiKey: () => this.bridge.getApiKey('anthropic'),
-                    },
-                  }),
-                ),
-              );
-            } catch (error) {
-              toolSuccess = false;
-              toolOutput = { ok: false, error: String(error) };
-            }
-
-            await this.bridge.createMessage({
-              conversationId: args.conversationId,
-              role: 'user',
-              contentBlocks: [
-                {
-                  type: 'tool_result',
-                  tool_use_id: block.id,
-                  content: summarizeToolResult(toolOutput),
-                },
-              ],
-            });
-            this.bridge.emit({
-              type: 'tool-result',
-              conversationId: args.conversationId,
-              toolCallId: block.id,
-              success: toolSuccess,
-              output: toolOutput,
-            });
-          }
+          continue;
         }
-        tracer.markAborted();
-    });
+
+        let toolOutput: unknown;
+        let toolSuccess = true;
+
+        try {
+          toolOutput = await tool.execute(
+            block.input,
+            buildToolExecutionContext({
+              conversationId: args.conversationId,
+              ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+              ...(project?.displayPath !== undefined ? { projectPath: project.displayPath } : {}),
+              toolCallId: block.id as string,
+              signal: args.signal,
+              bridge: {
+                workspaceRoot: this.bridge.workspaceRoot,
+                emit: (event) => this.bridge.emit(event),
+                getProject: (projectId) => this.bridge.getProject(projectId),
+                upsertProject: (toolArgs) => this.bridge.upsertProject(toolArgs),
+                getTaskPlan: (projectId) => this.bridge.getTaskPlan(projectId),
+                upsertTaskPlan: (toolArgs) => this.bridge.upsertTaskPlan(toolArgs),
+                launchGodot: (toolArgs) => this.bridge.launchGodot(toolArgs),
+                stopGodot: (toolArgs) => this.bridge.stopGodot(toolArgs),
+                getAnthropicApiKey: () => this.bridge.getApiKey('anthropic'),
+              },
+            }),
+          );
+        } catch (error) {
+          toolSuccess = false;
+          toolOutput = { ok: false, error: String(error) };
+        }
+
+        await this.bridge.createMessage({
+          conversationId: args.conversationId,
+          role: 'user',
+          contentBlocks: [
+            {
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: summarizeToolResult(toolOutput),
+            },
+          ],
+        });
+        this.bridge.emit({
+          type: 'tool-result',
+          conversationId: args.conversationId,
+          toolCallId: block.id,
+          success: toolSuccess,
+          output: toolOutput,
+        });
+      }
+    }
   }
 
   public abortConversation(conversationId: string): void {
@@ -519,7 +486,6 @@ export class ConversationAgent {
       signal: AbortSignal;
     },
     project: { id: string; normalizedPath: string; displayPath: string; title: string | null } | null,
-    tracer: Tracer,
   ): Promise<void> {
     const storedMessages = await this.bridge.listMessages(args.conversationId);
     const systemPrompt = buildConversationAgentPrompt({ project });
@@ -567,7 +533,7 @@ export class ConversationAgent {
             toolName: call.name,
             input: call.input,
           });
-          void tracer.wrapToolCall(call.name, call.input, () => Promise.resolve(call.input));
+          // LangSmith tracing is handled automatically via env vars — no manual wrap needed.
         },
         onTokens: (tokens) => {
           this.bridge.emit({
@@ -614,8 +580,7 @@ export class ConversationAgent {
     }
 
     const finalText = streamedText.trim().length > 0 ? streamedText : result.summary;
-    tracer.recordTokens(result.tokensUsed);
-    tracer.setFinalOutput(finalText);
+    // Token tracking (LangSmith auto-traces via env vars set by applyLangSmithEnv)
     await this.bridge.addConversationTokens({
       conversationId: args.conversationId,
       inputTokens: result.tokensUsed.input,

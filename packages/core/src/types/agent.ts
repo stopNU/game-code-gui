@@ -138,7 +138,7 @@ export function getModelProvider(modelId: string): ModelProvider {
   return MODELS.find((model) => model.id === modelId)?.provider ?? 'anthropic';
 }
 
-const HIGH_TOKEN_ROLES: ReadonlySet<AgentRole> = new Set([
+export const HIGH_TOKEN_ROLES: ReadonlySet<AgentRole> = new Set([
   'gameplay',
   'systems',
   'integration-verifier',
@@ -146,7 +146,7 @@ const HIGH_TOKEN_ROLES: ReadonlySet<AgentRole> = new Set([
 ]);
 
 // Creative roles benefit from some randomness; code/data roles need determinism.
-const ROLE_TEMPERATURE: Partial<Record<AgentRole, number>> = {
+export const ROLE_TEMPERATURE: Partial<Record<AgentRole, number>> = {
   designer: 0.4,
   'brief-analyst': 0.3,
   'integration-verifier': 0.1,

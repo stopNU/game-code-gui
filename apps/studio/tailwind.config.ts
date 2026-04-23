@@ -33,11 +33,11 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['"Segoe UI Variable"', 'Bahnschrift', '"Trebuchet MS"', 'sans-serif'],
+        sans: ['"IBM Plex Sans"', '"Segoe UI Variable"', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'Consolas', '"Courier New"', 'monospace'],
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(100, 218, 255, 0.2), 0 20px 80px rgba(18, 184, 255, 0.12)',
+        glow: '0 0 0 1px rgba(77, 158, 255, 0.15), 0 20px 80px rgba(77, 158, 255, 0.08)',
       },
       backgroundImage: {
         grid:

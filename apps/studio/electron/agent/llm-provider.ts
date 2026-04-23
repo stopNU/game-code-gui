@@ -1,4 +1,9 @@
-import { ClaudeClient, DEFAULT_RETRY_POLICY, withRetry } from '@agent-harness/core';
+import { ChatAnthropic } from '@langchain/anthropic';
+import { ChatOpenAI } from '@langchain/openai';
+import { SystemMessage, HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { BaseMessage } from '@langchain/core/messages';
+import { DEFAULT_RETRY_POLICY, withRetry } from '@agent-harness/core';
 import type { ClaudeContentBlock, ClaudeMessage, InputOutputTokens, ToolContract } from '@agent-harness/core';
 
 export interface ProviderStreamResult {
@@ -18,267 +23,154 @@ export interface LLMProvider {
   }): Promise<ProviderStreamResult>;
 }
 
-interface OpenAIResponseUsage {
-  input_tokens?: number;
-  output_tokens?: number;
-  input_tokens_details?: {
-    cached_tokens?: number;
-  };
-  cached_input_tokens?: number;
-}
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
 
-interface OpenAIResponseOutputText {
-  type: 'output_text' | 'text';
-  text?: string;
-}
-
-interface OpenAIResponseMessage {
-  type: 'message';
-  content?: OpenAIResponseOutputText[];
-}
-
-interface OpenAIResponseFunctionCall {
-  type: 'function_call';
-  call_id?: string;
-  id?: string;
-  name?: string;
-  arguments?: string;
-}
-
-interface OpenAICompletedResponse {
-  output?: Array<OpenAIResponseMessage | OpenAIResponseFunctionCall | Record<string, unknown>>;
-  usage?: OpenAIResponseUsage;
-}
-
-interface OpenAIStreamEvent {
-  type?: string;
-  delta?: string;
-  response?: OpenAICompletedResponse;
-  error?: {
-    message?: string;
-  };
-  message?: string;
-}
-
-interface OpenAITextInput {
-  type: 'input_text';
-  text: string;
-}
-
-interface OpenAIMessageInput {
-  type: 'message';
-  role: 'user' | 'assistant';
-  content: OpenAITextInput[];
-}
-
-interface OpenAIFunctionCallInput {
-  type: 'function_call';
-  call_id: string;
-  name: string;
-  arguments: string;
-}
-
-interface OpenAIFunctionCallOutputInput {
-  type: 'function_call_output';
-  call_id: string;
-  output: string;
-}
-
-type OpenAIInputItem = OpenAIMessageInput | OpenAIFunctionCallInput | OpenAIFunctionCallOutputInput;
-
-function isOpenAIMessageItem(
-  item: OpenAIResponseMessage | OpenAIResponseFunctionCall | Record<string, unknown>,
-): item is OpenAIResponseMessage {
-  return item.type === 'message';
-}
-
-function isOpenAIFunctionCallItem(
-  item: OpenAIResponseMessage | OpenAIResponseFunctionCall | Record<string, unknown>,
-): item is OpenAIResponseFunctionCall {
-  return item.type === 'function_call';
-}
-
-function ensureAnthropicBlocks(content: string | ClaudeContentBlock[]): ClaudeContentBlock[] {
-  if (typeof content === 'string') {
-    return [{ type: 'text', text: content }];
+function claudeToLC(msg: ClaudeMessage): BaseMessage {
+  if (typeof msg.content === 'string') {
+    return msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content);
   }
 
-  return content;
-}
+  const blocks = msg.content as ClaudeContentBlock[];
 
-function normalizeTextContent(content: string | ClaudeContentBlock[]): string {
-  return ensureAnthropicBlocks(content)
-    .filter((block) => block.type === 'text' && typeof block.text === 'string')
-    .map((block) => block.text)
-    .join('');
-}
-
-function serializeToolResultContent(content: ClaudeContentBlock['content']): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return JSON.stringify(content);
-  }
-
-  return '';
-}
-
-function safeParseJsonObject(value: string | undefined): Record<string, unknown> {
-  if (value === undefined || value.trim().length === 0) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-  } catch {
-    return { raw: value };
-  }
-
-  return {};
-}
-
-function toOpenAIInputItems(messages: ClaudeMessage[]): OpenAIInputItem[] {
-  const items: OpenAIInputItem[] = [];
-
-  for (const message of messages) {
-    const text = normalizeTextContent(message.content);
-    if (text.trim().length > 0) {
-      items.push({
-        type: 'message',
-        role: message.role,
-        content: [{ type: 'input_text', text }],
+  if (msg.role === 'user') {
+    const toolResultBlocks = blocks.filter((b) => b.type === 'tool_result');
+    if (toolResultBlocks.length > 0) {
+      const block = toolResultBlocks[0]!;
+      const content =
+        typeof block.content === 'string'
+          ? block.content
+          : JSON.stringify(block.content ?? '');
+      return new ToolMessage({
+        content,
+        tool_call_id: block.tool_use_id ?? '',
       });
     }
 
-    for (const block of ensureAnthropicBlocks(message.content)) {
-      if (block.type === 'tool_use' && block.id !== undefined && block.name !== undefined) {
-        items.push({
-          type: 'function_call',
-          call_id: block.id,
-          name: block.name,
-          arguments: JSON.stringify(block.input ?? {}),
-        });
-      }
-
-      if (block.type === 'tool_result' && block.tool_use_id !== undefined) {
-        items.push({
-          type: 'function_call_output',
-          call_id: block.tool_use_id,
-          output: serializeToolResultContent(block.content),
-        });
-      }
-    }
+    const text = blocks
+      .filter((b) => b.type === 'text')
+      .map((b) => b.text ?? '')
+      .join('\n');
+    return new HumanMessage(text);
   }
 
-  return items;
+  // assistant role
+  const textContent = blocks
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text ?? '')
+    .join('\n');
+
+  const toolCalls = blocks
+    .filter((b) => b.type === 'tool_use' && b.id && b.name)
+    .map((b) => ({
+      id: b.id as string,
+      name: b.name as string,
+      args: b.input ?? {},
+      type: 'tool_call' as const,
+    }));
+
+  if (toolCalls.length > 0) {
+    return new AIMessage({ content: textContent, tool_calls: toolCalls });
+  }
+  return new AIMessage(textContent);
 }
 
-function toOpenAITools(tools: ToolContract[]): Array<{
-  type: 'function';
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
-}> {
-  return tools.map((tool) => ({
-    type: 'function',
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.inputSchema,
-  }));
-}
+function lcToClaudeMessage(msg: AIMessage): ClaudeMessage {
+  const textContent = typeof msg.content === 'string'
+    ? msg.content
+    : Array.isArray(msg.content)
+      ? msg.content
+          .filter((b) => typeof b === 'object' && (b as { type?: string }).type === 'text')
+          .map((b) => (b as { text?: string }).text ?? '')
+          .join('\n')
+      : '';
 
-function mapOpenAIResponseToMessage(response: OpenAICompletedResponse): ClaudeMessage {
+  const toolBlocks: ClaudeContentBlock[] =
+    msg.tool_calls?.map((call) => ({
+      type: 'tool_use' as const,
+      ...(call.id !== undefined ? { id: call.id } : {}),
+      name: call.name,
+      input: call.args as Record<string, unknown>,
+    })) ?? [];
+
   const content: ClaudeContentBlock[] = [];
-
-  for (const item of response.output ?? []) {
-    if (isOpenAIMessageItem(item)) {
-      const text = (item.content ?? []).map((part: OpenAIResponseOutputText) => part.text ?? '').join('');
-      if (text.length > 0) {
-        content.push({
-          type: 'text',
-          text,
-        });
-      }
-    }
-
-    if (isOpenAIFunctionCallItem(item) && item.name !== undefined) {
-      const toolUseId = item.call_id ?? item.id ?? item.name;
-      content.push({
-        type: 'tool_use',
-        id: toolUseId,
-        name: item.name,
-        ...(item.arguments !== undefined ? { input: safeParseJsonObject(item.arguments) } : { input: {} }),
-      });
-    }
+  if (textContent.length > 0) {
+    content.push({ type: 'text', text: textContent });
   }
+  content.push(...toolBlocks);
 
   return {
     role: 'assistant',
-    content,
+    content: content.length === 1 && content[0]!.type === 'text'
+      ? content[0]!.text ?? ''
+      : content,
   };
 }
 
-function mapOpenAIUsageToTokens(usage?: OpenAIResponseUsage): InputOutputTokens {
+function toLC(tools: ToolContract[]): Array<{
+  type: 'function';
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}> {
+  return tools.map((t) => ({
+    type: 'function' as const,
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.inputSchema as Record<string, unknown>,
+    },
+  }));
+}
+
+function extractTokens(response: AIMessage): InputOutputTokens {
+  const usage = response.usage_metadata as Record<string, unknown> | undefined;
+  const inputDetails = usage?.['input_token_details'] as Record<string, unknown> | undefined;
   return {
-    input: usage?.input_tokens ?? 0,
-    output: usage?.output_tokens ?? 0,
-    cached: usage?.input_tokens_details?.cached_tokens ?? usage?.cached_input_tokens ?? 0,
+    input: (usage?.['input_tokens'] as number | undefined) ?? 0,
+    output: (usage?.['output_tokens'] as number | undefined) ?? 0,
+    cached: (inputDetails?.['cache_read'] as number | undefined) ?? 0,
   };
 }
 
-async function* parseSseEvents(stream: ReadableStream<Uint8Array>): AsyncGenerator<OpenAIStreamEvent> {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+async function invokeWithStreaming(
+  model: BaseChatModel,
+  messages: BaseMessage[],
+  signal: AbortSignal,
+  onText: (delta: string) => void,
+): Promise<AIMessage> {
+  const chunks: string[] = [];
+  const stream = await model.stream(messages, {
+    signal,
+    callbacks: [{
+      handleLLMNewToken(token: string) {
+        chunks.push(token);
+        onText(token);
+      },
+    }],
+  });
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-
-    buffer += decoder.decode(value, { stream: true });
-
-    while (true) {
-      const separatorIndex = buffer.indexOf('\n\n');
-      if (separatorIndex === -1) {
-        break;
-      }
-
-      const rawEvent = buffer.slice(0, separatorIndex);
-      buffer = buffer.slice(separatorIndex + 2);
-
-      const dataLines = rawEvent
-        .split(/\r?\n/)
-        .filter((line) => line.startsWith('data:'))
-        .map((line) => line.slice(5).trim());
-      if (dataLines.length === 0) {
-        continue;
-      }
-
-      const data = dataLines.join('\n');
-      if (data === '[DONE]') {
-        continue;
-      }
-
-      yield JSON.parse(data) as OpenAIStreamEvent;
-    }
+  // Consume stream to get the final message
+  let lastMsg: AIMessage | undefined;
+  for await (const chunk of stream) {
+    lastMsg = chunk as unknown as AIMessage;
   }
+
+  // If streaming didn't give us a final message, invoke non-streaming
+  if (!lastMsg) {
+    return model.invoke(messages, { signal }) as Promise<AIMessage>;
+  }
+
+  return lastMsg;
 }
+
+// ---------------------------------------------------------------------------
+// Anthropic provider via ChatAnthropic
+// ---------------------------------------------------------------------------
 
 export class AnthropicProvider implements LLMProvider {
-  private readonly client: ClaudeClient;
+  constructor(private readonly apiKey?: string) {}
 
-  public constructor(apiKey?: string) {
-    this.client = new ClaudeClient(apiKey);
-  }
-
-  public async streamMessage(args: {
+  async streamMessage(args: {
     messages: ClaudeMessage[];
     tools: ToolContract[];
     system: string;
@@ -288,25 +180,65 @@ export class AnthropicProvider implements LLMProvider {
   }): Promise<ProviderStreamResult> {
     return withRetry(
       async () => {
-        const result = await this.client.sendMessage({
+        const apiKey = this.apiKey ?? process.env['ANTHROPIC_API_KEY'];
+        const model = new ChatAnthropic({
           model: args.model,
           maxTokens: 16_384,
-          systemPrompt: args.system,
-          messages: args.messages,
-          tools: args.tools,
-          signal: args.signal,
-          onText: (delta: string) => {
-            args.onEvent({ type: 'text-delta', delta });
-          },
+          temperature: 0,
+          ...(apiKey !== undefined ? { apiKey } : {}),
         });
 
+        const lcMessages: BaseMessage[] = [
+          new SystemMessage(args.system),
+          ...args.messages.flatMap((m) => {
+            // Expand user messages with multiple tool_result blocks into separate ToolMessages
+            if (m.role === 'user' && Array.isArray(m.content)) {
+              const blocks = m.content as ClaudeContentBlock[];
+              const toolResults = blocks.filter((b) => b.type === 'tool_result');
+              if (toolResults.length > 1) {
+                return toolResults.map((b) => new ToolMessage({
+                  content: typeof b.content === 'string' ? b.content : JSON.stringify(b.content ?? ''),
+                  tool_call_id: b.tool_use_id ?? '',
+                }));
+              }
+            }
+            return [claudeToLC(m)];
+          }),
+        ];
+
+        const modelWithTools = args.tools.length > 0
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? (model as any).bindTools(toLC(args.tools)) as unknown as BaseChatModel
+          : model;
+
+        let streamedText = '';
+        const stream = modelWithTools.stream(lcMessages, {
+          signal: args.signal,
+        });
+
+        const chunks = [];
+        for await (const chunk of await stream) {
+          if (typeof chunk.content === 'string' && chunk.content.length > 0) {
+            streamedText += chunk.content;
+            args.onEvent({ type: 'text-delta', delta: chunk.content });
+          } else if (Array.isArray(chunk.content)) {
+            for (const part of chunk.content as Array<{ type?: string; text?: string }>) {
+              if (part.type === 'text' && typeof part.text === 'string' && part.text.length > 0) {
+                streamedText += part.text;
+                args.onEvent({ type: 'text-delta', delta: part.text });
+              }
+            }
+          }
+          chunks.push(chunk);
+        }
+
+        // Get final message with full structure (including tool calls)
+        const response = await model.invoke(lcMessages, { signal: args.signal }) as AIMessage;
+
         return {
-          message: {
-            role: result.message.role,
-            content: ensureAnthropicBlocks(result.message.content),
-          },
-          stopReason: result.stopReason,
-          tokens: result.tokens,
+          message: lcToClaudeMessage(response),
+          stopReason: (response.response_metadata?.['stop_reason'] as string | undefined) ?? 'end_turn',
+          tokens: extractTokens(response),
         };
       },
       {
@@ -314,21 +246,21 @@ export class AnthropicProvider implements LLMProvider {
         retryableErrors: ['429', '529', '500', '501', '502', '503', '504', ...DEFAULT_RETRY_POLICY.retryableErrors],
       },
       (attempt: number, error: Error) => {
-        args.onEvent({
-          type: 'retrying',
-          attempt,
-          reason: error.message,
-        });
+        args.onEvent({ type: 'retrying', attempt, reason: error.message });
       },
       args.signal,
     );
   }
 }
 
-export class OpenAIProvider implements LLMProvider {
-  public constructor(private readonly apiKey?: string) {}
+// ---------------------------------------------------------------------------
+// OpenAI provider via ChatOpenAI
+// ---------------------------------------------------------------------------
 
-  public async streamMessage(args: {
+export class OpenAIProvider implements LLMProvider {
+  constructor(private readonly apiKey?: string) {}
+
+  async streamMessage(args: {
     messages: ClaudeMessage[];
     tools: ToolContract[];
     system: string;
@@ -338,60 +270,51 @@ export class OpenAIProvider implements LLMProvider {
   }): Promise<ProviderStreamResult> {
     return withRetry(
       async () => {
-        const response = await fetch('https://api.openai.com/v1/responses', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiKey ?? process.env['OPENAI_API_KEY'] ?? ''}`,
-          },
-          body: JSON.stringify({
-            model: args.model,
-            instructions: args.system,
-            input: toOpenAIInputItems(args.messages),
-            tools: toOpenAITools(args.tools),
-            stream: true,
-          }),
-          signal: args.signal,
+        const openAiKey = this.apiKey ?? process.env['OPENAI_API_KEY'];
+        const model = new ChatOpenAI({
+          model: args.model,
+          maxTokens: 16_384,
+          temperature: 0,
+          ...(openAiKey !== undefined ? { apiKey: openAiKey } : {}),
+          streaming: true,
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`OpenAI Responses API request failed with ${response.status}: ${errorText}`);
-        }
+        const lcMessages: BaseMessage[] = [
+          new SystemMessage(args.system),
+          ...args.messages.flatMap((m) => {
+            if (m.role === 'user' && Array.isArray(m.content)) {
+              const blocks = m.content as ClaudeContentBlock[];
+              const toolResults = blocks.filter((b) => b.type === 'tool_result');
+              if (toolResults.length > 1) {
+                return toolResults.map((b) => new ToolMessage({
+                  content: typeof b.content === 'string' ? b.content : JSON.stringify(b.content ?? ''),
+                  tool_call_id: b.tool_use_id ?? '',
+                }));
+              }
+            }
+            return [claudeToLC(m)];
+          }),
+        ];
 
-        if (response.body === null) {
-          throw new Error('OpenAI Responses API returned an empty body.');
-        }
+        const modelWithTools = args.tools.length > 0
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? (model as any).bindTools(toLC(args.tools)) as unknown as BaseChatModel
+          : model;
 
-        let completedResponse: OpenAICompletedResponse | undefined;
+        const stream = modelWithTools.stream(lcMessages, { signal: args.signal });
 
-        for await (const event of parseSseEvents(response.body)) {
-          if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
-            args.onEvent({
-              type: 'text-delta',
-              delta: event.delta,
-            });
-            continue;
+        for await (const chunk of await stream) {
+          if (typeof chunk.content === 'string' && chunk.content.length > 0) {
+            args.onEvent({ type: 'text-delta', delta: chunk.content });
           }
-
-          if (event.type === 'response.completed') {
-            completedResponse = event.response;
-            continue;
-          }
-
-          if (event.type === 'response.failed' || event.type === 'error') {
-            throw new Error(event.error?.message ?? event.message ?? 'OpenAI response generation failed.');
-          }
         }
 
-        if (completedResponse === undefined) {
-          throw new Error('OpenAI Responses API stream ended without a completed response.');
-        }
+        const response = await model.invoke(lcMessages, { signal: args.signal }) as AIMessage;
 
         return {
-          message: mapOpenAIResponseToMessage(completedResponse),
+          message: lcToClaudeMessage(response),
           stopReason: 'end_turn',
-          tokens: mapOpenAIUsageToTokens(completedResponse.usage),
+          tokens: extractTokens(response),
         };
       },
       {
@@ -399,11 +322,7 @@ export class OpenAIProvider implements LLMProvider {
         retryableErrors: ['429', '500', '501', '502', '503', '504', ...DEFAULT_RETRY_POLICY.retryableErrors],
       },
       (attempt: number, error: Error) => {
-        args.onEvent({
-          type: 'retrying',
-          attempt,
-          reason: error.message,
-        });
+        args.onEvent({ type: 'retrying', attempt, reason: error.message });
       },
       args.signal,
     );

@@ -5,10 +5,10 @@ const preprocessBriefMock = vi.fn();
 const createAdvancedPlanMock = vi.fn();
 const scaffoldGameMock = vi.fn();
 const installDepsMock = vi.fn();
-const claudeClientMock = vi.fn();
+const createChatModelMock = vi.fn();
 
 vi.mock('@agent-harness/core', () => ({
-  ClaudeClient: claudeClientMock,
+  createChatModel: createChatModelMock,
   preprocessBrief: preprocessBriefMock,
   createAdvancedPlan: createAdvancedPlanMock,
 }));
@@ -24,7 +24,7 @@ vi.mock('@agent-harness/tools', () => ({
 describe('planGameService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    claudeClientMock.mockImplementation(() => ({ kind: 'client' }));
+    createChatModelMock.mockReturnValue({ kind: 'client' });
     scaffoldGameMock.mockResolvedValue(undefined);
     installDepsMock.mockResolvedValue(undefined);
   });
@@ -73,7 +73,7 @@ describe('planGameService', () => {
       },
     });
 
-    expect(claudeClientMock).toHaveBeenCalledTimes(1);
+    expect(createChatModelMock).toHaveBeenCalledTimes(1);
     expect(preprocessBriefMock).toHaveBeenCalledWith('A dragon deckbuilder.', { kind: 'client' });
     expect(createAdvancedPlanMock).toHaveBeenCalledWith(preprocessedBrief, { kind: 'client' });
     expect(scaffoldGameMock).toHaveBeenCalledWith({

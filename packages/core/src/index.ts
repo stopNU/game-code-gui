@@ -7,9 +7,16 @@ export * from './types/trace.js';
 export * from './types/memory.js';
 export * from './types/permissions.js';
 
-// Claude client
+// Claude client (now backed by ChatAnthropic — LangSmith auto-traces when LANGSMITH_API_KEY is set)
 export { ClaudeClient } from './claude/client.js';
 export type { SendMessageOptions, SendMessageResult } from './claude/client.js';
+
+// LangChain graph layer
+export { createAgentGraph } from './graph/agent-graph.js';
+export { createChatModel } from './graph/models.js';
+export { toLCTools, toLC } from './graph/tools-adapter.js';
+export { CodexChatModel } from './graph/codex-chat-model.js';
+export { ClaudeSubChatModel } from './graph/claude-sub-chat-model.js';
 
 // Agent roles
 export { ASSET_SYSTEM_PROMPT } from './claude/roles/asset.js';
