@@ -40,12 +40,14 @@ pnpm clean
 
 Current Studio capabilities:
 
+- Start screen (project picker) → Focus Mode workspace with flush side panels
 - Conversational agent UI with Anthropic/OpenAI top-level provider selection
 - Persisted conversations, projects, approvals, and task plans in SQLite
-- Godot launch/stop controls plus live log streaming
+- ▶ Launch / ■ Stop Godot in the top bar; ⊟ ⊞ toggles for sidebar and status panel
+- Live log strip in the left sidebar; full Godot controls in the right panel
 - Settings tabs for Workspace, API Keys, LangSmith, Godot, and About
 - Keyboard shortcuts: `Ctrl/Cmd+N` new conversation, `Ctrl/Cmd+,` settings, `Esc` abort active run
-- Theme toggle with dark/light support
+- LangSmith tracing via standard env vars (`LANGCHAIN_TRACING_V2`) — enabled per turn in settings
 
 Useful Studio commands:
 

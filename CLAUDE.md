@@ -100,7 +100,19 @@ Key capabilities:
 - Godot launch/stop controls plus live log streaming
 - Settings tabs for Workspace, API Keys, LangSmith, Godot, and About
 - Keyboard shortcuts: `Ctrl/Cmd+N` new conversation, `Ctrl/Cmd+,` settings, `Esc` abort active run
-- Theme toggle with dark/light support
+
+UI layout (Focus Mode):
+- Start screen → workspace two-page navigation; state persisted in `localStorage`
+- Workspace is a flush three-column layout (no padding/gap): left sidebar (210 px) | center chat | right panel (220 px)
+- Top bar has ▶ Launch / ■ Stop Godot toggle and ⊟ ⊞ sidebar visibility toggles
+- Left sidebar: project mini-card with progress bar, conversations list (Live badge + provider·model), Godot log strip
+- Right panel: compact sections (Session, Providers, Runtime + Godot controls, Live Usage, actions)
+- Godot runtime status type is `'running' | 'stopped' | 'crashed'` — there is no `'starting'` state
+
+Studio agent provider layer (`apps/studio/electron/agent/llm-provider.ts`):
+- Uses **LangChain** (`@langchain/anthropic`, `@langchain/openai`) — not the Anthropic SDK directly
+- `AnthropicProvider` wraps `ChatAnthropic`, `OpenAIProvider` wraps `ChatOpenAI`
+- LangSmith tracing is **env-var based**: call `applyLangSmithEnv(config)` from `langsmith/env.ts` before each turn to set `LANGCHAIN_TRACING_V2`, `LANGSMITH_API_KEY`, etc. — no custom tracer class
 
 ## Key conventions
 

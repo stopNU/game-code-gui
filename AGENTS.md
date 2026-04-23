@@ -103,7 +103,9 @@ Key capabilities:
 - Godot launch/stop controls plus live log streaming
 - Settings tabs for Workspace, API Keys, LangSmith, Godot, and About
 - Keyboard shortcuts: `Ctrl/Cmd+N` new conversation, `Ctrl/Cmd+,` settings, `Esc` abort active run
-- Theme toggle with dark/light support
+- Workspace is a flush three-column layout with ⊟ ⊞ sidebar toggles and ▶/■ Godot controls in the top bar
+
+Studio agent uses **LangChain** providers (`@langchain/anthropic`, `@langchain/openai`) — not the Anthropic SDK directly. LangSmith tracing is activated by calling `applyLangSmithEnv(config)` (`apps/studio/electron/agent/langsmith/env.ts`) before each turn, which sets the standard `LANGCHAIN_TRACING_V2` / `LANGSMITH_*` env vars so LangChain auto-tracing picks them up.
 
 ## Agent loop conventions
 
