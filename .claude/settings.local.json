@@ -108,7 +108,9 @@
       "Bash(pnpm --filter @agent-harness/core test -- --reporter=basic)",
       "Bash(npx vitest *)",
       "Bash(node apps/cli/bin/game-harness.js scaffold-plan --plan-file cat-deckbuilder-plan.json -o ./cat-deckbuilder)",
-      "Bash(grep -n \"games\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\dragon-deck\\\\|games/dragon-deck\" D:/dev/game-code-gui/apps/studio/electron/agent/tool-registry.test.ts)"
+      "Bash(grep -n \"games\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\dragon-deck\\\\|games/dragon-deck\" D:/dev/game-code-gui/apps/studio/electron/agent/tool-registry.test.ts)",
+      "Bash(sqlite3 studio.sqlite3 \"SELECT id, path, display_path, title FROM projects;\")",
+      "Bash(node insert-project.mjs)"
     ]
   }
 }

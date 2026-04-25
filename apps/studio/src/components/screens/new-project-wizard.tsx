@@ -185,9 +185,14 @@ function TextInput({
 }
 
 export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): JSX.Element {
+  const settingsStatus = trpc.settings.getStatus.useQuery();
+  const projectsRoot = settingsStatus.data?.workspaceRoot
+    ? settingsStatus.data.workspaceRoot.replace(/\\/g, '/') + '/apps/studio/projects'
+    : null;
+
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
-  const [path, setPath] = useState('~/dev/');
+  const [path, setPath] = useState('');
   const [pathManuallyEdited, setPathManuallyEdited] = useState(false);
   const [engine, setEngine] = useState<EngineId>('godot43');
   const [provider, setProvider] = useState<ProviderId>('anthropic');
@@ -213,9 +218,10 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
 
   useEffect(() => {
     if (!pathManuallyEdited) {
-      setPath(name.trim() ? `~/dev/${name.trim().toLowerCase().replace(/\s+/g, '-')}` : '~/dev/');
+      const base = projectsRoot ?? '~/dev';
+      setPath(name.trim() ? `${base}/${name.trim().toLowerCase().replace(/\s+/g, '-')}` : `${base}/`);
     }
-  }, [name, pathManuallyEdited]);
+  }, [name, pathManuallyEdited, projectsRoot]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -298,7 +304,7 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
             <TextInput
               value={path}
               onChange={(v) => { setPath(v); setPathManuallyEdited(true); }}
-              placeholder="~/dev/my-game"
+              placeholder={projectsRoot ? `${projectsRoot}/my-game` : '~/dev/my-game'}
               mono
             />
           </div>
