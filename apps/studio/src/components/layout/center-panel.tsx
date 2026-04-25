@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ConversationMessage } from '@renderer/store/conversation-store';
 import { Separator } from '@renderer/components/ui/separator';
 import { Skeleton } from '@renderer/components/ui/skeleton';
@@ -12,6 +12,9 @@ import { useConversationStore } from '@renderer/store/conversation-store';
 import { ConversationHeader } from '@renderer/components/chat/conversation-header';
 import { MessageList } from '@renderer/components/chat/message-list';
 import { ChatComposer } from '@renderer/components/chat/chat-composer';
+import { TaskPlanCard } from '@renderer/components/project/task-plan-card';
+
+type CenterTab = 'chat' | 'tasks';
 
 function normalizeDbMessages(
   messages: Array<{
@@ -33,6 +36,7 @@ function normalizeDbMessages(
 }
 
 export function CenterPanel(): JSX.Element {
+  const [activeTab, setActiveTab] = useState<CenterTab>('chat');
   const utils = trpc.useUtils();
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
   const selectedProjectId = useConversationStore((state) => state.selectedProjectId);
@@ -143,18 +147,82 @@ export function CenterPanel(): JSX.Element {
           }
         }}
       />
-      <Separator />
-      {messagesQuery.isLoading ? (
-        <div className="flex flex-1 flex-col gap-4 p-5">
-          <Skeleton className="h-20 w-[72%]" />
-          <Skeleton className="ml-auto h-16 w-[58%]" />
-          <Skeleton className="h-32 w-[80%]" />
-        </div>
+
+      {/* Tab bar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          borderBottom: '1px solid #1a1f30',
+          background: '#0d1018',
+          paddingLeft: 4,
+          flexShrink: 0,
+        }}
+      >
+        {(['chat', 'tasks'] as CenterTab[]).map((tab) => {
+          const active = activeTab === tab;
+          const disabled = tab === 'tasks' && selectedProjectId === null;
+          return (
+            <button
+              key={tab}
+              onClick={() => { if (!disabled) setActiveTab(tab); }}
+              style={{
+                padding: '8px 16px',
+                fontSize: 11,
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontWeight: active ? 500 : 400,
+                color: disabled ? '#363d57' : active ? '#eceef5' : '#545c7a',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: active ? '2px solid #4d9eff' : '2px solid transparent',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                marginBottom: -1,
+                transition: 'color 0.12s',
+                textTransform: 'capitalize',
+              }}
+            >
+              {tab}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'chat' ? (
+        <>
+          {messagesQuery.isLoading ? (
+            <div className="flex flex-1 flex-col gap-4 p-5">
+              <Skeleton className="h-20 w-[72%]" />
+              <Skeleton className="ml-auto h-16 w-[58%]" />
+              <Skeleton className="h-32 w-[80%]" />
+            </div>
+          ) : (
+            <MessageList messages={messages} toolCalls={visibleToolCalls} />
+          )}
+          <Separator />
+          <ChatComposer disabled={activeConversationId === null} sending={running || sending} onSend={handleSend} onAbort={handleAbort} />
+        </>
       ) : (
-        <MessageList messages={messages} toolCalls={visibleToolCalls} />
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {selectedProjectId !== null ? (
+            <TaskPlanCard projectId={selectedProjectId} />
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                fontSize: 12,
+                fontFamily: "'IBM Plex Mono', monospace",
+                color: '#363d57',
+              }}
+            >
+              No project selected
+            </div>
+          )}
+        </div>
       )}
-      <Separator />
-      <ChatComposer disabled={activeConversationId === null} sending={running || sending} onSend={handleSend} onAbort={handleAbort} />
     </div>
   );
 }
