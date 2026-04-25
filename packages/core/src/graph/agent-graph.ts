@@ -29,13 +29,12 @@ export interface CompiledAgentGraph {
 /**
  * Build and compile a LangGraph ReAct agent.
  *
- * For Codex/Claude-sub providers the tools node is omitted (the underlying
+ * For Codex providers the tools node is omitted (the underlying
  * SDK handles tool use internally).
  */
 export function createAgentGraph(opts: AgentGraphOptions): CompiledAgentGraph {
   const chatModel = createChatModel(opts.model, opts.role);
-  const isAutonomousProvider =
-    opts.model === 'gpt-5.4' || opts.model === 'claude-sonnet-4-6-sub';
+  const isAutonomousProvider = opts.model === 'gpt-5.4';
 
   if (isAutonomousProvider || opts.tools.length === 0) {
     return buildSimpleGraph(chatModel, opts.systemPrompt, opts.maxIterations);

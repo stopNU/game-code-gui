@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
 import type { ToolContract, ToolExecutionContext } from '@agent-harness/core';
+import { assertWritablePath } from '../guards/protected-paths.js';
 
 interface InsertBlockInput {
   path: string;
@@ -41,6 +42,7 @@ export const insertBlockTool: ToolContract<InsertBlockInput, InsertBlockOutput> 
   permissions: ['fs:read', 'fs:write'],
   async execute(input: InsertBlockInput, ctx: ToolExecutionContext): Promise<InsertBlockOutput> {
     const fullPath = resolve(ctx.projectPath, input.path);
+    assertWritablePath(ctx.projectPath, fullPath, 'code__insertBlock');
     const fileContent = await readFile(fullPath, 'utf8');
     let result: string;
     let insertedAt: string;

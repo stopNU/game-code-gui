@@ -301,13 +301,11 @@ export function SettingsDialog({
               {activeTab === 'api' ? (
                 <Section
                   title="Provider Keys"
-                  description="Anthropic is required for the main harness flow. If no API key is set, Studio will fall back to your Claude.ai subscription credentials."
+                  description="Anthropic is required for the main harness flow."
                 >
                   {!statusQuery.data?.anthropicConfigured ? (
                     <div className="mb-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
-                      {statusQuery.data?.claudeCodeConfigured
-                        ? 'Claude Code is authenticated, but its OAuth token cannot be used with the Anthropic API directly. An API key is still required.'
-                        : 'Anthropic is not configured yet, so conversation turns will fail until a key is saved.'}
+                      Anthropic is not configured yet, so conversation turns will fail until a key is saved.
                     </div>
                   ) : null}
                   <div className="grid gap-4">

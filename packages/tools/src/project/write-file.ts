@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import type { ToolContract, ToolExecutionContext } from '@agent-harness/core';
+import { assertWritablePath } from '../guards/protected-paths.js';
 
 interface WriteFileInput {
   path: string;
@@ -38,6 +39,7 @@ export const writeFileTool: ToolContract<WriteFileInput, WriteFileOutput> = {
   permissions: ['fs:write'],
   async execute(input: WriteFileInput, ctx: ToolExecutionContext): Promise<WriteFileOutput> {
     const fullPath = resolve(ctx.projectPath, input.path);
+    assertWritablePath(ctx.projectPath, fullPath, 'project__writeFile');
     await mkdir(dirname(fullPath), { recursive: true });
     const encoding = (input.encoding ?? 'utf8') as BufferEncoding;
     await writeFile(fullPath, input.content, encoding);

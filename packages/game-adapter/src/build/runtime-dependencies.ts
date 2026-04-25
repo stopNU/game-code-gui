@@ -26,55 +26,155 @@ interface SceneMetadata {
 }
 
 const BUILTIN_CLASS_NAMES = new Set([
+  // Core primitives & meta-types
+  'Variant',
+  'NodePath',
+  'Signal',
+  'PackedByteArray',
+  'PackedFloat32Array',
+  'PackedFloat64Array',
+  'PackedInt32Array',
+  'PackedInt64Array',
+  'PackedVector2Array',
+  'PackedVector3Array',
+  'PackedColorArray',
+  // Data containers
   'Array',
-  'AudioStreamPlayer',
-  'BaseButton',
-  'Button',
-  'Callable',
-  'Camera2D',
-  'CanvasItem',
-  'Color',
-  'Control',
   'Dictionary',
-  'Engine',
-  'FileAccess',
-  'GDScript',
-  'HBoxContainer',
-  'Input',
-  'ItemList',
-  'JSON',
-  'Label',
-  'Node',
-  'Node2D',
-  'Object',
-  'OS',
-  'PackedScene',
-  'PackedStringArray',
-  'Panel',
-  'PanelContainer',
-  'PopupPanel',
-  'ProgressBar',
-  'ProjectSettings',
-  'RandomNumberGenerator',
+  // Math / geometry
+  'Color',
   'Rect2',
-  'RefCounted',
-  'Resource',
-  'ResourceLoader',
-  'RichTextLabel',
-  'SceneTree',
-  'ScrollContainer',
-  'String',
-  'StringName',
-  'TabContainer',
-  'Texture2D',
-  'TextureRect',
-  'Time',
-  'Tween',
-  'VBoxContainer',
+  'Rect2i',
   'Vector2',
   'Vector2i',
   'Vector3',
+  'Vector3i',
+  'Vector4',
+  'Vector4i',
+  'Transform2D',
+  'Transform3D',
+  'Quaternion',
+  'Basis',
+  'Plane',
+  'AABB',
+  // String types
+  'String',
+  'StringName',
+  // Engine singletons / static classes
+  'Engine',
+  'OS',
+  'Input',
+  'DisplayServer',
+  'Time',
+  'JSON',
+  'ProjectSettings',
+  'ResourceLoader',
+  'ResourceSaver',
+  'ClassDB',
+  'PerformanceMonitor',
+  'Performance',
+  'Geometry2D',
+  'Geometry3D',
+  // I/O
+  'FileAccess',
+  'DirAccess',
+  // Input event hierarchy
+  'InputEvent',
+  'InputEventKey',
+  'InputEventMouseButton',
+  'InputEventMouseMotion',
+  'InputEventAction',
+  'InputEventJoypadButton',
+  'InputEventJoypadMotion',
+  'InputMap',
+  // Concurrency
+  'Callable',
+  'Mutex',
+  'Semaphore',
+  'Thread',
+  'WorkerThreadPool',
+  // Random / scripting
+  'RandomNumberGenerator',
+  'GDScript',
+  'Script',
+  'ScriptLanguage',
+  // Tree / animation
+  'SceneTree',
+  'SceneTreeTimer',
+  'Tween',
+  'AnimationPlayer',
+  'AnimationTree',
+  'Animation',
+  'Timer',
+  // Object hierarchy
+  'Object',
+  'RefCounted',
+  'Resource',
+  'PackedScene',
+  // Audio
+  'AudioStreamPlayer',
+  'AudioStreamPlayer2D',
+  'AudioStreamPlayer3D',
+  'AudioServer',
+  // Common nodes
+  'Node',
+  'Node2D',
+  'Node3D',
+  'CanvasItem',
+  'CanvasLayer',
+  'Camera2D',
+  'Camera3D',
+  'Sprite2D',
+  'Texture2D',
+  'TextureRect',
+  // UI
   'Window',
+  'Control',
+  'Panel',
+  'PanelContainer',
+  'PopupPanel',
+  'PopupMenu',
+  'AcceptDialog',
+  'ConfirmationDialog',
+  'BaseButton',
+  'Button',
+  'CheckBox',
+  'CheckButton',
+  'OptionButton',
+  'TextureButton',
+  'Label',
+  'RichTextLabel',
+  'LineEdit',
+  'TextEdit',
+  'CodeEdit',
+  'ItemList',
+  'Tree',
+  'ProgressBar',
+  'HBoxContainer',
+  'VBoxContainer',
+  'GridContainer',
+  'FlowContainer',
+  'HFlowContainer',
+  'VFlowContainer',
+  'BoxContainer',
+  'MarginContainer',
+  'CenterContainer',
+  'AspectRatioContainer',
+  'TabContainer',
+  'TabBar',
+  'ScrollContainer',
+  'SplitContainer',
+  'HSplitContainer',
+  'VSplitContainer',
+  'SubViewport',
+  'SubViewportContainer',
+  'Viewport',
+  // Networking / misc
+  'PackedStringArray',
+  'HTTPRequest',
+  'HTTPClient',
+  // Debug
+  'EngineDebugger',
 ]);
 
 const RESOURCE_REFERENCE_PATTERN = /\b(preload|load)\s*\(\s*["']([^"']+)["']\s*\)/g;
@@ -101,6 +201,14 @@ export async function validateRuntimeDependencies(
     }
   }
 
+  // Autoload singletons are registered in project.godot and accessible globally by name.
+  // They are NOT class_name declarations, so the registry above never includes them.
+  // Treat their names as resolvable identifiers.
+  const autoloadNames = new Set<string>();
+  for (const autoload of manifest.autoloads) {
+    autoloadNames.add(autoload.name);
+  }
+
   const activeScriptPaths = await collectActiveScriptPaths(projectPath, manifest, sceneMetadata, scriptMetadata, classRegistry);
   const issues: RuntimeDependencyValidationIssue[] = [];
 
@@ -122,7 +230,11 @@ export async function validateRuntimeDependencies(
         continue;
       }
 
-      if (!classRegistry.has(reference.value) && !BUILTIN_CLASS_NAMES.has(reference.value)) {
+      if (
+        !classRegistry.has(reference.value)
+        && !BUILTIN_CLASS_NAMES.has(reference.value)
+        && !autoloadNames.has(reference.value)
+      ) {
         issues.push({
           sourcePath: metadata.scriptPath,
           sourceLine: reference.line,

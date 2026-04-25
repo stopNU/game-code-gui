@@ -2,7 +2,6 @@ import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import {
   runAgentLoop,
-  runClaudeCodeLoop,
   runCodexLoop,
   Tracer,
   FULL_DEV_POLICY,
@@ -98,9 +97,7 @@ export async function runTask(
 
   const rawResult = provider === 'openai-codex'
     ? await runCodexLoop(ctx, loopOptions)
-    : provider === 'claude-code'
-      ? await runClaudeCodeLoop(ctx, loopOptions)
-      : await runAgentLoop(ctx, loopOptions, { tools: allowedTools });
+    : await runAgentLoop(ctx, loopOptions, { tools: allowedTools });
   const result = withTokenBreakdown(rawResult, 'main');
 
   const codeRoles: TaskState['role'][] = [
@@ -111,7 +108,7 @@ export async function runTask(
     'balance',
     'designer',
   ];
-  const finalResult = provider !== 'openai-codex' && provider !== 'claude-code' && codeRoles.includes(task.role)
+  const finalResult = provider !== 'openai-codex' && codeRoles.includes(task.role)
     ? await verifyAndRepair(projectPath, task, plan, result, agentConfig, signal, onProgress, onText)
     : result;
 

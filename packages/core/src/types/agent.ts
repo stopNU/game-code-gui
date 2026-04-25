@@ -122,13 +122,6 @@ export const MODELS = [
     costHint: '$$$',
     provider: 'openai-codex',
   },
-  {
-    id: 'claude-sonnet-4-6-sub',
-    label: 'Sonnet 4.6 · Subscription',
-    description: 'Sonnet 4.6 via Claude Code subscription — no API credits',
-    costHint: '~',
-    provider: 'claude-code',
-  },
 ] as const;
 
 export type ModelId = (typeof MODELS)[number]['id'];

@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
 import type { ToolContract, ToolExecutionContext } from '@agent-harness/core';
+import { assertWritablePath } from '../guards/protected-paths.js';
 
 interface ApplyPatchInput {
   path: string;
@@ -34,6 +35,7 @@ export const applyPatchTool: ToolContract<ApplyPatchInput, ApplyPatchOutput> = {
   permissions: ['fs:read', 'fs:write'],
   async execute(input: ApplyPatchInput, ctx: ToolExecutionContext): Promise<ApplyPatchOutput> {
     const fullPath = resolve(ctx.projectPath, input.path);
+    assertWritablePath(ctx.projectPath, fullPath, 'code__applyPatch');
     const content = await readFile(fullPath, 'utf8');
 
     if (!content.includes(input.oldString)) {

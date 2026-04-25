@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { resolve as resolvePath } from 'path';
 import {
   DEFAULT_RETRY_POLICY,
   runCodexLoop,
@@ -236,7 +237,8 @@ export class ConversationAgent {
       return;
     }
 
-    const systemPrompt = buildConversationAgentPrompt({ project });
+    const cliEntryPath = resolvePath(this.bridge.workspaceRoot, 'apps/cli/bin/game-harness.js');
+    const systemPrompt = buildConversationAgentPrompt({ project, provider: args.provider, cliEntryPath });
     const initialMessages = await this.bridge.listMessages(args.conversationId);
     const initialHistory = initialMessages.map(toClaudeMessage);
 
@@ -281,7 +283,7 @@ export class ConversationAgent {
           message.role === 'user' ? message : { ...message, content: truncateToolResultBlocks(message.content as ClaudeContentBlock[]) },
         ),
         tools: this.tools,
-        system: buildConversationAgentPrompt({ project }),
+        system: buildConversationAgentPrompt({ project, provider: args.provider, cliEntryPath }),
         model: args.model,
         signal: args.signal,
         onEvent: (event) => {
@@ -488,7 +490,8 @@ export class ConversationAgent {
     project: { id: string; normalizedPath: string; displayPath: string; title: string | null } | null,
   ): Promise<void> {
     const storedMessages = await this.bridge.listMessages(args.conversationId);
-    const systemPrompt = buildConversationAgentPrompt({ project });
+    const cliEntryPath = resolvePath(this.bridge.workspaceRoot, 'apps/cli/bin/game-harness.js');
+    const systemPrompt = buildConversationAgentPrompt({ project, provider: 'codex', cliEntryPath });
     const messageId = randomUUID();
     let streamedText = '';
     const codexToolCalls: Array<{ id: string; name: string }> = [];

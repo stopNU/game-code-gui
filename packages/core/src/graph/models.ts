@@ -3,7 +3,6 @@ import { ChatOpenAI } from '@langchain/openai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { MODELS, ROLE_TEMPERATURE, HIGH_TOKEN_ROLES, type AgentRole, type ModelId } from '../types/agent.js';
 import { CodexChatModel } from './codex-chat-model.js';
-import { ClaudeSubChatModel } from './claude-sub-chat-model.js';
 
 const HIGH_TOKEN_MAX = 16384;
 const STANDARD_TOKEN_MAX = 8192;
@@ -34,10 +33,6 @@ export function createChatModel(
 
   if (provider === 'openai-codex') {
     return new CodexChatModel({ model: modelId, temperature, maxTokens });
-  }
-
-  if (provider === 'claude-code') {
-    return new ClaudeSubChatModel({ model: modelId, temperature, maxTokens });
   }
 
   if (provider === 'openai') {

@@ -16,7 +16,6 @@ export { createAgentGraph } from './graph/agent-graph.js';
 export { createChatModel } from './graph/models.js';
 export { toLCTools, toLC } from './graph/tools-adapter.js';
 export { CodexChatModel } from './graph/codex-chat-model.js';
-export { ClaudeSubChatModel } from './graph/claude-sub-chat-model.js';
 
 // Agent roles
 export { ASSET_SYSTEM_PROMPT } from './claude/roles/asset.js';
@@ -34,7 +33,6 @@ export type { SystemPromptOptions } from './claude/roles/index.js';
 // Loop
 export { runAgentLoop } from './loop/agent-loop.js';
 export { runCodexLoop } from './loop/codex-loop.js';
-export { runClaudeCodeLoop } from './loop/claude-code-loop.js';
 export type { AgentLoopDeps } from './loop/agent-loop.js';
 export { withRetry } from './loop/retry.js';
 export { decomposeTasks } from './loop/planner.js';

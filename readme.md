@@ -124,7 +124,6 @@ Supported model shorthands:
 - `opus` -> `claude-opus-4-6`
 - `haiku` -> `claude-haiku-4-5-20251001`
 - `codex` -> `gpt-5.4`
-- `subscription` -> `claude-sonnet-4-6-sub`
 
 ### `plan-feature`
 

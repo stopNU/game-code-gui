@@ -35,6 +35,11 @@ function normalizeTaskStatus(status: unknown): TaskStatus {
     case 'failed':
       return status;
     default:
+      if (status !== undefined && status !== null) {
+        console.warn(
+          `[task-plan] Unknown task status ${JSON.stringify(status)}, coercing to 'pending'. Valid statuses: pending, planning, in-progress, blocked, review, complete, failed.`,
+        );
+      }
       return 'pending';
   }
 }
