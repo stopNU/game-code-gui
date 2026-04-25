@@ -10,7 +10,6 @@ export interface ImplementTaskOptions {
   project: string;
   task?: string;
   resume?: boolean;
-  mode?: 'simple' | 'advanced';
   concurrency?: number;
   model?: string;
   reconciliationReport?: string;
@@ -18,7 +17,6 @@ export interface ImplementTaskOptions {
 
 export interface ParallelRunOptions {
   concurrency?: number;
-  taskMode?: 'simple' | 'advanced';
   signal?: AbortSignal;
   model?: string;
   reconciliationReport?: string;

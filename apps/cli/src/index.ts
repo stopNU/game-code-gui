@@ -56,7 +56,6 @@ program
   .requiredOption('-p, --project <path>', 'Path to game project')
   .option('-t, --task <id>', 'Task ID from harness/tasks.json')
   .option('--resume', 'Resume from first non-complete task')
-  .option('--mode <mode>', 'Agent mode: simple | advanced')
   .option('--concurrency <n>', 'Max parallel tasks in resume mode (default: 3)', '3')
   .option('--model <model>', 'Execution model: sonnet | opus | haiku | codex | subscription (or full model ID)')
   .option('--reconciliation-report <path>', 'Optional reconciliation report path relative to the project for later repair-aware work')

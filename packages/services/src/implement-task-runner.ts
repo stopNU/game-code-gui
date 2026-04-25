@@ -32,7 +32,6 @@ export async function runTask(
   task: TaskState,
   plan: TaskPlan,
   onProgress?: (msg: string) => void,
-  mode: 'simple' | 'advanced' = 'simple',
   onToolCallDetail?: (call: { name: string; input: Record<string, unknown> }) => void,
   onAgentMessage?: (message: ClaudeMessage) => void,
   onTokens?: (tokens: InputOutputTokens) => void,
@@ -46,13 +45,13 @@ export async function runTask(
   const tasksPath = join(projectPath, 'harness', 'tasks.json');
   const memoryPath = join(projectPath, 'harness', 'memory.json');
   const persist = persistPlan ?? ((currentPlan: TaskPlan) => writeFile(tasksPath, JSON.stringify(currentPlan, null, 2), 'utf8'));
-  const { memory } = await prepareTaskContext(projectPath, memoryPath, task, plan, mode, reconciliationReportPath);
+  const { memory } = await prepareTaskContext(projectPath, memoryPath, task, plan, reconciliationReportPath);
 
   await persist(plan);
 
   const tracer = new Tracer(task.id, task.role);
   const agentConfig: AgentConfig = {
-    ...defaultAgentConfig(task.role, rolePrompt(task.role, mode, task)),
+    ...defaultAgentConfig(task.role, rolePrompt(task.role, task)),
     toolGroups: task.toolsAllowed,
     permissions: FULL_DEV_POLICY,
     ...(model !== undefined ? { model } : {}),
@@ -113,7 +112,7 @@ export async function runTask(
     'designer',
   ];
   const finalResult = provider !== 'openai-codex' && provider !== 'claude-code' && codeRoles.includes(task.role)
-    ? await verifyAndRepair(projectPath, task, plan, result, agentConfig, mode, signal, onProgress, onText)
+    ? await verifyAndRepair(projectPath, task, plan, result, agentConfig, signal, onProgress, onText)
     : result;
 
   task.status = finalResult.success ? 'complete' : 'failed';

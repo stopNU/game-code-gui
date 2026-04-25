@@ -17,7 +17,6 @@ export async function verifyAndRepair(
   plan: TaskPlan,
   result: TaskResult,
   agentConfig: AgentConfig,
-  mode: 'simple' | 'advanced',
   signal?: AbortSignal,
   onProgress?: (msg: string) => void,
   onText?: (delta: string) => void,
@@ -31,7 +30,7 @@ export async function verifyAndRepair(
     return typeCheckedResult;
   }
 
-  return runEvalRepairPass(projectPath, task, plan, typeCheckedResult, agentConfig, mode, signal, onProgress, onText);
+  return runEvalRepairPass(projectPath, task, plan, typeCheckedResult, agentConfig, signal, onProgress, onText);
 }
 
 async function runTypecheckFixPass(
@@ -111,12 +110,11 @@ async function runEvalRepairPass(
   plan: TaskPlan,
   result: TaskResult,
   agentConfig: AgentConfig,
-  mode: 'simple' | 'advanced',
   signal?: AbortSignal,
   onProgress?: (msg: string) => void,
   onText?: (delta: string) => void,
 ): Promise<TaskResult> {
-  const layers = determineEvalLayers(task, mode);
+  const layers = determineEvalLayers(task);
   if (layers.length === 0) {
     return result;
   }
@@ -219,7 +217,7 @@ export function finalizeEvalRepairOutcome(
   };
 }
 
-function determineEvalLayers(task: TaskState, mode: 'simple' | 'advanced'): EvalLayerName[] {
+function determineEvalLayers(task: TaskState): EvalLayerName[] {
   const layers = new Set<EvalLayerName>(['build']);
 
   if (
@@ -229,15 +227,8 @@ function determineEvalLayers(task: TaskState, mode: 'simple' | 'advanced'): Eval
     layers.add('functional');
   }
 
-  if (
-    mode === 'advanced'
-    || task.role === 'systems'
-    || task.role === 'integration-verifier'
-    || task.role === 'balance'
-  ) {
-    layers.add('data');
-    layers.add('systems');
-  }
+  layers.add('data');
+  layers.add('systems');
 
   return [...layers];
 }

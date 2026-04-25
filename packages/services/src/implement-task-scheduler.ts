@@ -23,7 +23,7 @@ export async function runTasksParallel(
   plan: TaskPlan,
   opts: ParallelRunOptions = {},
 ): Promise<ParallelRunResult> {
-  const { concurrency = 3, taskMode = 'simple', signal, model } = opts;
+  const { concurrency = 3, signal, model } = opts;
   const tasksPath = join(projectPath, 'harness', 'tasks.json');
   const persist = makeWriteQueue(tasksPath);
 
@@ -106,7 +106,6 @@ export async function runTasksParallel(
         task,
         plan,
         (message) => opts.onProgress?.(task.id, message),
-        taskMode,
         undefined,
         undefined,
         undefined,

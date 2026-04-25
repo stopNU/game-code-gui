@@ -28,7 +28,6 @@ export async function prepareTaskContext(
   memoryPath: string,
   task: TaskState,
   plan: TaskPlan,
-  mode: 'simple' | 'advanced',
   reconciliationReportPath?: string,
 ): Promise<PreparedTaskContext> {
   const memoryStore = await loadMemoryStore(projectPath, memoryPath);
@@ -43,8 +42,8 @@ export async function prepareTaskContext(
 
   await attachGameSpecContext(projectPath, task, plan);
   await attachAssetContext(projectPath, task, plan);
-  await attachArchitectureContext(projectPath, task, mode);
-  await attachAdvancedContext(projectPath, task, mode);
+  await attachArchitectureContext(projectPath, task);
+  await attachAdvancedContext(projectPath, task);
   await attachRuntimeManifestContext(projectPath, task);
   await attachReconciliationReportContext(projectPath, task, reconciliationReportPath);
   await attachRelevantFileContext(projectPath, plan, task);
@@ -88,17 +87,7 @@ async function attachAssetContext(
 async function attachArchitectureContext(
   projectPath: string,
   task: TaskState,
-  mode: 'simple' | 'advanced',
 ): Promise<void> {
-  if (
-    mode !== 'advanced'
-    && task.role !== 'gameplay'
-    && task.role !== 'systems'
-    && task.role !== 'balance'
-  ) {
-    return;
-  }
-
   const architecturePath = join(projectPath, 'docs', 'architecture.json');
   try {
     const architecture = JSON.parse(await readFile(architecturePath, 'utf8')) as ArchitectureContract;
@@ -114,12 +103,7 @@ async function attachArchitectureContext(
 async function attachAdvancedContext(
   projectPath: string,
   task: TaskState,
-  mode: 'simple' | 'advanced',
 ): Promise<void> {
-  if (mode !== 'advanced') {
-    return;
-  }
-
   const advancedContextPath = join(projectPath, 'docs', 'advanced-context.json');
   try {
     const advancedSharedContext = JSON.parse(

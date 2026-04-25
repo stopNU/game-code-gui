@@ -13,7 +13,7 @@ export type TaskStatus =
 
 /**
  * Phase number for a task.
- * Simple mode uses phases 1–5; advanced mode may use up to 10.
+ * Generated GDScript deckbuilder plans may use up to 10 phases.
  */
 export type TaskPhase = number;
 

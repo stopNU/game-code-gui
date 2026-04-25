@@ -36,7 +36,7 @@ Return a JSON object with exactly these fields:
   "gameTitle": string,          // inferred or stated title; use "Untitled Game" if none
   "summary": string,            // 2–3 sentence summary of the game concept
 
-  "subsystems": [               // named game systems; empty array for simple mode
+  "subsystems": [               // named game systems
     {
       "id": string,             // kebab-case, e.g. "combat-engine"
       "name": string,           // PascalCase module name, e.g. "CombatEngine"
@@ -131,4 +131,4 @@ Brief: "A top-down shooter RPG where enemies drop loot that modifies the player'
 - Return ONLY valid JSON. No markdown, no prose before or after the JSON.
 - If a field has no relevant information in the brief, return an empty array [] or the string "Unknown".
 - Do not hallucinate schemas that are not implied by the brief — if card mechanics are not described, do not invent a card schema.
-- For simple mode, subsystems, dataSchemas, sprintPlan, eventTypes, and stateMachines should all be empty arrays.`;
+- Always produce data-driven architecture context for the GDScript deckbuilder pipeline.`;

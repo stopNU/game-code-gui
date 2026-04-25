@@ -18,7 +18,7 @@ export const BUNDLED_EVAL_DATASET = fileURLToPath(
 
 const memoryWriteQueues = new Map<string, Promise<void>>();
 
-export function rolePrompt(role: AgentRole, _mode: string, task: TaskState): string {
+export function rolePrompt(role: AgentRole, task: TaskState): string {
   return getSystemPrompt(role, undefined, {
     hasNPCs: detectNPCs(task.title, task.description),
   });

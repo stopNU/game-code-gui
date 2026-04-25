@@ -282,4 +282,4 @@ godot --headless --export-release "Windows Desktop" builds/game.exe --path .
 
 ## Known drift to clean up
 
-The docs now reflect the current Godot/fal.ai workflow and the Electron-based Studio app, but there are still a few stale implementation references in code and config, such as old `simple|advanced` wording in CLI internals. Those should be cleaned up separately so the code matches the docs end to end.
+The docs now reflect the current Godot/fal.ai workflow and the Electron-based Studio app. Keep future implementation changes aligned with this workflow so the code and docs stay in sync end to end.

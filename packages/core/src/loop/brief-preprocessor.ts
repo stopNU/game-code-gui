@@ -211,14 +211,12 @@ export async function preprocessBrief(
     return result;
   }
 
-  // If both attempts fail, fall back to a simple classification so the
-  // pipeline doesn't hard-crash — the advanced planner will work with less context.
   const allIssues = retryResult.issues
     .map((i) => `  ${i.path.join('.')}: ${i.message}`)
     .join('\n');
   throw new Error(
     '[brief-preprocessor] Analyst returned invalid structured output twice.\n' +
-    'Refusing to fall back to simple mode because that can route data-driven games into the wrong pipeline.\n' +
+    'Refusing to continue without structured architecture context for the GDScript deckbuilder pipeline.\n' +
     allIssues,
   );
 }

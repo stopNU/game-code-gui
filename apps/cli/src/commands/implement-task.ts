@@ -42,7 +42,6 @@ export async function implementTask(opts: ImplementTaskOptions): Promise<void> {
     const spinners = new Map<string, ReturnType<typeof spinner>>();
     const { ranCount, failedCount } = await runTasksParallel(projectPath, plan, {
       concurrency,
-      taskMode: 'advanced',
       ...(opts.model !== undefined ? { model: opts.model } : {}),
       ...(opts.reconciliationReport !== undefined ? { reconciliationReport: opts.reconciliationReport } : {}),
       onTaskStart: (task) => {
@@ -121,7 +120,6 @@ export async function implementTask(opts: ImplementTaskOptions): Promise<void> {
     (msg) => {
       loopSpinner.text = msg;
     },
-    'advanced',
     undefined,
     undefined,
     undefined,

@@ -62,7 +62,7 @@ describe('preprocessBrief', () => {
     const brief = `Build a deckbuilder with relics, card synergies, map nodes, and event-bus-driven combat. [${uid}c]`;
     const { model, callCount } = makeModel(['not json', 'still not json']);
 
-    await expect(preprocessBrief(brief, model)).rejects.toThrow(/Refusing to fall back to simple mode/);
+    await expect(preprocessBrief(brief, model)).rejects.toThrow(/Refusing to continue without structured architecture context/);
     expect(callCount()).toBe(2);
   });
 });

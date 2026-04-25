@@ -125,7 +125,7 @@ Studio agent provider layer (`apps/studio/electron/agent/llm-provider.ts`):
 - Build order: core -> tools -> game-adapter -> assets -> playtest -> evals -> cli (Turbo handles this)
 - When typechecking cross-package, build the dependency first so declaration files are up to date
 - Godot binary resolved via `GODOT_PATH` env var, falling back to `godot` in PATH
-- **No simple mode** - everything is always advanced/GDScript. `mode` param is ignored; `getSystemPrompt(role)` always returns GDScript role prompts
+- Everything is advanced/GDScript. There is no CLI agent mode switch; `getSystemPrompt(role)` always returns GDScript role prompts
 - **No Phaser, no Vite, no Playwright, no TypeScript in generated games** - all game code is GDScript
 
 ## Agent loop conventions
