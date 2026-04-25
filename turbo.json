@@ -7,7 +7,7 @@
     },
     "test": {
       "dependsOn": ["build"],
-      "env": ["ANTHROPIC_API_KEY", "REPLICATE_API_TOKEN"]
+      "env": ["ANTHROPIC_API_KEY", "FAL_KEY"]
     },
     "typecheck": {
       "dependsOn": ["^build"]

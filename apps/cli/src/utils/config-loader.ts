@@ -4,7 +4,6 @@ import { resolve, join } from 'path';
 
 export interface HarnessConfig {
   anthropicApiKey: string;
-  replicateApiToken?: string;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
 }
 
@@ -20,10 +19,8 @@ export function loadHarnessConfig(): HarnessConfig {
     );
   }
 
-  const replicateApiToken = process.env['REPLICATE_API_TOKEN'];
   return {
     anthropicApiKey: apiKey,
-    ...(replicateApiToken !== undefined ? { replicateApiToken } : {}),
     logLevel: (process.env['LOG_LEVEL'] as HarnessConfig['logLevel']) ?? 'info',
   };
 }
