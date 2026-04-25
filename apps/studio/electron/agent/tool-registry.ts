@@ -6,13 +6,16 @@ import { planGameService, runTask } from '@agent-harness/services';
 import { normalizePath } from '../db/normalize-path.js';
 import type { StreamEvent } from '../../shared/protocol.js';
 
+const PROJECTS_SUBDIR = 'apps/studio/projects';
+
 function resolveProjectPath(workspaceRoot: string, outputPath: string): string {
+  const projectsRoot = resolve(workspaceRoot, PROJECTS_SUBDIR);
   if (isAbsolute(outputPath)) {
-    // Strip leading slashes so absolute AI-provided paths resolve under the workspace root
+    // Strip leading slashes so absolute AI-provided paths resolve under the projects root
     const relative = outputPath.replace(/^[/\\]+/, '');
-    return resolve(workspaceRoot, relative);
+    return resolve(projectsRoot, relative);
   }
-  return resolve(workspaceRoot, outputPath);
+  return resolve(projectsRoot, outputPath);
 }
 
 interface ToolBridge {

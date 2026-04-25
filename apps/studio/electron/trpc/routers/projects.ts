@@ -1,4 +1,5 @@
-import { mkdirSync } from 'fs';
+import { mkdirSync, existsSync, readFileSync } from 'fs';
+import { join, basename } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
@@ -104,6 +105,40 @@ export const projectsRouter = router({
       })();
 
       return { jobId };
+    }),
+  pickFolder: publicProcedure
+    .input(z.void())
+    .mutation(({ ctx }) => ctx.chooseDirectory()),
+  open: publicProcedure
+    .input(z.object({ path: z.string().min(1) }))
+    .mutation(({ ctx, input }) => {
+      const expandedPath = input.path.replace(/^~/, homedir());
+      const tasksPath = join(expandedPath, 'harness', 'tasks.json');
+      let title: string | null = null;
+      let planJson: string | null = null;
+
+      if (existsSync(tasksPath)) {
+        try {
+          const raw = readFileSync(tasksPath, 'utf8');
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
+          title = typeof parsed['gameTitle'] === 'string' ? parsed['gameTitle'] : null;
+          planJson = raw;
+        } catch {
+          // Malformed tasks.json — register without a plan
+        }
+      }
+
+      const project = ctx.database.projects.upsert({
+        normalizedPath: normalizePath(expandedPath),
+        displayPath: expandedPath,
+        title: title ?? basename(expandedPath),
+      });
+
+      if (planJson !== null) {
+        ctx.database.taskPlans.upsert({ projectId: project.id, planJson });
+      }
+
+      return { id: project.id, path: expandedPath, title: project.title };
     }),
   getInfo: publicProcedure
     .input(

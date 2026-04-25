@@ -150,7 +150,7 @@ describe('Studio tool contracts', () => {
 
     expect(planGameServiceImpl).toHaveBeenCalledWith({
       brief: 'Build a dragon deckbuilder.',
-      outputPath: 'D:\\dev\\game-code-gui\\games\\dragon-deck',
+      outputPath: 'D:\\dev\\game-code-gui\\apps\\studio\\projects\\games\\dragon-deck',
     });
     expect(bridge.upsertProject).toHaveBeenCalledTimes(1);
     expect(bridge.upsertTaskPlan).toHaveBeenCalledWith({
@@ -207,14 +207,14 @@ describe('Studio tool contracts', () => {
     );
 
     expect(scaffoldGameImpl).toHaveBeenCalledWith({
-      outputPath: 'D:\\dev\\game-code-gui\\games\\dragon-deck',
+      outputPath: 'D:\\dev\\game-code-gui\\apps\\studio\\projects\\games\\dragon-deck',
       plan,
       preprocessedBrief,
     });
     expect(bridge.upsertProject).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       projectId: 'project-1',
-      outputPath: 'D:\\dev\\game-code-gui\\games\\dragon-deck',
+      outputPath: 'D:\\dev\\game-code-gui\\apps\\studio\\projects\\games\\dragon-deck',
     });
   });
 

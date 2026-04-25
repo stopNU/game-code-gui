@@ -25,7 +25,4 @@ apps/studio/projects
 .DS_Store
 Thumbs.db
 
-apps/cli/game-*
-apps/cli/slay-v0-1
-apps/cli/slay-the-cats
 

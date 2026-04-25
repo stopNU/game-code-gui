@@ -12,6 +12,7 @@ import { reconcileRuntimeCmd } from './commands/reconcile-runtime.js';
 import { inspectScenesCmd } from './commands/inspect-scenes.js';
 import { generateAssets } from './commands/generate-assets.js';
 import { verifyProjectCmd } from './commands/verify-project.js';
+import { scaffoldPlan } from './commands/scaffold-plan.js';
 
 program
   .name('game-harness')
@@ -39,6 +40,15 @@ program
   .option('-o, --output <path>', 'Output directory (default: ./<slugified-game-name>)')
   .action(async (opts) => {
     await run(() => planGame(opts));
+  });
+
+program
+  .command('scaffold-plan')
+  .description('Scaffold a Godot project from a pre-existing plan JSON file (skips the AI planning step)')
+  .requiredOption('--plan-file <path>', 'Path to the plan JSON file')
+  .option('-o, --output <path>', 'Output directory (default: ./<slugified-game-title>)')
+  .action(async (opts) => {
+    await run(() => scaffoldPlan(opts));
   });
 
 program

@@ -15,6 +15,7 @@ export function buildConversationAgentPrompt(args: BuildPromptArgs): string {
     '`scaffold_game` is for writing a project from an already-formed plan; do not use it as a substitute for `plan_game` unless the user explicitly provides planning artifacts.',
     'When implementing, start by reading the task plan and then invoke `implement_task` for the most relevant pending task unless the user named a specific task.',
     'Treat tool results as authoritative. If a tool returns `success: false`, do not describe the work as complete even when files were created; explain that implementation progressed but verification or follow-up work still failed.',
+    'When scaffolding or planning a new game, pass `outputPath` as a bare project slug (e.g. `cat-deckbuilder`). It will be resolved under the workspace `apps/studio/projects/` directory automatically. Do not place new game projects at the workspace root.',
   ];
 
   if (args.project !== undefined && args.project !== null) {

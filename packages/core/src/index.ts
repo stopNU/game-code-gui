@@ -43,6 +43,7 @@ export type { IterationType, PlanIterationOptions } from './loop/iterate.js';
 export { preprocessBrief } from './loop/brief-preprocessor.js';
 export type { PreprocessedBrief, BriefSection, StateMachineDef } from './loop/brief-preprocessor.js';
 export { createAdvancedPlan } from './loop/advanced-planner.js';
+export { validateTaskPlan } from './loop/plan-validation.js';
 export { extractJson, extractText } from './loop/extract.js';
 
 // Memory

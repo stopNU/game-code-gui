@@ -17,5 +17,5 @@ export function resolveProjectOutputPath(output: string | undefined, gameName: s
     return resolve(process.cwd(), output);
   }
 
-  return resolve(process.cwd(), slugifyProjectName(gameName));
+  return resolve(process.cwd(), 'generated', slugifyProjectName(gameName));
 }

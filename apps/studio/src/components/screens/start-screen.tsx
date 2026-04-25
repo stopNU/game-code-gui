@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ProjectSummary } from '@shared/domain';
 import { trpc } from '@renderer/lib/trpc';
 import { Skeleton } from '@renderer/components/ui/skeleton';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface StartScreenProps {
   onOpenProject: (projectId: string) => void;
@@ -64,6 +65,17 @@ function ProjectRow({
 export function StartScreen({ onOpenProject, onNewGame }: StartScreenProps): JSX.Element {
   const projectsQuery = trpc.projects.list.useQuery(undefined);
   const [filter, setFilter] = useState('');
+  const queryClient = useQueryClient();
+  const pickFolder = trpc.projects.pickFolder.useMutation();
+  const openProject = trpc.projects.open.useMutation();
+
+  const handleOpenFolder = async (): Promise<void> => {
+    const path = await pickFolder.mutateAsync(undefined);
+    if (path === null) return;
+    const result = await openProject.mutateAsync({ path });
+    await queryClient.invalidateQueries();
+    onOpenProject(result.id);
+  };
 
   const projects = projectsQuery.data ?? [];
   const filtered = projects.filter(
@@ -85,7 +97,7 @@ export function StartScreen({ onOpenProject, onNewGame }: StartScreenProps): JSX
       title: 'Open Folder',
       sub: 'Import an existing project directory',
       accent: false,
-      onClick: undefined,
+      onClick: () => { void handleOpenFolder(); },
     },
     {
       icon: '⌕',
