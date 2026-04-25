@@ -33,14 +33,10 @@ export function buildConversationAgentPrompt(args: BuildPromptArgs): string {
   ];
 
   if (provider === 'codex') {
-    const cliPath = args.cliEntryPath ?? 'game-harness';
-    const modelArg = args.model !== undefined && args.model.length > 0
-      ? ` --model ${args.model}`
-      : '';
     lines.push(
       'TASK STATUS IS MANAGED BY THE TASK RUNNER, NOT BY YOU. Never edit `harness/tasks.json` directly — that file is owned by the harness and direct edits will be rejected or cause UI/state drift.',
-      `When the user asks you to implement a task by id (e.g. "implement task write-cards-json"), do NOT edit project files manually. Instead run the CLI wrapper from the project directory: \`node "${cliPath}" implement-task -p . --task <task-id>${modelArg}\`. The wrapper invokes the typed task runner, which executes the work AND updates task status correctly.${modelArg.length > 0 ? ` ALWAYS pass \`--model ${args.model}\` exactly as shown — that is the model the user has selected in Studio for this conversation, and the spawned runner must honor it.` : ''}`,
-      'For free-form work the user asks for that is not a known task id (refactors, exploration, ad-hoc edits), you may edit files directly using your built-in tools. Only the structured task-implementation flow must go through the CLI wrapper.',
+      'When the user asks to implement one or more tasks by id (e.g. "implement task write-cards-json", or "implement these tasks: a, b, c"), the harness intercepts the request and runs the typed task runner in-process for each id. You will NOT see this turn — it is handled before your prompt is invoked. Do not try to do task implementation yourself for those requests; if you somehow see one, the auto-route did not match (likely because the id is not in the current plan), so ask the user to confirm the exact task id.',
+      'For free-form work the user asks for that is not a known task id (refactors, exploration, ad-hoc edits, debugging), edit files directly using your built-in tools as normal.',
       'Before implementing, you may read `harness/tasks.json` to discover task ids and their pending status. Reading is fine; writing is not.',
     );
   } else {

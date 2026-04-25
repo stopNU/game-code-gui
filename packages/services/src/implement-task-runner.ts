@@ -43,7 +43,16 @@ export async function runTask(
 ): Promise<TaskResult> {
   const tasksPath = join(projectPath, 'harness', 'tasks.json');
   const memoryPath = join(projectPath, 'harness', 'memory.json');
-  const persist = persistPlan ?? ((currentPlan: TaskPlan) => writeFile(tasksPath, JSON.stringify(currentPlan, null, 2), 'utf8'));
+  // Always write disk — the project scanner merges disk into the SQLite cache and disk-wins
+  // for task status. If we skipped the disk write, a subsequent scan would clobber the
+  // freshly-persisted status with stale disk content (e.g. "pending"). Also call the optional
+  // Studio persistPlan callback so the in-memory cache reflects the new state immediately.
+  const persist = async (currentPlan: TaskPlan): Promise<void> => {
+    await writeFile(tasksPath, JSON.stringify(currentPlan, null, 2), 'utf8');
+    if (persistPlan !== undefined) {
+      await persistPlan(currentPlan);
+    }
+  };
   const { memory } = await prepareTaskContext(projectPath, memoryPath, task, plan, reconciliationReportPath);
 
   await persist(plan);

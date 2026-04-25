@@ -489,6 +489,47 @@ export class ConversationAgent {
     },
     project: { id: string; normalizedPath: string; displayPath: string; title: string | null } | null,
   ): Promise<void> {
+    // Fast path: if the user is asking to implement one or more known tasks by id, route
+    // through the structured implement_task tool in-process. This bypasses Codex SDK + the
+    // CLI shell-out (both of which are fragile on Windows: spawn EPERM, path-resolution
+    // issues, no typed status update). The structured runner handles task status correctly,
+    // honors the chat model selection, and reuses Studio's in-process Codex SDK if the
+    // selected model resolves to Codex. Free-form Codex chat for anything else still works.
+    //
+    // We validate ids against the actual plan so identifier-shaped phrases in prose don't
+    // false-trigger. Multiple ids in one message are run sequentially — the user can fire a
+    // whole phase with one prompt.
+    if (args.projectId !== undefined) {
+      const planRecord = await this.bridge.getTaskPlan(args.projectId);
+      const validIds = new Set<string>();
+      if (planRecord !== null) {
+        try {
+          const plan = JSON.parse(planRecord.planJson) as { phases?: Array<{ tasks?: Array<{ id?: string }> }> };
+          for (const phase of plan.phases ?? []) {
+            for (const t of phase.tasks ?? []) {
+              if (typeof t.id === 'string') {
+                validIds.add(t.id);
+              }
+            }
+          }
+        } catch (err) {
+          this.log('runCodexConversation: failed to parse task plan for id validation', err);
+        }
+      }
+
+      const taskIds = parseImplementTaskIntents(args.userMessage, validIds.size > 0 ? validIds : undefined);
+      if (taskIds.length > 0) {
+        await this.runStructuredImplementTaskBatch({
+          conversationId: args.conversationId,
+          projectId: args.projectId,
+          taskIds,
+          model: args.model,
+          signal: args.signal,
+        });
+        return;
+      }
+    }
+
     const storedMessages = await this.bridge.listMessages(args.conversationId);
     const cliEntryPath = resolvePath(this.bridge.workspaceRoot, 'apps/cli/bin/game-harness.js');
     const systemPrompt = buildConversationAgentPrompt({ project, provider: 'codex', cliEntryPath, model: args.model });
@@ -607,6 +648,202 @@ export class ConversationAgent {
       conversationId: args.conversationId,
     });
   }
+
+  /**
+   * Run an implement_task request directly through the in-process structured tool, bypassing
+   * the chat LLM entirely. Used by the Codex chat fast-path so we never depend on a CLI
+   * subprocess (Windows EPERM) or on the LLM correctly constructing a wrapper command.
+   *
+   * Streams the same set of events a normal LLM-driven tool call would produce, so the UI
+   * renders identically.
+   */
+  private async runStructuredImplementTask(args: {
+    conversationId: string;
+    projectId: string;
+    taskId: string;
+    model: string;
+    signal: AbortSignal;
+  }): Promise<{ success: boolean; summary: string }> {
+    const tool = this.tools.find((candidate) => candidate.name === 'implement_task');
+    if (tool === undefined) {
+      throw new Error('implement_task tool is not registered.');
+    }
+
+    const messageId = randomUUID();
+    const toolCallId = randomUUID();
+    const toolInput = { projectId: args.projectId, taskId: args.taskId, model: args.model };
+
+    this.bridge.emit({
+      type: 'message-start',
+      conversationId: args.conversationId,
+      messageId,
+      role: 'assistant',
+      createdAt: new Date().toISOString(),
+    });
+
+    this.bridge.emit({
+      type: 'tool-call',
+      conversationId: args.conversationId,
+      toolCallId,
+      toolName: 'implement_task',
+      input: toolInput,
+    });
+
+    const ctx = buildToolExecutionContext({
+      conversationId: args.conversationId,
+      projectId: args.projectId,
+      toolCallId,
+      signal: args.signal,
+      bridge: {
+        workspaceRoot: this.bridge.workspaceRoot,
+        emit: (event) => this.bridge.emit(event),
+        getProject: (projectId) => this.bridge.getProject(projectId),
+        upsertProject: (toolArgs) => this.bridge.upsertProject(toolArgs),
+        getTaskPlan: (projectId) => this.bridge.getTaskPlan(projectId),
+        upsertTaskPlan: (toolArgs) => this.bridge.upsertTaskPlan(toolArgs),
+        launchGodot: (toolArgs) => this.bridge.launchGodot(toolArgs),
+        stopGodot: (toolArgs) => this.bridge.stopGodot(toolArgs),
+        getAnthropicApiKey: () => this.bridge.getApiKey('anthropic'),
+      },
+    });
+
+    let summaryText: string;
+    let success = false;
+
+    try {
+      const result = await tool.execute(toolInput, ctx) as { success: boolean; summary: string };
+      success = result.success === true;
+      summaryText = success
+        ? `Task \`${args.taskId}\` completed.\n\n${result.summary}`
+        : `Task \`${args.taskId}\` failed.\n\n${result.summary}`;
+
+      this.bridge.emit({
+        type: 'tool-result',
+        conversationId: args.conversationId,
+        toolCallId,
+        success,
+        output: result,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      summaryText = `Task \`${args.taskId}\` crashed before completion: ${message}`;
+      this.bridge.emit({
+        type: 'tool-result',
+        conversationId: args.conversationId,
+        toolCallId,
+        success: false,
+        output: { error: message },
+      });
+    }
+
+    await this.bridge.createMessage({
+      conversationId: args.conversationId,
+      role: 'assistant',
+      contentBlocks: [{ type: 'text', text: summaryText }],
+    });
+
+    this.bridge.emit({
+      type: 'message-complete',
+      conversationId: args.conversationId,
+      messageId,
+      fullText: summaryText,
+      completedAt: new Date().toISOString(),
+    });
+
+    return { success, summary: summaryText };
+  }
+
+  /**
+   * Run a batch of implement_task requests sequentially in-process. Each task gets its own
+   * message-start/tool-call/tool-result/message-complete event sequence so the UI renders one
+   * card per task. A single `done` event is emitted at the end of the batch — emitting `done`
+   * per-task would confuse the UI's "is this turn over?" tracking.
+   *
+   * Failures do not abort the batch: subsequent tasks still run so the user sees all results
+   * in one go. Cancellation via signal does abort cleanly between tasks.
+   */
+  private async runStructuredImplementTaskBatch(args: {
+    conversationId: string;
+    projectId: string;
+    taskIds: string[];
+    model: string;
+    signal: AbortSignal;
+  }): Promise<void> {
+    for (const taskId of args.taskIds) {
+      if (args.signal.aborted) {
+        break;
+      }
+      try {
+        await this.runStructuredImplementTask({
+          conversationId: args.conversationId,
+          projectId: args.projectId,
+          taskId,
+          model: args.model,
+          signal: args.signal,
+        });
+      } catch (err) {
+        this.log(`runStructuredImplementTaskBatch: task ${taskId} threw`, err);
+        // Continue to the next task — the per-task method already emitted a tool-result with
+        // success=false in this case, so the UI is informed.
+      }
+    }
+
+    this.bridge.emit({
+      type: 'done',
+      conversationId: args.conversationId,
+    });
+  }
+}
+
+/**
+ * Extract task ids the user wants implemented from a chat message. Returns an empty array if
+ * the message is not a task-implementation request.
+ *
+ * Heuristic: the message must contain both "implement" and "task" (case-insensitive). When it
+ * does, we extract every kebab-case identifier (≥ 1 hyphen, e.g. `wire-combat-scene-card-play`)
+ * that appears in the message. If `validIds` is provided, we filter to ids that are real tasks
+ * in the current plan — this is the common case from the conversation-agent caller and avoids
+ * false positives on identifier-shaped phrases like `try-this-thing` in free-form prose.
+ *
+ * Examples that match:
+ *   "implement task wire-combat-scene-card-play"
+ *   "Please implement task A: ..."
+ *   "implement these tasks: a, b, c"
+ *   bullet-list of ids under "implement task <id>" intro line
+ *
+ * Examples that do not match:
+ *   "edit this file foo-bar-baz" — no "implement" + "task"
+ *   "implement task <id>" — `<id>` is the literal placeholder string, not kebab-case
+ */
+export function parseImplementTaskIntents(message: string, validIds?: ReadonlySet<string>): string[] {
+  if (!/\bimplement/i.test(message) || !/\btasks?\b/i.test(message)) {
+    return [];
+  }
+
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  // Kebab-case: starts with letter, has at least one hyphen, segments are lowercase alphanumeric.
+  const idPattern = /\b([a-z][a-z0-9]*(?:-[a-z0-9]+)+)\b/g;
+  for (const match of message.toLowerCase().matchAll(idPattern)) {
+    const id = match[1];
+    if (id === undefined || seen.has(id)) {
+      continue;
+    }
+    if (validIds !== undefined && !validIds.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * @deprecated Use {@link parseImplementTaskIntents} which returns all matched ids.
+ * Retained for any external callers; returns the first match (if any) for backward compatibility.
+ */
+export function parseImplementTaskIntent(message: string, validIds?: ReadonlySet<string>): string | null {
+  return parseImplementTaskIntents(message, validIds)[0] ?? null;
 }
 
 function buildCondensedCodexHistory(messages: DbMessageRecord[], limit = 6): string {
