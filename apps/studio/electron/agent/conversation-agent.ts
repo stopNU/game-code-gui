@@ -238,7 +238,7 @@ export class ConversationAgent {
     }
 
     const cliEntryPath = resolvePath(this.bridge.workspaceRoot, 'apps/cli/bin/game-harness.js');
-    const systemPrompt = buildConversationAgentPrompt({ project, provider: args.provider, cliEntryPath });
+    const systemPrompt = buildConversationAgentPrompt({ project, provider: args.provider, cliEntryPath, model: args.model });
     const initialMessages = await this.bridge.listMessages(args.conversationId);
     const initialHistory = initialMessages.map(toClaudeMessage);
 
@@ -283,7 +283,7 @@ export class ConversationAgent {
           message.role === 'user' ? message : { ...message, content: truncateToolResultBlocks(message.content as ClaudeContentBlock[]) },
         ),
         tools: this.tools,
-        system: buildConversationAgentPrompt({ project, provider: args.provider, cliEntryPath }),
+        system: buildConversationAgentPrompt({ project, provider: args.provider, cliEntryPath, model: args.model }),
         model: args.model,
         signal: args.signal,
         onEvent: (event) => {
@@ -491,7 +491,7 @@ export class ConversationAgent {
   ): Promise<void> {
     const storedMessages = await this.bridge.listMessages(args.conversationId);
     const cliEntryPath = resolvePath(this.bridge.workspaceRoot, 'apps/cli/bin/game-harness.js');
-    const systemPrompt = buildConversationAgentPrompt({ project, provider: 'codex', cliEntryPath });
+    const systemPrompt = buildConversationAgentPrompt({ project, provider: 'codex', cliEntryPath, model: args.model });
     const messageId = randomUUID();
     let streamedText = '';
     const codexToolCalls: Array<{ id: string; name: string }> = [];
