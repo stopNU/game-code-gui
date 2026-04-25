@@ -111,7 +111,7 @@ export function App(): JSX.Element {
     try { localStorage.setItem(PAGE_STORAGE_KEY, 'new-project'); } catch { /* ignore */ }
   };
 
-  const handleProjectCreated = (_details: { name: string; path: string; engine: string }): void => {
+  const handleProjectCreated = (_details: { name: string; path: string; engine: string; provider: string; model: string; template: string; brief: string }): void => {
     setSelectedProjectId(null);
     setPage('workspace');
     try { localStorage.setItem(PAGE_STORAGE_KEY, 'workspace'); } catch { /* ignore */ }
