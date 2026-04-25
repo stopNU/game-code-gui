@@ -372,7 +372,6 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
             message,
           });
         },
-        'advanced',
         undefined,
         undefined,
         (tokens) => {
@@ -393,7 +392,7 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
             planJson: JSON.stringify(nextPlan),
           });
         },
-        async (used, budget) => {
+        async (used, budget, _filesWritten) => {
           ctx.bridge.emit({
             type: 'budget-exhausted',
             conversationId: ctx.conversationId,
