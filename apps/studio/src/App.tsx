@@ -71,6 +71,12 @@ export function App(): JSX.Element {
     },
   });
   const abortConversation = trpc.agent.abort.useMutation();
+  const createProject = trpc.projects.create.useMutation({
+    onSuccess: async () => {
+      await utils.projects.list.invalidate();
+    },
+  });
+  const sendMessage = trpc.agent.send.useMutation();
 
   const selectedProject =
     selectedProjectId !== null
@@ -111,11 +117,32 @@ export function App(): JSX.Element {
     try { localStorage.setItem(PAGE_STORAGE_KEY, 'new-project'); } catch { /* ignore */ }
   };
 
-  const handleProjectCreated = (_details: { name: string; path: string; engine: string; provider: string; model: string; template: string; brief: string }): void => {
-    setSelectedProjectId(null);
-    setPage('workspace');
-    try { localStorage.setItem(PAGE_STORAGE_KEY, 'workspace'); } catch { /* ignore */ }
-    createConversationFromCurrentContext();
+  const handleProjectCreated = (details: { name: string; path: string; engine: string; provider: string; model: string; template: string; brief: string }): void => {
+    const provider = details.provider as 'anthropic' | 'openai' | 'codex';
+    void createProject.mutateAsync({ name: details.name, path: details.path }).then((project) => {
+      setSelectedProjectId(project.id);
+      setPage('workspace');
+      try {
+        localStorage.setItem(PAGE_STORAGE_KEY, 'workspace');
+        localStorage.setItem(PROJECT_STORAGE_KEY, project.id);
+      } catch { /* ignore */ }
+      void createConversation.mutateAsync({
+        projectId: project.id,
+        title: details.name,
+        provider,
+        model: details.model,
+      }).then((conversation) => {
+        if (details.brief.trim()) {
+          sendMessage.mutate({
+            conversationId: conversation.id,
+            userMessage: details.brief,
+            projectId: project.id,
+            model: details.model,
+            provider,
+          });
+        }
+      });
+    });
   };
 
   const pendingApprovalsQuery = trpc.approvals.listPending.useQuery(

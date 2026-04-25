@@ -89,6 +89,7 @@ pnpm --filter @agent-harness/studio run package:win
 - `ALL_TOOLS` array in packages/tools must be typed `ToolContract<any, any>[]` (invariant generics)
 - Build order: core -> tools -> game-adapter -> assets -> playtest -> evals -> cli (Turbo handles this)
 - Godot binary resolved via `GODOT_PATH` env var, falling back to `godot` in PATH
+- `rg` works on Windows/PowerShell in this environment; use it for repo search when available instead of assuming it is blocked
 - **No simple mode** - everything is always advanced/GDScript; `mode` param ignored
 - **No Phaser, no Vite, no Playwright, no TypeScript in generated games** - all game code is GDScript
 
