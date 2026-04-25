@@ -287,6 +287,88 @@ describe('createAdvancedPlan', () => {
     expect(verifier?.toolsAllowed).toEqual(expect.arrayContaining(['project', 'code', 'npm']));
   });
 
+  it('wires cross-phase deps for integration-verifier in a phase with no systems/gameplay tasks', async () => {
+    const preprocessed: PreprocessedBrief = {
+      rawBrief: 'A turn-based deckbuilder.',
+      mode: 'advanced',
+      classification: 'data-driven',
+      gameGenre: 'deckbuilder',
+      gameTitle: 'Test Deckbuilder',
+      summary: 'A test game.',
+      extractedSubsystems: [],
+      extractedSchemas: [],
+      sprintPlan: ['Build systems', 'Integration pass'],
+      mvpFeatures: ['Play cards'],
+      stretchFeatures: [],
+      eventTypes: [],
+      stateMachines: [],
+      sections: [],
+    };
+
+    const response = {
+      gameTitle: 'Test Deckbuilder',
+      gameBrief: 'A test game.',
+      genre: 'deckbuilder',
+      coreLoop: 'Play cards and end turns.',
+      controls: ['Mouse'],
+      scenes: ['BootScene', 'CombatScene'],
+      entities: ['Player', 'Enemy'],
+      assets: ['cards'],
+      phases: [
+        {
+          phase: 1,
+          tasks: [
+            {
+              id: 'implement-combat-engine',
+              phase: 1,
+              role: 'systems',
+              title: 'Combat engine',
+              description: 'Implement combat engine.',
+              acceptanceCriteria: ['Engine exists'],
+              dependencies: [],
+              toolsAllowed: ['project', 'code'],
+            },
+            {
+              id: 'implement-combat-scene',
+              phase: 1,
+              role: 'gameplay',
+              title: 'Combat scene',
+              description: 'Wire combat scene.',
+              acceptanceCriteria: ['Scene wired'],
+              dependencies: ['implement-combat-engine'],
+              toolsAllowed: ['project', 'code'],
+            },
+          ],
+        },
+        {
+          phase: 2,
+          tasks: [
+            {
+              id: 'final-integration-test',
+              phase: 2,
+              role: 'integration-verifier',
+              title: 'Final integration test',
+              description: 'Verify everything is wired.',
+              acceptanceCriteria: ['All wired'],
+              dependencies: [],
+              toolsAllowed: ['project', 'code'],
+            },
+          ],
+        },
+      ],
+      verificationSteps: [],
+      contentManifest: [],
+    };
+
+    const plan = await createAdvancedPlan(preprocessed, makeClient(response));
+    const verifier = plan.phases[1]?.tasks.find((task) => task.id === 'final-integration-test');
+
+    expect(verifier?.dependencies).toEqual(
+      expect.arrayContaining(['implement-combat-engine', 'implement-combat-scene']),
+    );
+    expect(verifier?.toolsAllowed).toEqual(expect.arrayContaining(['project', 'code', 'npm']));
+  });
+
   it('selects the schema-valid plan object when an earlier JSON array is present in the response', async () => {
     const preprocessed: PreprocessedBrief = {
       rawBrief: 'A turn-based deckbuilder.',

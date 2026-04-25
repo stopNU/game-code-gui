@@ -346,25 +346,37 @@ function defaultPrimaryAction(sceneId: string): string | undefined {
 function ensureIntegrationVerifierTasks(
   phases: AdvancedDesignerPlan['phases'],
 ): AdvancedDesignerPlan['phases'] {
+  // Accumulate systems/gameplay tasks across phases so verifiers in later phases
+  // (e.g. a final QA phase with no systems/gameplay tasks of their own) can still
+  // be wired to the tasks they depend on from prior phases.
+  const cumulativeSystemsOrGameplay: AdvancedDesignerTask[] = [];
+
   return phases.map((phase) => {
     const tasks = [...phase.tasks];
-    const systemsOrGameplay = tasks.filter((task) => task.role === 'systems' || task.role === 'gameplay');
+    const phaseSystemsOrGameplay = tasks.filter((task) => task.role === 'systems' || task.role === 'gameplay');
     const verifierTasks = tasks.filter((task) => task.role === 'integration-verifier');
 
-    if (systemsOrGameplay.length === 0) {
+    // Include this phase's tasks before computing deps so same-phase tasks are reachable.
+    cumulativeSystemsOrGameplay.push(...phaseSystemsOrGameplay);
+
+    if (verifierTasks.length > 0) {
+      // Fix verifier deps using all systems/gameplay tasks available up to this phase.
+      if (cumulativeSystemsOrGameplay.length > 0) {
+        return {
+          ...phase,
+          tasks: verifierTasksHaveDependencies(tasks, cumulativeSystemsOrGameplay),
+        };
+      }
       return phase;
     }
 
-    if (verifierTasks.length > 0) {
-      return {
-        ...phase,
-        tasks: verifierTasksHaveDependencies(tasks, systemsOrGameplay),
-      };
+    if (phaseSystemsOrGameplay.length === 0) {
+      return phase;
     }
 
-    const dependencyIds = systemsOrGameplay.map((task) => task.id);
-    const subsystemId = inferSharedSubsystemId(systemsOrGameplay);
-    const dataSchemaRefs = [...new Set(systemsOrGameplay.flatMap((task) => task.dataSchemaRefs ?? []))];
+    const dependencyIds = phaseSystemsOrGameplay.map((task) => task.id);
+    const subsystemId = inferSharedSubsystemId(phaseSystemsOrGameplay);
+    const dataSchemaRefs = [...new Set(phaseSystemsOrGameplay.flatMap((task) => task.dataSchemaRefs ?? []))];
 
     tasks.push({
       id: `verify-integration-phase-${phase.phase}`,
