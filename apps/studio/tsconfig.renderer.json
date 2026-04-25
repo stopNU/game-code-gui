@@ -23,6 +23,7 @@
     "electron/preload.ts",
     "electron/trpc/**/*.ts",
     "electron/db/**/*.ts",
-    "electron/services/**/*.ts"
+    "electron/services/**/*.ts",
+    "electron/agent/langsmith/**/*.ts"
   ]
 }

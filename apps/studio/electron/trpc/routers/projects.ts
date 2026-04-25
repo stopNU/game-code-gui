@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { router, publicProcedure } from '../trpc-base.js';
 import { normalizePath } from '../../db/normalize-path.js';
+import { applyLangSmithEnv } from '../../agent/langsmith/env.js';
 // Dynamic import used intentionally: the electron main process is built as CJS,
 // but @agent-harness/services is pure ESM. A static require() would fail at
 // runtime; import() loads ESM correctly from CJS context.
@@ -49,11 +50,17 @@ export const projectsRouter = router({
         ctx.sessionManager.emitStreamEvent({ type: 'scaffold-log', jobId, line, done });
       };
 
+      // Apply LangSmith tracing for the planning phase (mirrors conversation-agent.ts pattern).
+      const langSmithCfg = ctx.settingsService.getLangSmithRuntimeConfig();
+      const planningCfg = { ...langSmithCfg, projectName: `${langSmithCfg.projectName}-planning` };
+      applyLangSmithEnv(planningCfg);
+
       // Fire-and-forget: run the full scaffold pipeline async
       void (async () => {
         try {
           mkdirSync(expandedPath, { recursive: true });
           emit('Project directory created.');
+          emit(`[LangSmith] tracing ${planningCfg.enabled && langSmithCfg.apiKey !== null ? 'enabled' : 'disabled'} (project: ${planningCfg.projectName})`);
 
           const planGameService = await getPlanGameService();
           const plan = await planGameService({

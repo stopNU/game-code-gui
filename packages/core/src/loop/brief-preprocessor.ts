@@ -12,6 +12,8 @@ import type { SubsystemDef, DataSchemaDef, StateMachineDef as TaskStateMachineDe
 
 export type StateMachineDef = TaskStateMachineDef;
 import { extractJson, extractText } from './extract.js';
+import { withRetry } from './retry.js';
+import { DEFAULT_RETRY_POLICY } from '../types/agent.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -107,7 +109,7 @@ type AnalystResponse = z.infer<typeof AnalystResponseSchema>;
 // ---------------------------------------------------------------------------
 
 // Bump this when BRIEF_ANALYST_SYSTEM_PROMPT changes in a way that would alter results.
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 const CACHE_DIR = join(tmpdir(), 'agent-harness-cache', 'brief-preprocessor');
 
 function briefCacheKey(brief: string): string {
@@ -172,10 +174,20 @@ export async function preprocessBrief(
 
   const callbacks = onText ? [{ handleLLMNewToken: (token: string) => onText(token) }] : [];
 
-  const firstResponse = await model.invoke(
-    [new SystemMessage(BRIEF_ANALYST_SYSTEM_PROMPT), new HumanMessage(userPrompt)],
-    { callbacks },
+  const firstResponse = await withRetry(
+    () => model.invoke(
+      [new SystemMessage(BRIEF_ANALYST_SYSTEM_PROMPT), new HumanMessage(userPrompt)],
+      { callbacks, runName: 'preprocess-brief', tags: ['planning', 'preprocess'] },
+    ),
+    DEFAULT_RETRY_POLICY,
   );
+
+  if (wasTruncated(firstResponse)) {
+    throw new Error(
+      '[brief-preprocessor] Analyst response was truncated by max_tokens. ' +
+      'The brief is too large for the current token budget — consider shortening it.',
+    );
+  }
 
   const text = extractText(typeof firstResponse.content === 'string' ? firstResponse.content : JSON.stringify(firstResponse.content));
   const analysisResult = parseAnalystResponse(text);
@@ -192,15 +204,18 @@ export async function preprocessBrief(
     .map((i) => `  ${i.path.join('.')}: ${i.message}`)
     .join('\n');
 
-  const retryResponse = await model.invoke([
-    new SystemMessage(BRIEF_ANALYST_SYSTEM_PROMPT),
-    new HumanMessage(userPrompt),
-    new AIMessage(text),
-    new HumanMessage(
-      `Your response failed schema validation. Fix these errors and return corrected JSON only:\n` +
-      errorSummary,
-    ),
-  ]);
+  const retryResponse = await withRetry(
+    () => model.invoke([
+      new SystemMessage(BRIEF_ANALYST_SYSTEM_PROMPT),
+      new HumanMessage(userPrompt),
+      new AIMessage(text),
+      new HumanMessage(
+        `Your response failed schema validation. Fix these errors and return corrected JSON only:\n` +
+        errorSummary,
+      ),
+    ], { runName: 'preprocess-brief-retry', tags: ['planning', 'preprocess', 'retry'] }),
+    DEFAULT_RETRY_POLICY,
+  );
 
   const retryText = extractText(typeof retryResponse.content === 'string' ? retryResponse.content : JSON.stringify(retryResponse.content));
   const retryResult = parseAnalystResponse(retryText);
@@ -228,6 +243,15 @@ export async function preprocessBrief(
 type ParseSuccess = { success: true; data: AnalystResponse };
 type ParseFailure = { success: false; issues: Array<{ path: string[]; message: string }> };
 type ParseOutcome = ParseSuccess | ParseFailure;
+
+/** See advanced-planner.ts for the rationale. */
+function wasTruncated(response: unknown): boolean {
+  if (response === null || typeof response !== 'object') return false;
+  const meta = (response as { response_metadata?: Record<string, unknown> }).response_metadata;
+  if (meta === undefined) return false;
+  const stop = meta['stop_reason'] ?? meta['finish_reason'];
+  return stop === 'max_tokens' || stop === 'length';
+}
 
 function parseAnalystResponse(raw: string): ParseOutcome {
   let parsed: unknown;
