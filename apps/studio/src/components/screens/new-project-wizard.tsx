@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { trpc } from '@renderer/lib/trpc';
+import { waitForStudioPort } from '@renderer/lib/port';
+import type { ScaffoldLogEvent, ScaffoldDoneEvent, ScaffoldErrorEvent } from '@shared/protocol';
 
 interface NewProjectWizardProps {
   onBack: () => void;
-  onCreate: (details: { name: string; path: string; engine: EngineId; provider: ProviderId; model: string; template: BriefPresetId; brief: string }) => void;
+  onCreate: (details: { name: string; projectId: string; path: string; engine: EngineId; provider: ProviderId; model: string; template: BriefPresetId; brief: string }) => void;
 }
 
 const STEP_LABELS = ['Project', 'Engine', 'AI', 'Template', 'Brief', 'Review'] as const;
@@ -97,18 +99,6 @@ const BRIEF_PRESETS = [
 
 type BriefPresetId = typeof BRIEF_PRESETS[number]['id'];
 
-const SCAFFOLD_STEPS = [
-  'Initialising project directory…',
-  'Copying Godot 4.3 template files…',
-  'Writing project.godot config…',
-  'Scaffolding src/ folder structure…',
-  'Generating starter scenes…',
-  'Seeding content data (cards, enemies, relics)…',
-  'Installing AI provider configuration…',
-  'Writing .harness/config.json…',
-  'Running initial headless syntax check…',
-  'Project ready.',
-] as const;
 
 const T = {
   bg0: '#080a0f',
@@ -268,11 +258,14 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
     setTemplate(id);
     setBrief(BRIEF_PRESETS.find((p) => p.id === id)?.brief ?? '');
   };
-  const [logLines, setLogLines] = useState<string[]>([]);
+  const [logLines, setLogLines] = useState<Array<{ text: string; final: boolean }>>([]);
   const [logDone, setLogDone] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
+  const [scaffoldResult, setScaffoldResult] = useState<{ projectId: string; path: string; gameTitle: string } | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const chooseDirectory = trpc.runtime.chooseDirectory.useMutation();
+  const scaffoldMutation = trpc.projects.scaffold.useMutation();
 
   useEffect(() => {
     if (!pathManuallyEdited) {
@@ -288,14 +281,46 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
     setCreating(true);
     setLogLines([]);
     setLogDone(false);
-    SCAFFOLD_STEPS.forEach((line, i) => {
-      setTimeout(() => {
-        setLogLines((l) => [...l, line]);
-        if (i === SCAFFOLD_STEPS.length - 1) {
-          setTimeout(() => setLogDone(true), 400);
-        }
-      }, 280 + i * 420);
+    setLogError(null);
+    setScaffoldResult(null);
+
+    let jobId: string | null = null;
+    let port: MessagePort | null = null;
+
+    const handleMessage = (event: MessageEvent): void => {
+      const data = event.data as { type?: string; jobId?: string } | null;
+      if (data === null || data === undefined || data.jobId !== jobId) return;
+
+      if (data.type === 'scaffold-log') {
+        const e = data as ScaffoldLogEvent;
+        setLogLines((prev) => [...prev, { text: e.line, final: e.done }]);
+      } else if (data.type === 'scaffold-done') {
+        const e = data as ScaffoldDoneEvent;
+        setLogDone(true);
+        setScaffoldResult({ projectId: e.projectId, path: e.path, gameTitle: e.gameTitle });
+        if (port !== null) port.removeEventListener('message', handleMessage);
+      } else if (data.type === 'scaffold-error') {
+        const e = data as ScaffoldErrorEvent;
+        setLogError(e.message);
+        if (port !== null) port.removeEventListener('message', handleMessage);
+      }
+    };
+
+    void waitForStudioPort().then((p) => {
+      port = p;
+      port.addEventListener('message', handleMessage);
     });
+
+    scaffoldMutation.mutate(
+      { name, path, brief },
+      {
+        onSuccess: (result) => { jobId = result.jobId; },
+        onError: (err) => {
+          setLogError(err.message);
+          if (port !== null) port.removeEventListener('message', handleMessage);
+        },
+      },
+    );
   };
 
   const canNext = [
@@ -508,40 +533,51 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
               fontSize: 11,
             }}
           >
-            {logLines.map((line, i) => (
-              <div
-                key={i}
-                style={{
-                  color: i === logLines.length - 1 && !logDone ? T.text0 : T.text2,
-                  marginBottom: 5,
-                  lineHeight: 1.5,
-                  display: 'flex',
-                  gap: 8,
-                  alignItems: 'center',
-                }}
-              >
-                <span style={{ color: T.green, flexShrink: 0 }}>
-                  {i < logLines.length - 1 || logDone ? '✓' : '›'}
-                </span>
-                {line}
+            {logLines.map((entry, i) => {
+              const isLast = i === logLines.length - 1;
+              const isActive = isLast && !logDone && logError === null;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    color: isActive ? T.text0 : T.text2,
+                    marginBottom: 5,
+                    lineHeight: 1.5,
+                    display: 'flex',
+                    gap: 8,
+                    alignItems: 'center',
+                  }}
+                >
+                  <span style={{ color: isActive ? T.accent : T.green, flexShrink: 0 }}>
+                    {isActive ? '›' : '✓'}
+                  </span>
+                  {entry.text}
+                </div>
+              );
+            })}
+            {logError !== null && (
+              <div style={{ color: '#d97777', marginTop: 8, fontSize: 11, fontFamily: T.mono, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                ✗ {logError}
               </div>
-            ))}
-            {!logDone && (
+            )}
+            {!logDone && logError === null && (
               <div style={{ display: 'flex', gap: 6, color: T.text3 }}>
                 <span style={{ animation: 'pulse 2s ease-in-out infinite' }}>▌</span>
               </div>
             )}
           </div>
 
-          {logDone && (
+          {logDone && scaffoldResult !== null && (
             <div style={{ marginTop: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.green, boxShadow: `0 0 8px ${T.green}` }} />
-                <span style={{ fontSize: 13, fontWeight: 500, color: T.green }}>Project ready — {name}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: T.green }}>
+                  Project ready — {scaffoldResult.gameTitle}
+                </span>
               </div>
               <button
                 onClick={() => {
-                  onCreate({ name, path, engine, provider, model, template, brief });
+                  onCreate({ name: scaffoldResult.gameTitle, projectId: scaffoldResult.projectId, path: scaffoldResult.path, engine, provider, model, template, brief });
                 }}
                 style={{
                   width: '100%',
@@ -557,6 +593,27 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
                 }}
               >
                 Open in Workspace →
+              </button>
+            </div>
+          )}
+          {logError !== null && (
+            <div style={{ marginTop: 16 }}>
+              <button
+                onClick={startCreate}
+                style={{
+                  width: '100%',
+                  padding: '11px 0',
+                  background: T.bg3,
+                  color: T.text1,
+                  border: `1px solid ${T.border2}`,
+                  borderRadius: 5,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  fontFamily: T.sans,
+                }}
+              >
+                Retry
               </button>
             </div>
           )}

@@ -142,6 +142,28 @@ export interface UpdateStatusEvent {
   message?: string;
 }
 
+export interface ScaffoldLogEvent {
+  type: 'scaffold-log';
+  jobId: string;
+  line: string;
+  /** true on the final success log line */
+  done: boolean;
+}
+
+export interface ScaffoldDoneEvent {
+  type: 'scaffold-done';
+  jobId: string;
+  projectId: string;
+  path: string;
+  gameTitle: string;
+}
+
+export interface ScaffoldErrorEvent {
+  type: 'scaffold-error';
+  jobId: string;
+  message: string;
+}
+
 export type StreamEvent =
   | SessionReadyEvent
   | SessionStateEvent
@@ -162,7 +184,10 @@ export type StreamEvent =
   | DoneEvent
   | GodotLogEvent
   | GodotStatusEvent
-  | UpdateStatusEvent;
+  | UpdateStatusEvent
+  | ScaffoldLogEvent
+  | ScaffoldDoneEvent
+  | ScaffoldErrorEvent;
 
 export interface AgentSendCommand {
   type: 'send';

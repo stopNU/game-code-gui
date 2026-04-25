@@ -117,31 +117,31 @@ export function App(): JSX.Element {
     try { localStorage.setItem(PAGE_STORAGE_KEY, 'new-project'); } catch { /* ignore */ }
   };
 
-  const handleProjectCreated = (details: { name: string; path: string; engine: string; provider: string; model: string; template: string; brief: string }): void => {
+  const handleProjectCreated = (details: { name: string; projectId: string; path: string; engine: string; provider: string; model: string; template: string; brief: string }): void => {
     const provider = details.provider as 'anthropic' | 'openai' | 'codex';
-    void createProject.mutateAsync({ name: details.name, path: details.path }).then((project) => {
-      setSelectedProjectId(project.id);
-      setPage('workspace');
-      try {
-        localStorage.setItem(PAGE_STORAGE_KEY, 'workspace');
-        localStorage.setItem(PROJECT_STORAGE_KEY, project.id);
-      } catch { /* ignore */ }
-      void createConversation.mutateAsync({
-        projectId: project.id,
-        title: details.name,
-        provider,
-        model: details.model,
-      }).then((conversation) => {
-        if (details.brief.trim()) {
-          sendMessage.mutate({
-            conversationId: conversation.id,
-            userMessage: details.brief,
-            projectId: project.id,
-            model: details.model,
-            provider,
-          });
-        }
-      });
+    // The scaffold mutation already created the directory and DB project record.
+    // Just navigate and create the initial conversation.
+    setSelectedProjectId(details.projectId);
+    setPage('workspace');
+    try {
+      localStorage.setItem(PAGE_STORAGE_KEY, 'workspace');
+      localStorage.setItem(PROJECT_STORAGE_KEY, details.projectId);
+    } catch { /* ignore */ }
+    void createConversation.mutateAsync({
+      projectId: details.projectId,
+      title: details.name,
+      provider,
+      model: details.model,
+    }).then((conversation) => {
+      if (details.brief.trim()) {
+        sendMessage.mutate({
+          conversationId: conversation.id,
+          userMessage: `Project scaffolded. The game plan is in harness/tasks.json. Brief: ${details.brief}`,
+          projectId: details.projectId,
+          model: details.model,
+          provider,
+        });
+      }
     });
   };
 
