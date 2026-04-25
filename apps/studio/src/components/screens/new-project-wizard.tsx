@@ -6,14 +6,17 @@ interface NewProjectWizardProps {
   onCreate: (details: { name: string; path: string; engine: EngineId; provider: ProviderId; model: string; template: BriefPresetId; brief: string }) => void;
 }
 
-const STEP_LABELS = ['Project', 'Engine', 'AI', 'Template', 'Review'] as const;
+const STEP_LABELS = ['Project', 'Engine', 'AI', 'Template', 'Brief', 'Review'] as const;
 const STEP_TITLES = [
   'Name your project',
   'Choose an engine',
   'Set up AI',
   'Pick a template',
+  'Refine the brief',
   'Review & create',
 ];
+
+const BRIEF_MIN_CHARS = 20;
 
 const ENGINES = [
   { id: 'godot42', label: 'Godot 4.2', sub: 'GDScript · C# · open source',      icon: '◆', disabled: true  },
@@ -256,7 +259,15 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
   const [provider, setProvider] = useState<ProviderId>('anthropic');
   const [model, setModel] = useState<string>('claude-sonnet-4-6');
   const [template, setTemplate] = useState<BriefPresetId>('dark-fantasy');
+  const [brief, setBrief] = useState<string>(
+    BRIEF_PRESETS.find((p) => p.id === 'dark-fantasy')?.brief ?? '',
+  );
   const [creating, setCreating] = useState(false);
+
+  const handleTemplateChange = (id: BriefPresetId): void => {
+    setTemplate(id);
+    setBrief(BRIEF_PRESETS.find((p) => p.id === id)?.brief ?? '');
+  };
   const [logLines, setLogLines] = useState<string[]>([]);
   const [logDone, setLogDone] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
@@ -292,6 +303,7 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
     true,
     true,
     true,
+    brief.trim().length >= BRIEF_MIN_CHARS,
     true,
   ][step];
 
@@ -426,13 +438,57 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
           key={t.id}
           item={t}
           selected={template}
-          onSelect={(id) => setTemplate(id as BriefPresetId)}
+          onSelect={(id) => handleTemplateChange(id as BriefPresetId)}
         />
       ))}
     </div>,
 
-    // Step 4: Review + create
-    <div key="s4" style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+    // Step 4: Brief — editable textarea, prefilled from template (or empty for custom)
+    (() => {
+      const preset = BRIEF_PRESETS.find((p) => p.id === template);
+      const isCustom = template === 'custom';
+      const trimmed = brief.trim().length;
+      const valid = trimmed >= BRIEF_MIN_CHARS;
+      return (
+        <div key="s4" style={{ display: 'flex', flexDirection: 'column', gap: 14, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+          <div style={{ fontSize: 11, fontFamily: T.mono, color: T.text2, lineHeight: 1.6 }}>
+            {isCustom
+              ? 'Describe your game in your own words — theme, mood, mechanics, art direction. The agent will use this brief to plan the full deckbuilder.'
+              : `Edit the ${preset?.label ?? 'template'} brief below, or keep it as-is. The agent uses this brief verbatim to plan content and tone.`}
+          </div>
+          <textarea
+            value={brief}
+            onChange={(e) => setBrief(e.target.value)}
+            placeholder={isCustom
+              ? 'A deckbuilder roguelike where…'
+              : 'Edit the prefilled brief…'}
+            style={{
+              width: '100%',
+              minHeight: 200,
+              resize: 'vertical',
+              background: T.bg2,
+              border: `1px solid ${T.border2}`,
+              borderRadius: 4,
+              padding: '10px 12px',
+              outline: 'none',
+              fontFamily: T.sans,
+              fontSize: 12,
+              lineHeight: 1.55,
+              color: T.text0,
+            }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: T.mono }}>
+            <span style={{ color: valid ? T.text2 : '#d97777' }}>
+              {valid ? 'Looks good.' : `At least ${BRIEF_MIN_CHARS} characters needed`}
+            </span>
+            <span style={{ color: T.text3 }}>{trimmed} / {BRIEF_MIN_CHARS}+ chars</span>
+          </div>
+        </div>
+      );
+    })(),
+
+    // Step 5: Review + create
+    <div key="s5" style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
       {creating ? (
         /* ── Scaffold log ── */
         <div>
@@ -485,8 +541,7 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
               </div>
               <button
                 onClick={() => {
-                  const preset = BRIEF_PRESETS.find((p) => p.id === template);
-                  onCreate({ name, path, engine, provider, model, template, brief: preset?.brief ?? '' });
+                  onCreate({ name, path, engine, provider, model, template, brief });
                 }}
                 style={{
                   width: '100%',
@@ -521,10 +576,11 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
             ['Provider',  `${providerLabel} · ${modelLabel}`, T.mono],
             ['Theme',     themeLabel,                         null],
           ];
+          const totalRows = rows.length + 1; // + brief row
 
           return (
             <div>
-              {rows.map(([k, v, font], i, arr) => (
+              {rows.map(([k, v, font], i) => (
                 <div
                   key={k}
                   style={{
@@ -533,19 +589,49 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
                     alignItems: 'center',
                     padding: '11px 14px',
                     background: i % 2 === 0 ? T.bg2 : T.bg3,
-                    borderTop:    i === 0             ? `1px solid ${T.border}` : 'none',
+                    borderTop:    i === 0 ? `1px solid ${T.border}` : 'none',
                     borderBottom: `1px solid ${T.border}`,
                     borderLeft:   `1px solid ${T.border}`,
                     borderRight:  `1px solid ${T.border}`,
-                    borderRadius: i === 0             ? '5px 5px 0 0'
-                                : i === arr.length - 1 ? '0 0 5px 5px'
-                                : 0,
+                    borderRadius: i === 0 ? '5px 5px 0 0' : 0,
                   }}
                 >
                   <span style={{ fontSize: 11, fontFamily: T.mono, color: T.text2 }}>{k}</span>
                   <span style={{ fontSize: 11, fontFamily: font ?? T.sans, color: T.text1 }}>{v}</span>
                 </div>
               ))}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  padding: '11px 14px',
+                  background: totalRows % 2 === 1 ? T.bg2 : T.bg3,
+                  borderBottom: `1px solid ${T.border}`,
+                  borderLeft:   `1px solid ${T.border}`,
+                  borderRight:  `1px solid ${T.border}`,
+                  borderRadius: '0 0 5px 5px',
+                }}
+              >
+                <span style={{ fontSize: 11, fontFamily: T.mono, color: T.text2 }}>Brief</span>
+                <div
+                  style={{
+                    maxHeight: 110,
+                    overflowY: 'auto',
+                    background: T.bg0,
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 3,
+                    padding: '8px 10px',
+                    fontSize: 11,
+                    fontFamily: T.sans,
+                    color: T.text1,
+                    lineHeight: 1.5,
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {brief.trim() ? brief : <span style={{ color: T.text3, fontStyle: 'italic' }}>—</span>}
+                </div>
+              </div>
             </div>
           );
         })()
@@ -691,7 +777,7 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
               {step === 0 ? 'Cancel' : '← Back'}
             </button>
 
-            {step < 4 ? (
+            {step < 5 ? (
               <button
                 onClick={() => setStep((s) => s + 1)}
                 disabled={!canNext}

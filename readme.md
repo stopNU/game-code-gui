@@ -77,13 +77,13 @@ game-harness new-game --brief "..." --plan-only
 
 Flags:
 
-| Flag | Description |
-|---|---|
-| `-n, --name <name>` | Game name used for the default output folder |
-| `-b, --brief <text>` | Game description |
-| `--brief-file <path>` | Markdown brief file |
-| `-o, --output <path>` | Output directory |
-| `--plan-only` | Scaffold and plan only; skip implementation |
+| Flag                  | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `-n, --name <name>`   | Game name used for the default output folder |
+| `-b, --brief <text>`  | Game description                             |
+| `--brief-file <path>` | Markdown brief file                          |
+| `-o, --output <path>` | Output directory                             |
+| `--plan-only`         | Scaffold and plan only; skip implementation  |
 
 ### `plan-game`
 
@@ -109,13 +109,13 @@ game-harness implement-task -p ./my-game --resume --reconciliation-report harnes
 
 Flags:
 
-| Flag | Description |
-|---|---|
-| `-p, --project <path>` | Game project path |
-| `-t, --task <id>` | Task ID from `harness/tasks.json` |
-| `--resume` | Resume from remaining incomplete tasks |
-| `--concurrency <n>` | Parallel task limit in resume mode, default `3` |
-| `--model <model>` | Model shorthand or full model ID |
+| Flag                             | Description                                                |
+| -------------------------------- | ---------------------------------------------------------- |
+| `-p, --project <path>`           | Game project path                                          |
+| `-t, --task <id>`                | Task ID from `harness/tasks.json`                          |
+| `--resume`                       | Resume from remaining incomplete tasks                     |
+| `--concurrency <n>`              | Parallel task limit in resume mode, default `3`            |
+| `--model <model>`                | Model shorthand or full model ID                           |
 | `--reconciliation-report <path>` | Runtime reconciliation report path relative to the project |
 
 Supported model shorthands:
@@ -156,13 +156,13 @@ game-harness run-evals -p ./my-game --baseline ./old-report.json
 
 Flags:
 
-| Flag | Description |
-|---|---|
-| `-p, --project <path>` | Game project path |
-| `-l, --layer <name>` | `build`, `data`, `systems`, `deckbuilder`, `functional`, `design`, or `all` |
-| `--dataset <path>` | Custom eval dataset |
-| `--baseline <path>` | Baseline report for regression comparison |
-| `--no-fail-on-threshold` | Do not exit with code 1 on threshold failure |
+| Flag                     | Description                                                                 |
+| ------------------------ | --------------------------------------------------------------------------- |
+| `-p, --project <path>`   | Game project path                                                           |
+| `-l, --layer <name>`     | `build`, `data`, `systems`, `deckbuilder`, `functional`, `design`, or `all` |
+| `--dataset <path>`       | Custom eval dataset                                                         |
+| `--baseline <path>`      | Baseline report for regression comparison                                   |
+| `--no-fail-on-threshold` | Do not exit with code 1 on threshold failure                                |
 
 ### `generate-assets`
 
@@ -176,16 +176,16 @@ game-harness generate-assets -p ./my-game -r "glowing cursed sword icon" --key r
 
 Flags:
 
-| Flag | Description |
-|---|---|
-| `-p, --project <path>` | Game project path |
-| `-c, --content` | Generate art for content entries with `artPrompt` |
-| `--style <text>` | Style guide applied to content prompts |
-| `-r, --request <text>` | Single asset prompt |
-| `--type <type>` | Asset type, default `image` |
-| `--key <key>` | Asset key |
-| `--width <px>` | Width, default `256` |
-| `--height <px>` | Height, default `256` |
+| Flag                   | Description                                       |
+| ---------------------- | ------------------------------------------------- |
+| `-p, --project <path>` | Game project path                                 |
+| `-c, --content`        | Generate art for content entries with `artPrompt` |
+| `--style <text>`       | Style guide applied to content prompts            |
+| `-r, --request <text>` | Single asset prompt                               |
+| `--type <type>`        | Asset type, default `image`                       |
+| `--key <key>`          | Asset key                                         |
+| `--width <px>`         | Width, default `256`                              |
+| `--height <px>`        | Height, default `256`                             |
 
 Without `FAL_KEY`, placeholder assets are generated and still registered.
 
@@ -249,28 +249,28 @@ godot --headless --export-release "Windows Desktop" builds/game.exe --path .
 
 ## Eval layers
 
-| Layer | What it checks | CI threshold |
-|---|---|---|
-| `build` | Godot syntax/build validation | pass rate 100% |
-| `data` | content JSON validity and required fields | score >= 6/10 |
-| `systems` | expected GDScript system/autoload structure | score >= 6/10 |
-| `deckbuilder` | card/enemy/relic counts and content coverage | score >= 6/10 |
-| `functional` | stub for headless playtest-driven checks | pending |
-| `design` | stub for screenshot/judge checks | pending |
+| Layer         | What it checks                               | CI threshold   |
+| ------------- | -------------------------------------------- | -------------- |
+| `build`       | Godot syntax/build validation                | pass rate 100% |
+| `data`        | content JSON validity and required fields    | score >= 6/10  |
+| `systems`     | expected GDScript system/autoload structure  | score >= 6/10  |
+| `deckbuilder` | card/enemy/relic counts and content coverage | score >= 6/10  |
+| `functional`  | stub for headless playtest-driven checks     | pending        |
+| `design`      | stub for screenshot/judge checks             | pending        |
 
 ## Package layout
 
-| Package | Purpose |
-|---|---|
-| `packages/core` | Agent loop, types, Claude client, prompts, planner, memory, tracing |
-| `packages/tools` | Tool contracts for fs, code, npm, git |
-| `packages/game-adapter` | Godot scaffolder, template registry, build runner, runtime inspection |
-| `packages/assets` | fal.ai image pipeline with placeholder fallback |
-| `packages/playtest` | Godot headless smoke test runner |
-| `packages/evals` | Eval layers, CI thresholds, regression reports |
-| `apps/cli` | `game-harness` CLI |
-| `apps/studio` | Electron desktop app for conversational orchestration, approvals, Godot launch/logs, settings, updates, and tracing |
-| `templates/deckbuilder` | Godot 4 deckbuilder roguelike template |
+| Package                 | Purpose                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `packages/core`         | Agent loop, types, Claude client, prompts, planner, memory, tracing                                                 |
+| `packages/tools`        | Tool contracts for fs, code, npm, git                                                                               |
+| `packages/game-adapter` | Godot scaffolder, template registry, build runner, runtime inspection                                               |
+| `packages/assets`       | fal.ai image pipeline with placeholder fallback                                                                     |
+| `packages/playtest`     | Godot headless smoke test runner                                                                                    |
+| `packages/evals`        | Eval layers, CI thresholds, regression reports                                                                      |
+| `apps/cli`              | `game-harness` CLI                                                                                                  |
+| `apps/studio`           | Electron desktop app for conversational orchestration, approvals, Godot launch/logs, settings, updates, and tracing |
+| `templates/deckbuilder` | Godot 4 deckbuilder roguelike template                                                                              |
 
 ## Notes
 
@@ -279,7 +279,3 @@ godot --headless --export-release "Windows Desktop" builds/game.exe --path .
 - `simple-git` should be imported as `import { simpleGit } from 'simple-git'`
 - `ALL_TOOLS` should be typed as `ToolContract<any, any>[]`
 - Build order is handled by Turbo across the workspace
-
-## Known drift to clean up
-
-The docs now reflect the current Godot/fal.ai workflow and the Electron-based Studio app. Keep future implementation changes aligned with this workflow so the code and docs stay in sync end to end.
