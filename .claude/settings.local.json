@@ -110,7 +110,12 @@
       "Bash(node apps/cli/bin/game-harness.js scaffold-plan --plan-file cat-deckbuilder-plan.json -o ./cat-deckbuilder)",
       "Bash(grep -n \"games\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\dragon-deck\\\\|games/dragon-deck\" D:/dev/game-code-gui/apps/studio/electron/agent/tool-registry.test.ts)",
       "Bash(sqlite3 studio.sqlite3 \"SELECT id, path, display_path, title FROM projects;\")",
-      "Bash(node insert-project.mjs)"
+      "Bash(node insert-project.mjs)",
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Bash(node -e \"const Database = require\\('better-sqlite3'\\); const db = new Database\\('C:/Users/Michael/AppData/Roaming/@agent-harness/studio/studio.sqlite3', {readonly: true}\\); console.log\\(JSON.stringify\\(db.prepare\\('SELECT id, path, display_path, title FROM projects'\\).all\\(\\), null, 2\\)\\);\")",
+      "Bash(node --experimental-sqlite -e \"const {DatabaseSync} = require\\('node:sqlite'\\); const db = new DatabaseSync\\('C:/Users/Michael/AppData/Roaming/@agent-harness/studio/studio.sqlite3'\\); console.log\\(JSON.stringify\\(db.prepare\\('SELECT id, path, display_path, title FROM projects'\\).all\\(\\), null, 2\\)\\);\")",
+      "Bash(node --experimental-sqlite -e \"const {DatabaseSync} = require\\('node:sqlite'\\); const db = new DatabaseSync\\('C:/Users/Michael/AppData/Roaming/@agent-harness/studio/studio.sqlite3'\\); console.log\\(JSON.stringify\\(db.prepare\\('SELECT project_id, length\\(plan_json\\) as plan_size FROM task_plans'\\).all\\(\\), null, 2\\)\\);\")",
+      "Bash(node --experimental-sqlite -e ' *)"
     ]
   }
 }

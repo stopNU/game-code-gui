@@ -88,6 +88,16 @@ export const projectsRouter = router({
             title: plan.gameTitle ?? input.name,
           });
 
+          const tasksPath = join(expandedPath, 'harness', 'tasks.json');
+          if (existsSync(tasksPath)) {
+            try {
+              const raw = readFileSync(tasksPath, 'utf8');
+              ctx.database.taskPlans.upsert({ projectId: project.id, planJson: raw });
+            } catch {
+              // Plan file unreadable — discoverProjects will retry on next list()
+            }
+          }
+
           ctx.sessionManager.emitStreamEvent({
             type: 'scaffold-done',
             jobId,

@@ -1,7 +1,7 @@
 import { basename, join } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import type { ProjectDetails, ProjectPlanSummary, ProjectSummary } from '../../shared/domain.js';
-import { isPathInsideRoot } from '../db/normalize-path.js';
+import { isPathInsideRoot, normalizePath } from '../db/normalize-path.js';
 import type { ProjectsRepository } from '../db/repositories/projects-repository.js';
 import type { TaskPlanRecord, TaskPlansRepository } from '../db/repositories/task-plans-repository.js';
 import type { TaskStatus } from '@agent-harness/core';
@@ -74,6 +74,8 @@ export class ProjectScanner {
   ) {}
 
   public list(workspaceRoot: string): ProjectSummary[] {
+    this.discoverProjects(workspaceRoot);
+
     return this.projectsRepository
       .listWithPlans()
       .filter((project) => isPathInsideRoot(project.displayPath, workspaceRoot))
@@ -137,6 +139,51 @@ export class ProjectScanner {
     }
 
     return JSON.parse(taskPlan.planJson) as unknown;
+  }
+
+  private discoverProjects(workspaceRoot: string): void {
+    const scanDirs = [
+      join(workspaceRoot, 'apps', 'studio', 'projects'),
+      join(workspaceRoot, 'generated'),
+    ];
+
+    for (const scanDir of scanDirs) {
+      if (!existsSync(scanDir)) continue;
+
+      let entries: string[];
+      try {
+        entries = readdirSync(scanDir);
+      } catch {
+        continue;
+      }
+
+      for (const entry of entries) {
+        const projectPath = join(scanDir, entry);
+        const tasksPath = join(projectPath, 'harness', 'tasks.json');
+        if (!existsSync(tasksPath)) continue;
+
+        const normalized = normalizePath(projectPath);
+        const existing = this.projectsRepository.getByNormalizedPath(normalized);
+        const existingPlan = existing === null ? null : this.taskPlansRepository.getByProjectId(existing.id);
+        if (existing !== null && existingPlan !== null) continue;
+
+        try {
+          const raw = readFileSync(tasksPath, 'utf8');
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
+          const title = typeof parsed['gameTitle'] === 'string' ? parsed['gameTitle'] : null;
+
+          const project = existing ?? this.projectsRepository.upsert({
+            normalizedPath: normalized,
+            displayPath: projectPath,
+            title: title ?? entry,
+          });
+
+          this.taskPlansRepository.upsert({ projectId: project.id, planJson: raw });
+        } catch {
+          // Malformed tasks.json or upsert failure — skip
+        }
+      }
+    }
   }
 
   private getCurrentTaskPlan(
