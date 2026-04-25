@@ -212,6 +212,26 @@ export async function validateRuntimeDependencies(
   const activeScriptPaths = await collectActiveScriptPaths(projectPath, manifest, sceneMetadata, scriptMetadata, classRegistry);
   const issues: RuntimeDependencyValidationIssue[] = [];
 
+  // Detect the silent "class_name shadows autoload" trap: in Godot 4, a script registered
+  // as an autoload that ALSO declares `class_name X` (matching the autoload name) fails to
+  // parse with "Class hides a global script class". The autoload then never initializes,
+  // and headless tests/runs exit cleanly with no output, which is extremely confusing.
+  // Surface this as a first-class error so agents don't waste cycles chasing symptoms.
+  for (const autoload of manifest.autoloads) {
+    const meta = scriptMetadata.get(autoload.scriptPath);
+    if (meta !== undefined && meta.className === autoload.name) {
+      issues.push({
+        sourcePath: autoload.scriptPath,
+        sourceLine: 1,
+        dependencyKind: 'class_name',
+        dependency: autoload.name,
+        message:
+          `Autoload "${autoload.name}" also declares \`class_name ${autoload.name}\` — this collides with the autoload singleton name and causes a Godot parse error ("Class hides a global script class"), preventing the autoload from loading. Remove the class_name declaration; the singleton is already globally accessible by name.`,
+        active: true,
+      });
+    }
+  }
+
   for (const metadata of scriptMetadata.values()) {
     const isActive = activeScriptPaths.has(metadata.scriptPath);
     for (const reference of metadata.references) {
