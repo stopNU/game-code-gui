@@ -99,26 +99,6 @@ const BRIEF_PRESETS = [
 
 type BriefPresetId = typeof BRIEF_PRESETS[number]['id'];
 
-
-const T = {
-  bg0: '#080a0f',
-  bg2: '#11141f',
-  bg3: '#161b28',
-  bg4: '#1c2133',
-  border: '#1a1f30',
-  border2: '#242b3d',
-  text0: '#eceef5',
-  text1: '#9aa0bc',
-  text2: '#545c7a',
-  text3: '#363d57',
-  accent: '#4d9eff',
-  accentLo: '#1a3a6e',
-  green: '#3dca7e',
-  greenLo: '#14311f',
-  mono: "'IBM Plex Mono', monospace" as const,
-  sans: "'IBM Plex Sans', sans-serif" as const,
-};
-
 function SelectCard({
   item,
   selected,
@@ -130,59 +110,43 @@ function SelectCard({
   onSelect: (id: string) => void;
   wide?: boolean;
 }): JSX.Element {
-  const [hov, setHov] = useState(false);
   const active = selected === item.id;
   const disabled = item.disabled === true;
   return (
     <div
       onClick={() => { if (!disabled) onSelect(item.id); }}
-      onMouseEnter={() => { if (!disabled) setHov(true); }}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        padding: wide ? '12px 14px' : '14px 14px',
-        borderRadius: 5,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
-        background: active ? T.accentLo : hov ? T.bg3 : T.bg2,
-        border: `1px solid ${active ? T.accent + '77' : hov ? T.border2 : T.border}`,
-        display: 'flex',
-        alignItems: wide ? 'center' : 'flex-start',
-        gap: 12,
-        transition: 'all 0.12s',
-      }}
+      className={[
+        'flex gap-3 rounded-[5px] border p-[12px_14px] transition-all duration-[120ms]',
+        wide ? 'items-center' : 'items-start',
+        disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer',
+        active
+          ? 'bg-accent-lo border-[#4d9eff77]'
+          : 'bg-surface-2 border-border-1 hover:bg-surface-3 hover:border-border-2',
+      ].join(' ')}
     >
       <div
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 4,
-          flexShrink: 0,
-          background: active ? T.accentLo : T.bg4,
-          border: `1px solid ${active ? T.accent + '55' : T.border2}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 13,
-          color: active ? T.accent : T.text2,
-        }}
+        className={[
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded border text-13',
+          active ? 'bg-accent-lo border-[#4d9eff55] text-accent' : 'bg-surface-4 border-border-2 text-fg-2',
+        ].join(' ')}
       >
         {item.icon}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: active ? T.text0 : T.text1, marginBottom: 2 }}>
+      <div className="min-w-0 flex-1">
+        <div className={`mb-0.5 text-xs font-medium ${active ? 'text-fg-0' : 'text-fg-1'}`}>
           {item.label}
         </div>
-        <div style={{ fontSize: 10, color: T.text2, fontFamily: T.mono, lineHeight: 1.4 }}>
+        <div className="font-mono text-10 leading-[1.4] text-fg-2">
           {item.sub}
         </div>
       </div>
       {disabled && (
-        <span style={{ fontSize: 9, fontFamily: T.mono, color: T.text3, border: `1px solid ${T.border2}`, borderRadius: 3, padding: '2px 6px', flexShrink: 0 }}>
+        <span className="shrink-0 rounded-[3px] border border-border-2 px-1.5 py-0.5 font-mono text-9 text-fg-3">
           soon
         </span>
       )}
       {active && !disabled && (
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: T.accent, flexShrink: 0 }} />
+        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
       )}
     </div>
   );
@@ -190,16 +154,7 @@ function SelectCard({
 
 function FieldLabel({ children }: { children: React.ReactNode }): JSX.Element {
   return (
-    <div
-      style={{
-        fontSize: 10,
-        fontFamily: T.mono,
-        color: T.text2,
-        textTransform: 'uppercase',
-        letterSpacing: '0.1em',
-        marginBottom: 7,
-      }}
-    >
+    <div className="mb-[7px] font-mono text-10 uppercase tracking-[0.1em] text-fg-2">
       {children}
     </div>
   );
@@ -216,26 +171,15 @@ function TextInput({
   placeholder?: string;
   mono?: boolean;
 }): JSX.Element {
-  const [focused, setFocused] = useState(false);
   return (
     <input
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      style={{
-        width: '100%',
-        background: T.bg2,
-        border: `1px solid ${focused ? T.accent + '99' : T.border2}`,
-        borderRadius: 4,
-        padding: '9px 12px',
-        outline: 'none',
-        fontFamily: mono ? T.mono : T.sans,
-        fontSize: 12,
-        color: T.text0,
-        transition: 'border-color 0.15s',
-      }}
+      className={[
+        'w-full rounded border border-border-2 bg-surface-2 px-3 py-[9px] text-xs text-fg-0 outline-none transition-colors duration-150 focus:border-[#4d9eff99]',
+        mono ? 'font-mono' : 'font-sans',
+      ].join(' ')}
     />
   );
 }
@@ -342,15 +286,15 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
 
   const stepContent = [
     // Step 0: Name & path
-    <div key="s0" style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+    <div key="s0" className="flex animate-fade-up flex-col gap-[18px]">
       <div>
         <FieldLabel>Project Name</FieldLabel>
         <TextInput value={name} onChange={setName} placeholder="My Awesome Game" />
       </div>
       <div>
         <FieldLabel>Directory</FieldLabel>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <div style={{ flex: 1 }}>
+        <div className="flex gap-2">
+          <div className="flex-1">
             <TextInput
               value={path}
               onChange={(v) => { setPath(v); setPathManuallyEdited(true); }}
@@ -361,40 +305,29 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
           <button
             onClick={() => void handleBrowse()}
             disabled={chooseDirectory.isPending}
-            style={{
-              padding: '0 14px',
-              background: T.bg3,
-              border: `1px solid ${T.border2}`,
-              borderRadius: 4,
-              color: T.text1,
-              fontSize: 11,
-              cursor: 'pointer',
-              fontFamily: T.mono,
-              whiteSpace: 'nowrap',
-              opacity: chooseDirectory.isPending ? 0.6 : 1,
-            }}
+            className={`cursor-pointer whitespace-nowrap rounded border border-border-2 bg-surface-3 px-[14px] font-mono text-11 text-fg-1 ${chooseDirectory.isPending ? 'opacity-60' : ''}`}
           >
             Browse…
           </button>
         </div>
-        <div style={{ fontSize: 10, fontFamily: T.mono, color: T.text2, marginTop: 5 }}>
+        <div className="mt-[5px] font-mono text-10 text-fg-2">
           The folder will be created if it doesn't exist.
         </div>
       </div>
     </div>,
 
     // Step 1: Engine
-    <div key="s1" style={{ display: 'flex', flexDirection: 'column', gap: 8, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+    <div key="s1" className="flex animate-fade-up flex-col gap-2">
       {ENGINES.map((e) => (
         <SelectCard key={e.id} item={e} selected={engine} onSelect={(id) => setEngine(id as EngineId)} wide />
       ))}
     </div>,
 
     // Step 2: AI provider + model
-    <div key="s2" style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+    <div key="s2" className="flex animate-fade-up flex-col gap-[18px]">
       <div>
         <FieldLabel>Provider</FieldLabel>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="flex flex-col gap-1.5">
           {PROVIDERS.map((p) => (
             <div
               key={p.id}
@@ -402,20 +335,13 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
                 setProvider(p.id);
                 setModel(p.models[0].id);
               }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '10px 12px',
-                borderRadius: 5,
-                cursor: 'pointer',
-                background: provider === p.id ? T.accentLo : T.bg2,
-                border: `1px solid ${provider === p.id ? T.accent + '66' : T.border}`,
-                transition: 'all 0.12s',
-              }}
+              className={[
+                'flex cursor-pointer items-center gap-2.5 rounded-[5px] border px-3 py-2.5 transition-all duration-[120ms]',
+                provider === p.id ? 'bg-accent-lo border-[#4d9eff66]' : 'bg-surface-2 border-border-1',
+              ].join(' ')}
             >
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: provider === p.id ? T.accent : T.text3, flexShrink: 0 }} />
-              <span style={{ fontSize: 12, fontWeight: 500, color: provider === p.id ? T.text0 : T.text1, flex: 1 }}>
+              <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${provider === p.id ? 'bg-accent' : 'bg-fg-3'}`} />
+              <span className={`flex-1 text-xs font-medium ${provider === p.id ? 'text-fg-0' : 'text-fg-1'}`}>
                 {p.label}
               </span>
             </div>
@@ -424,22 +350,17 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
       </div>
       <div>
         <FieldLabel>Model</FieldLabel>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div className="flex flex-wrap gap-1.5">
           {PROVIDERS.find((p) => p.id === provider)?.models.map((m) => (
             <button
               key={m.id}
               onClick={() => setModel(m.id)}
-              style={{
-                padding: '5px 12px',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontSize: 11,
-                fontFamily: T.mono,
-                background: model === m.id ? T.accentLo : T.bg3,
-                color: model === m.id ? T.accent : T.text1,
-                border: `1px solid ${model === m.id ? T.accent + '55' : T.border2}`,
-                transition: 'all 0.12s',
-              }}
+              className={[
+                'cursor-pointer rounded border px-3 py-[5px] font-mono text-11 transition-all duration-[120ms]',
+                model === m.id
+                  ? 'bg-accent-lo border-[#4d9eff55] text-accent'
+                  : 'bg-surface-3 border-border-2 text-fg-1',
+              ].join(' ')}
             >
               {m.label}
             </button>
@@ -451,12 +372,7 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
     // Step 3: Template (deckbuilder theme / brief preset)
     <div
       key="s3"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 8,
-        animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both',
-      }}
+      className="grid animate-fade-up grid-cols-2 gap-2"
     >
       {BRIEF_PRESETS.map((t) => (
         <SelectCard
@@ -475,8 +391,8 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
       const trimmed = brief.trim().length;
       const valid = trimmed >= BRIEF_MIN_CHARS;
       return (
-        <div key="s4" style={{ display: 'flex', flexDirection: 'column', gap: 14, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
-          <div style={{ fontSize: 11, fontFamily: T.mono, color: T.text2, lineHeight: 1.6 }}>
+        <div key="s4" className="flex animate-fade-up flex-col gap-[14px]">
+          <div className="font-mono text-11 leading-[1.6] text-fg-2">
             {isCustom
               ? 'Describe your game in your own words — theme, mood, mechanics, art direction. The agent will use this brief to plan the full deckbuilder.'
               : `Edit the ${preset?.label ?? 'template'} brief below, or keep it as-is. The agent uses this brief verbatim to plan content and tone.`}
@@ -484,54 +400,32 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
           <textarea
             value={brief}
             onChange={(e) => setBrief(e.target.value)}
-            placeholder={isCustom
-              ? 'A deckbuilder roguelike where…'
-              : 'Edit the prefilled brief…'}
-            style={{
-              width: '100%',
-              minHeight: 200,
-              resize: 'vertical',
-              background: T.bg2,
-              border: `1px solid ${T.border2}`,
-              borderRadius: 4,
-              padding: '10px 12px',
-              outline: 'none',
-              fontFamily: T.sans,
-              fontSize: 12,
-              lineHeight: 1.55,
-              color: T.text0,
-            }}
+            placeholder={isCustom ? 'A deckbuilder roguelike where…' : 'Edit the prefilled brief…'}
+            className="w-full resize-y rounded border border-border-2 bg-surface-2 px-3 py-2.5 font-sans text-xs leading-[1.55] text-fg-0 outline-none"
+            style={{ minHeight: 200 }}
           />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: T.mono }}>
-            <span style={{ color: valid ? T.text2 : '#d97777' }}>
+          <div className="flex justify-between font-mono text-10">
+            <span className={valid ? 'text-fg-2' : 'text-[#d97777]'}>
               {valid ? 'Looks good.' : `At least ${BRIEF_MIN_CHARS} characters needed`}
             </span>
-            <span style={{ color: T.text3 }}>{trimmed} / {BRIEF_MIN_CHARS}+ chars</span>
+            <span className="text-fg-3">{trimmed} / {BRIEF_MIN_CHARS}+ chars</span>
           </div>
         </div>
       );
     })(),
 
     // Step 5: Review + create
-    <div key="s5" style={{ display: 'flex', flexDirection: 'column', gap: 0, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+    <div key="s5" className="flex flex-col gap-0 animate-fade-up">
       {creating ? (
         /* ── Scaffold log ── */
         <div>
-          <div style={{ fontSize: 10, fontFamily: T.mono, color: T.text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+          <div className="mb-2.5 font-mono text-10 uppercase tracking-[0.1em] text-fg-2">
             Scaffolding Project
           </div>
           <div
             ref={logRef}
-            style={{
-              background: T.bg2,
-              border: `1px solid ${T.border}`,
-              borderRadius: 5,
-              padding: '12px 14px',
-              height: 200,
-              overflowY: 'auto',
-              fontFamily: T.mono,
-              fontSize: 11,
-            }}
+            className="overflow-y-auto rounded-[5px] border border-border-1 bg-surface-2 p-[12px_14px] font-mono text-11"
+            style={{ height: 200 }}
           >
             {logLines.map((entry, i) => {
               const isLast = i === logLines.length - 1;
@@ -539,16 +433,9 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
               return (
                 <div
                   key={i}
-                  style={{
-                    color: isActive ? T.text0 : T.text2,
-                    marginBottom: 5,
-                    lineHeight: 1.5,
-                    display: 'flex',
-                    gap: 8,
-                    alignItems: 'center',
-                  }}
+                  className={`mb-[5px] flex items-center gap-2 leading-[1.5] ${isActive ? 'text-fg-0' : 'text-fg-2'}`}
                 >
-                  <span style={{ color: isActive ? T.accent : T.green, flexShrink: 0 }}>
+                  <span className={`shrink-0 ${isActive ? 'text-accent' : 'text-success'}`}>
                     {isActive ? '›' : '✓'}
                   </span>
                   {entry.text}
@@ -556,22 +443,22 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
               );
             })}
             {logError !== null && (
-              <div style={{ color: '#d97777', marginTop: 8, fontSize: 11, fontFamily: T.mono, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+              <div className="mt-2 whitespace-pre-wrap text-11 leading-[1.5] text-[#d97777]">
                 ✗ {logError}
               </div>
             )}
             {!logDone && logError === null && (
-              <div style={{ display: 'flex', gap: 6, color: T.text3 }}>
-                <span style={{ animation: 'pulse 2s ease-in-out infinite' }}>▌</span>
+              <div className="flex gap-1.5 text-fg-3">
+                <span className="animate-blink">▌</span>
               </div>
             )}
           </div>
 
           {logDone && scaffoldResult !== null && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.green, boxShadow: `0 0 8px ${T.green}` }} />
-                <span style={{ fontSize: 13, fontWeight: 500, color: T.green }}>
+            <div className="mt-4">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-success" style={{ boxShadow: '0 0 8px #3dca7e' }} />
+                <span className="text-13 font-medium text-success">
                   Project ready — {scaffoldResult.gameTitle}
                 </span>
               </div>
@@ -579,39 +466,17 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
                 onClick={() => {
                   onCreate({ name: scaffoldResult.gameTitle, projectId: scaffoldResult.projectId, path: scaffoldResult.path, engine, provider, model, template, brief });
                 }}
-                style={{
-                  width: '100%',
-                  padding: '11px 0',
-                  background: T.accent,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 5,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  fontFamily: T.sans,
-                }}
+                className="w-full cursor-pointer rounded-[5px] border-0 bg-accent py-[11px] font-sans text-13 font-medium text-white"
               >
                 Open in Workspace →
               </button>
             </div>
           )}
           {logError !== null && (
-            <div style={{ marginTop: 16 }}>
+            <div className="mt-4">
               <button
                 onClick={startCreate}
-                style={{
-                  width: '100%',
-                  padding: '11px 0',
-                  background: T.bg3,
-                  color: T.text1,
-                  border: `1px solid ${T.border2}`,
-                  borderRadius: 5,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  fontFamily: T.sans,
-                }}
+                className="w-full cursor-pointer rounded-[5px] border border-border-2 bg-surface-3 py-[11px] font-sans text-13 font-medium text-fg-1"
               >
                 Retry
               </button>
@@ -626,67 +491,39 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
           const modelLabel   = PROVIDERS.find((p) => p.id === provider)?.models.find((m) => m.id === model)?.label ?? model;
           const themeLabel   = BRIEF_PRESETS.find((p) => p.id === template)?.label ?? template;
 
-          const rows: [string, string, string | null][] = [
-            ['Project',   name || '—',                        null],
-            ['Directory', path,                               T.mono],
-            ['Engine',    engineLabel,                        null],
-            ['Provider',  `${providerLabel} · ${modelLabel}`, T.mono],
-            ['Theme',     themeLabel,                         null],
+          const rows: [string, string, boolean][] = [
+            ['Project',   name || '—',                        false],
+            ['Directory', path,                               true],
+            ['Engine',    engineLabel,                        false],
+            ['Provider',  `${providerLabel} · ${modelLabel}`, true],
+            ['Theme',     themeLabel,                         false],
           ];
           const totalRows = rows.length + 1; // + brief row
 
           return (
             <div>
-              {rows.map(([k, v, font], i) => (
+              {rows.map(([k, v, isMono], i) => (
                 <div
                   key={k}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '11px 14px',
-                    background: i % 2 === 0 ? T.bg2 : T.bg3,
-                    borderTop:    i === 0 ? `1px solid ${T.border}` : 'none',
-                    borderBottom: `1px solid ${T.border}`,
-                    borderLeft:   `1px solid ${T.border}`,
-                    borderRight:  `1px solid ${T.border}`,
-                    borderRadius: i === 0 ? '5px 5px 0 0' : 0,
-                  }}
+                  className={[
+                    'flex items-center justify-between border-b border-l border-r border-border-1 px-[14px] py-[11px]',
+                    i === 0 ? 'rounded-t-[5px] border-t' : '',
+                    i % 2 === 0 ? 'bg-surface-2' : 'bg-surface-3',
+                  ].join(' ')}
                 >
-                  <span style={{ fontSize: 11, fontFamily: T.mono, color: T.text2 }}>{k}</span>
-                  <span style={{ fontSize: 11, fontFamily: font ?? T.sans, color: T.text1 }}>{v}</span>
+                  <span className="font-mono text-11 text-fg-2">{k}</span>
+                  <span className={`text-11 text-fg-1 ${isMono ? 'font-mono' : 'font-sans'}`}>{v}</span>
                 </div>
               ))}
               <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                  padding: '11px 14px',
-                  background: totalRows % 2 === 1 ? T.bg2 : T.bg3,
-                  borderBottom: `1px solid ${T.border}`,
-                  borderLeft:   `1px solid ${T.border}`,
-                  borderRight:  `1px solid ${T.border}`,
-                  borderRadius: '0 0 5px 5px',
-                }}
+                className={[
+                  'flex flex-col gap-2 rounded-b-[5px] border-b border-l border-r border-border-1 px-[14px] py-[11px]',
+                  totalRows % 2 === 1 ? 'bg-surface-2' : 'bg-surface-3',
+                ].join(' ')}
               >
-                <span style={{ fontSize: 11, fontFamily: T.mono, color: T.text2 }}>Brief</span>
-                <div
-                  style={{
-                    maxHeight: 110,
-                    overflowY: 'auto',
-                    background: T.bg0,
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 3,
-                    padding: '8px 10px',
-                    fontSize: 11,
-                    fontFamily: T.sans,
-                    color: T.text1,
-                    lineHeight: 1.5,
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {brief.trim() ? brief : <span style={{ color: T.text3, fontStyle: 'italic' }}>—</span>}
+                <span className="font-mono text-11 text-fg-2">Brief</span>
+                <div className="max-h-[110px] overflow-y-auto rounded-[3px] border border-border-1 bg-surface-0 px-2.5 py-2 font-sans text-11 leading-[1.5] text-fg-1 whitespace-pre-wrap">
+                  {brief.trim() ? brief : <span className="italic text-fg-3">—</span>}
                 </div>
               </div>
             </div>
@@ -697,115 +534,57 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
   ];
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        background: T.bg0,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-      }}
-    >
+    <div className="relative flex h-full w-full flex-col items-center justify-center bg-surface-0">
       {/* Grid background */}
       <div
+        className="pointer-events-none absolute inset-0 opacity-35"
         style={{
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          backgroundImage: `linear-gradient(${T.border} 1px, transparent 1px), linear-gradient(90deg, ${T.border} 1px, transparent 1px)`,
+          backgroundImage: 'linear-gradient(#1a1f30 1px, transparent 1px), linear-gradient(90deg, #1a1f30 1px, transparent 1px)',
           backgroundSize: '48px 48px',
-          opacity: 0.35,
           maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
           WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
         }}
       />
 
-      <div style={{ width: 520, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+      <div className="relative flex w-[520px] flex-col">
         {/* Header */}
-        <div style={{ marginBottom: 28, animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+        <div className="mb-7 animate-fade-up">
           <button
             onClick={onBack}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              color: T.text2,
-              fontSize: 11,
-              fontFamily: T.mono,
-              marginBottom: 18,
-              padding: 0,
-            }}
+            className="mb-[18px] flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 font-mono text-11 text-fg-2"
           >
             ← Back
           </button>
-          <div
-            style={{
-              fontFamily: T.mono,
-              fontSize: 10,
-              letterSpacing: '0.28em',
-              color: T.accent,
-              marginBottom: 8,
-              textTransform: 'uppercase',
-            }}
-          >
+          <div className="mb-2 font-mono text-10 uppercase tracking-widest2 text-accent">
             New Game Project
           </div>
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: 300,
-              color: T.text0,
-              letterSpacing: '-0.02em',
-            }}
-          >
+          <div className="text-2xl font-light tracking-[-0.02em] text-fg-0">
             {STEP_TITLES[step]}
           </div>
         </div>
 
         {/* Step indicator */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 24, alignItems: 'center' }}>
+        <div className="mb-6 flex items-center gap-1.5">
           {STEP_LABELS.map((label, i) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: i < STEP_LABELS.length - 1 ? 'none' : undefined }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div key={label} className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5">
                 <div
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: '50%',
-                    flexShrink: 0,
-                    background: i < step ? T.accentLo : i === step ? T.accent : T.bg3,
-                    border: `1px solid ${i <= step ? T.accent : T.border2}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 9,
-                    fontFamily: T.mono,
-                    fontWeight: 600,
-                    color: i < step ? T.accent : i === step ? '#fff' : T.text3,
-                    transition: 'all 0.2s',
-                  }}
+                  className={[
+                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border font-mono text-9 font-semibold transition-all duration-200',
+                    i < step  ? 'bg-accent-lo border-accent text-accent'
+                      : i === step ? 'bg-accent border-accent text-white'
+                      : 'bg-surface-3 border-border-2 text-fg-3',
+                  ].join(' ')}
                 >
                   {i < step ? '✓' : i + 1}
                 </div>
-                <span style={{ fontSize: 10, fontFamily: T.mono, color: i === step ? T.text1 : T.text3 }}>
+                <span className={`font-mono text-10 ${i === step ? 'text-fg-1' : 'text-fg-3'}`}>
                   {label}
                 </span>
               </div>
               {i < STEP_LABELS.length - 1 && (
                 <div
-                  style={{
-                    flex: 1,
-                    width: 28,
-                    height: 1,
-                    background: i < step ? T.accent + '44' : T.border,
-                    marginLeft: 6,
-                  }}
+                  className={`ml-1.5 h-px w-7 ${i < step ? 'bg-[#4d9eff44]' : 'bg-border-1'}`}
                 />
               )}
             </div>
@@ -813,23 +592,14 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
         </div>
 
         {/* Step content */}
-        <div style={{ minHeight: 240 }}>{stepContent[step]}</div>
+        <div className="min-h-[240px]">{stepContent[step]}</div>
 
         {/* Navigation — hidden once scaffold is running */}
         {!creating && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28 }}>
+          <div className="mt-7 flex justify-between">
             <button
               onClick={() => (step > 0 ? setStep((s) => s - 1) : onBack())}
-              style={{
-                padding: '8px 18px',
-                background: 'transparent',
-                color: T.text2,
-                border: `1px solid ${T.border2}`,
-                borderRadius: 4,
-                fontSize: 12,
-                cursor: 'pointer',
-                fontFamily: T.sans,
-              }}
+              className="cursor-pointer rounded border border-border-2 bg-transparent px-[18px] py-2 font-sans text-xs text-fg-2"
             >
               {step === 0 ? 'Cancel' : '← Back'}
             </button>
@@ -838,35 +608,17 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
               <button
                 onClick={() => setStep((s) => s + 1)}
                 disabled={!canNext}
-                style={{
-                  padding: '8px 22px',
-                  background: canNext ? T.accent : T.bg4,
-                  color: canNext ? '#fff' : T.text3,
-                  border: 'none',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: canNext ? 'pointer' : 'default',
-                  fontFamily: T.sans,
-                  transition: 'background 0.15s',
-                }}
+                className={[
+                  'rounded border-0 px-[22px] py-2 font-sans text-xs font-medium transition-colors duration-150',
+                  canNext ? 'cursor-pointer bg-accent text-white' : 'cursor-default bg-surface-4 text-fg-3',
+                ].join(' ')}
               >
                 Continue →
               </button>
             ) : (
               <button
                 onClick={startCreate}
-                style={{
-                  padding: '8px 22px',
-                  background: T.accent,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  fontFamily: T.sans,
-                }}
+                className="cursor-pointer rounded border-0 bg-accent px-[22px] py-2 font-sans text-xs font-medium text-white"
               >
                 Create Project
               </button>
@@ -874,17 +626,6 @@ export function NewProjectWizard({ onBack, onCreate }: NewProjectWizardProps): J
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.4; }
-        }
-      `}</style>
     </div>
   );
 }

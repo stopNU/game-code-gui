@@ -11,68 +11,50 @@ interface StartScreenProps {
 function StatusDot({ status }: { status: 'ready' | 'unknown' }): JSX.Element {
   return (
     <span
-      className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-      style={{
-        background: status === 'ready' ? '#3dca7e' : '#363d57',
-        boxShadow: status === 'ready' ? '0 0 6px #3dca7e66' : 'none',
-      }}
+      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${status === 'ready' ? 'bg-success' : 'bg-fg-3'}`}
+      style={status === 'ready' ? { boxShadow: '0 0 6px #3dca7e66' } : undefined}
     />
   );
 }
 
 function ProjectRow({
   project,
-  hovered,
-  onMouseEnter,
-  onMouseLeave,
   onClick,
 }: {
   project: ProjectSummary;
-  hovered: boolean;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
   onClick: () => void;
 }): JSX.Element {
   return (
     <div
-      className="grid cursor-pointer items-center gap-4 px-4 py-3 transition-colors"
-      style={{
-        gridTemplateColumns: '1fr 180px 80px 72px',
-        background: hovered ? 'rgba(77,158,255,0.04)' : 'transparent',
-        borderBottom: '1px solid #1a1f30',
-      }}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      className="grid cursor-pointer items-center gap-4 border-b border-border-1 px-4 py-3 transition-colors hover:bg-[rgba(77,158,255,0.04)]"
+      style={{ gridTemplateColumns: '1fr 180px 80px 72px' }}
       onClick={onClick}
     >
       {/* Name + path */}
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium" style={{ color: '#eceef5' }}>
+        <div className="truncate text-sm font-medium text-fg-0">
           {project.title ?? project.name}
         </div>
-        <div className="mt-0.5 truncate font-mono text-[10px]" style={{ color: '#545c7a' }}>
+        <div className="mt-0.5 truncate font-mono text-10 text-fg-2">
           {project.displayPath ?? project.path}
         </div>
       </div>
 
       {/* Tasks */}
-      <div className="font-mono text-[11px]" style={{ color: '#545c7a' }}>
+      <div className="font-mono text-11 text-fg-2">
         {project.completeCount ?? 0}/{project.taskCount ?? 0} tasks
       </div>
 
       {/* Status */}
       <div className="flex items-center gap-1.5">
         <StatusDot status={project.status} />
-        <span
-          className="font-mono text-[10px] uppercase tracking-wider"
-          style={{ color: project.status === 'ready' ? '#3dca7e' : '#545c7a' }}
-        >
+        <span className={`font-mono text-10 uppercase tracking-wider ${project.status === 'ready' ? 'text-success' : 'text-fg-2'}`}>
           {project.status}
         </span>
       </div>
 
       {/* Updated */}
-      <div className="text-right font-mono text-[10px]" style={{ color: '#545c7a' }}>
+      <div className="text-right font-mono text-10 text-fg-2">
         {project.updatedAt !== undefined ? new Date(project.updatedAt).toLocaleDateString() : '—'}
       </div>
     </div>
@@ -81,8 +63,6 @@ function ProjectRow({
 
 export function StartScreen({ onOpenProject, onNewGame }: StartScreenProps): JSX.Element {
   const projectsQuery = trpc.projects.list.useQuery(undefined);
-  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
-  const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
 
   const projects = projectsQuery.data ?? [];
@@ -117,17 +97,13 @@ export function StartScreen({ onOpenProject, onNewGame }: StartScreenProps): JSX
   ];
 
   return (
-    <div
-      className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden"
-      style={{ background: '#080a0f' }}
-    >
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-surface-0">
       {/* Grid background */}
       <div
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 opacity-35"
         style={{
           backgroundImage: 'linear-gradient(#1a1f30 1px, transparent 1px), linear-gradient(90deg, #1a1f30 1px, transparent 1px)',
           backgroundSize: '48px 48px',
-          opacity: 0.35,
           maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
           WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
         }}
@@ -135,60 +111,35 @@ export function StartScreen({ onOpenProject, onNewGame }: StartScreenProps): JSX
 
       <div className="relative flex w-[640px] flex-col gap-9">
         {/* Logo + heading */}
-        <div style={{ animation: 'fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
-          <div
-            className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.28em]"
-            style={{ color: '#4d9eff' }}
-          >
+        <div className="animate-fade-up">
+          <div className="mb-2.5 font-mono text-10 uppercase tracking-widest2 text-accent">
             Harness Studio
           </div>
-          <div
-            className="text-[30px] font-light leading-tight tracking-tight"
-            style={{ color: '#eceef5' }}
-          >
+          <div className="text-[30px] font-light leading-tight tracking-tight text-fg-0">
             What are we building today?
           </div>
         </div>
 
         {/* CTA cards */}
-        <div
-          className="flex gap-2.5"
-          style={{ animation: 'fadeUp 0.35s 60ms cubic-bezier(0.16,1,0.3,1) both' }}
-        >
-          {ctaCards.map((card, i) => (
+        <div className="flex gap-2.5 animate-fade-up-1">
+          {ctaCards.map((card) => (
             <div
               key={card.title}
-              className="flex flex-1 cursor-pointer flex-col gap-2 rounded-md p-[18px_16px] transition-colors"
-              style={{
-                background:
-                  hoveredCard === i
-                    ? card.accent
-                      ? '#1d3d6a'
-                      : '#161b28'
-                    : card.accent
-                      ? '#1a3a6e'
-                      : '#11141f',
-                border: `1px solid ${
-                  card.accent
-                    ? hoveredCard === i
-                      ? '#4d9eff99'
-                      : '#4d9eff44'
-                    : hoveredCard === i
-                      ? '#242b3d'
-                      : '#1a1f30'
-                }`,
-              }}
-              onMouseEnter={() => setHoveredCard(i)}
-              onMouseLeave={() => setHoveredCard(null)}
+              className={[
+                'flex flex-1 cursor-pointer flex-col gap-2 rounded-md p-[18px_16px] transition-colors border',
+                card.accent
+                  ? 'bg-accent-lo border-[#4d9eff44] hover:bg-[#1d3d6a] hover:border-[#4d9eff99]'
+                  : 'bg-surface-2 border-border-1 hover:bg-surface-3 hover:border-border-2',
+              ].join(' ')}
               onClick={card.onClick}
             >
-              <div className="text-[17px]" style={{ color: card.accent ? '#4d9eff' : '#545c7a' }}>
+              <div className={`text-[17px] ${card.accent ? 'text-accent' : 'text-fg-2'}`}>
                 {card.icon}
               </div>
-              <div className="text-[13px] font-medium" style={{ color: '#eceef5' }}>
+              <div className="text-13 font-medium text-fg-0">
                 {card.title}
               </div>
-              <div className="text-[11px] leading-relaxed" style={{ color: '#545c7a' }}>
+              <div className="text-11 leading-relaxed text-fg-2">
                 {card.sub}
               </div>
             </div>
@@ -196,51 +147,35 @@ export function StartScreen({ onOpenProject, onNewGame }: StartScreenProps): JSX
         </div>
 
         {/* Recent projects */}
-        <div style={{ animation: 'fadeUp 0.35s 120ms cubic-bezier(0.16,1,0.3,1) both' }}>
+        <div className="animate-fade-up-2">
           {/* Header row */}
           <div className="mb-2.5 flex items-center justify-between">
-            <div
-              className="font-mono text-[10px] uppercase tracking-[0.12em]"
-              style={{ color: '#545c7a' }}
-            >
+            <div className="font-mono text-10 uppercase tracking-wider2 text-fg-2">
               Recent Projects
             </div>
             {/* Search */}
-            <div
-              className="flex items-center gap-1.5 rounded px-2.5 py-1"
-              style={{ background: '#11141f', border: '1px solid #1a1f30' }}
-            >
-              <span className="text-[11px]" style={{ color: '#545c7a' }}>
-                ⌕
-              </span>
+            <div className="flex items-center gap-1.5 rounded border border-border-1 bg-surface-2 px-2.5 py-1">
+              <span className="text-11 text-fg-2">⌕</span>
               <input
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 placeholder="Filter projects…"
-                className="w-36 bg-transparent text-[11px] outline-none placeholder:opacity-60"
-                style={{ color: '#9aa0bc' }}
+                className="w-36 bg-transparent text-11 text-fg-1 outline-none placeholder:opacity-60"
               />
             </div>
           </div>
 
           {/* Table */}
-          <div
-            className="overflow-hidden rounded-md"
-            style={{ border: '1px solid #1a1f30', background: '#0d1018' }}
-          >
+          <div className="overflow-hidden rounded-md border border-border-1 bg-surface-1">
             {/* Column headers */}
             <div
-              className="grid px-4 py-2"
-              style={{
-                gridTemplateColumns: '1fr 180px 80px 72px',
-                borderBottom: '1px solid #1a1f30',
-              }}
+              className="grid border-b border-border-1 px-4 py-2"
+              style={{ gridTemplateColumns: '1fr 180px 80px 72px' }}
             >
               {['Project', 'Tasks', 'Status', 'Updated'].map((h, i) => (
                 <div
                   key={h}
-                  className={`font-mono text-[10px] uppercase tracking-[0.12em] ${i === 3 ? 'text-right' : ''}`}
-                  style={{ color: '#363d57' }}
+                  className={`font-mono text-10 uppercase tracking-wider2 text-fg-3 ${i === 3 ? 'text-right' : ''}`}
                 >
                   {h}
                 </div>
@@ -255,7 +190,7 @@ export function StartScreen({ onOpenProject, onNewGame }: StartScreenProps): JSX
                 <Skeleton className="h-12 w-full" />
               </div>
             ) : filtered.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm" style={{ color: '#545c7a' }}>
+              <div className="px-4 py-8 text-center text-sm text-fg-2">
                 {projects.length === 0
                   ? 'No projects yet — start a new game to get going.'
                   : 'No projects match your filter.'}
@@ -265,9 +200,6 @@ export function StartScreen({ onOpenProject, onNewGame }: StartScreenProps): JSX
                 <ProjectRow
                   key={project.id}
                   project={project}
-                  hovered={hoveredRow === project.id}
-                  onMouseEnter={() => setHoveredRow(project.id)}
-                  onMouseLeave={() => setHoveredRow(null)}
                   onClick={() => onOpenProject(project.id)}
                 />
               ))
@@ -277,29 +209,16 @@ export function StartScreen({ onOpenProject, onNewGame }: StartScreenProps): JSX
       </div>
 
       {/* Bottom bar */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        padding: '10px 24px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderTop: '1px solid #1a1f30',
-        background: '#0d1018',
-      }}>
-        <span className="font-mono text-[10px]" style={{ color: '#545c7a' }}>
+      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between border-t border-border-1 bg-surface-1 px-6 py-2.5">
+        <span className="font-mono text-10 text-fg-2">
           Runtime v0.1.0 · auto-update disabled
         </span>
-        <div style={{ display: 'flex', gap: 16 }}>
+        <div className="flex gap-4">
           {['Providers', 'Settings', 'Docs'].map((l) => (
-            <span key={l} className="font-mono text-[10px]" style={{ color: '#545c7a', cursor: 'pointer' }}>{l}</span>
+            <span key={l} className="cursor-pointer font-mono text-10 text-fg-2">{l}</span>
           ))}
         </div>
       </div>
-
-      <style>{`
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }

@@ -3,44 +3,46 @@
 @tailwind utilities;
 
 :root {
-  --background: 220 32% 5%;
-  --foreground: 225 30% 94%;
-  --card: 221 30% 8%;
-  --card-foreground: 225 30% 94%;
-  --primary: 213 100% 65%;
-  --primary-foreground: 220 32% 5%;
-  --muted: 221 28% 11%;
-  --muted-foreground: 221 18% 68%;
-  --accent: 147 55% 51%;
-  --accent-foreground: 220 32% 5%;
-  --border: 221 28% 14%;
-  --input: 221 28% 14%;
-  --ring: 213 100% 65%;
-  --destructive: 0 58% 60%;
-  --destructive-foreground: 0 0% 98%;
+  /* ── Design palette ─────────────────────────────────────────── */
+  --surface-0: #080a0f;
+  --surface-1: #0d1018;
+  --surface-2: #11141f;
+  --surface-3: #161b28;
+  --surface-4: #1c2133;
+  --surface-5: #222840;
+  --border-1: #1a1f30;
+  --border-2: #242b3d;
+  --fg-0: #eceef5;
+  --fg-1: #9aa0bc;
+  --fg-2: #545c7a;
+  --fg-3: #363d57;
+  --accent-lo: #1a3a6e;
+  --success: #3dca7e;
+  --success-lo: #14311f;
+  --warn: #f5a83a;
+  --danger: #e05252;
+
+  /* ── Semantic aliases (HSL so Tailwind /opacity modifiers work) ─ */
+  --background: 220 30% 4%;       /* ≈ surface-0  #080a0f */
+  --foreground: 228 38% 94%;      /* ≈ fg-0       #eceef5 */
+  --card: 220 25% 8%;             /* ≈ surface-1  #0d1018 */
+  --card-foreground: 228 38% 94%;
+  --primary: 213 100% 65%;        /* = accent     #4d9eff */
+  --primary-foreground: 220 30% 4%;
+  --muted: 226 30% 9%;            /* ≈ surface-2  #11141f */
+  --muted-foreground: 225 20% 67%;/* ≈ fg-1       #9aa0bc */
+  --accent: 213 100% 65%;         /* = accent     #4d9eff (remapped from green) */
+  --accent-foreground: 220 30% 4%;
+  --border: 223 30% 14%;          /* ≈ border-1   #1a1f30 */
+  --input: 224 26% 19%;           /* ≈ border-2   #242b3d */
+  --ring: 213 100% 65%;           /* = accent     #4d9eff */
+  --destructive: 0 60% 60%;       /* ≈ danger     #e05252 */
+  --destructive-foreground: 228 38% 94%;
+
   color-scheme: dark;
   font-family: "IBM Plex Sans", "Segoe UI Variable", sans-serif;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-}
-
-html.light {
-  --background: 220 20% 97%;
-  --foreground: 220 30% 12%;
-  --card: 0 0% 100%;
-  --card-foreground: 220 30% 12%;
-  --primary: 213 85% 45%;
-  --primary-foreground: 0 0% 100%;
-  --muted: 220 15% 92%;
-  --muted-foreground: 220 12% 40%;
-  --accent: 147 55% 38%;
-  --accent-foreground: 0 0% 100%;
-  --border: 220 18% 84%;
-  --input: 220 18% 84%;
-  --ring: 213 85% 45%;
-  --destructive: 0 58% 46%;
-  --destructive-foreground: 0 0% 100%;
-  color-scheme: light;
 }
 
 * {

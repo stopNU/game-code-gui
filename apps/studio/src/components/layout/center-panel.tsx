@@ -149,16 +149,7 @@ export function CenterPanel(): JSX.Element {
       />
 
       {/* Tab bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          borderBottom: '1px solid #1a1f30',
-          background: '#0d1018',
-          paddingLeft: 4,
-          flexShrink: 0,
-        }}
-      >
+      <div className="flex shrink-0 items-center border-b border-border-1 bg-surface-1 pl-1">
         {(['chat', 'tasks'] as CenterTab[]).map((tab) => {
           const active = activeTab === tab;
           const disabled = tab === 'tasks' && selectedProjectId === null;
@@ -166,20 +157,12 @@ export function CenterPanel(): JSX.Element {
             <button
               key={tab}
               onClick={() => { if (!disabled) setActiveTab(tab); }}
-              style={{
-                padding: '8px 16px',
-                fontSize: 11,
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontWeight: active ? 500 : 400,
-                color: disabled ? '#363d57' : active ? '#eceef5' : '#545c7a',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: active ? '2px solid #4d9eff' : '2px solid transparent',
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                marginBottom: -1,
-                transition: 'color 0.12s',
-                textTransform: 'capitalize',
-              }}
+              className={[
+                '-mb-px border-b-2 border-x-0 border-t-0 bg-transparent px-4 py-2 font-mono text-11 capitalize transition-colors duration-[120ms]',
+                disabled ? 'cursor-not-allowed border-transparent text-fg-3'
+                  : active ? 'cursor-pointer border-accent font-medium text-fg-0'
+                  : 'cursor-pointer border-transparent text-fg-2',
+              ].join(' ')}
             >
               {tab}
             </button>
@@ -207,17 +190,7 @@ export function CenterPanel(): JSX.Element {
           {selectedProjectId !== null ? (
             <TaskPlanCard projectId={selectedProjectId} />
           ) : (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                fontSize: 12,
-                fontFamily: "'IBM Plex Mono', monospace",
-                color: '#363d57',
-              }}
-            >
+            <div className="flex h-full items-center justify-center font-mono text-xs text-fg-3">
               No project selected
             </div>
           )}

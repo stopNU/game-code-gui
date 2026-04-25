@@ -4,7 +4,13 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { router, publicProcedure } from '../trpc-base.js';
 import { normalizePath } from '../../db/normalize-path.js';
-import { planGameService } from '@agent-harness/services';
+// Dynamic import used intentionally: the electron main process is built as CJS,
+// but @agent-harness/services is pure ESM. A static require() would fail at
+// runtime; import() loads ESM correctly from CJS context.
+async function getPlanGameService(): Promise<typeof import('@agent-harness/services').planGameService> {
+  const mod = await import('@agent-harness/services');
+  return mod.planGameService;
+}
 
 export const projectsRouter = router({
   list: publicProcedure.input(z.void()).query(({ ctx }) => ctx.projectScanner.list(ctx.settingsService.getEffectiveWorkspaceRoot())),
@@ -49,6 +55,7 @@ export const projectsRouter = router({
           mkdirSync(expandedPath, { recursive: true });
           emit('Project directory created.');
 
+          const planGameService = await getPlanGameService();
           const plan = await planGameService({
             brief: input.brief,
             outputPath: expandedPath,

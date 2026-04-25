@@ -104,7 +104,8 @@
       "Bash(gunzip -c \"C:\\\\Users\\\\Michael\\\\.claude\\\\projects\\\\D--dev-game-code-gui\\\\00384489-6cd0-41d8-aa46-895b23ca4581\\\\tool-results\\\\webfetch-1777107818447-pe35pd.bin\")",
       "Bash(gunzip -c \"C:\\\\Users\\\\Michael\\\\.claude\\\\projects\\\\D--dev-game-code-gui\\\\00384489-6cd0-41d8-aa46-895b23ca4581\\\\tool-results\\\\webfetch-1777108189227-6ntayv.bin\")",
       "Bash(gunzip -c \"C:\\\\Users\\\\Michael\\\\.claude\\\\projects\\\\D--dev-game-code-gui\\\\00384489-6cd0-41d8-aa46-895b23ca4581\\\\tool-results\\\\webfetch-1777108455979-q4ea68.bin\")",
-      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(pnpm --filter @agent-harness/core test -- --reporter=basic)"
     ]
   }
 }

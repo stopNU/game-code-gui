@@ -2,29 +2,10 @@ import { useEffect } from 'react';
 import { trpc } from '@renderer/lib/trpc';
 import { useConversationStore } from '@renderer/store/conversation-store';
 
-const S = {
-  bg1: '#0d1018',
-  bg3: '#161b28',
-  bg4: '#1c2133',
-  border: '#1a1f30',
-  border2: '#242b3d',
-  text0: '#eceef5',
-  text1: '#9aa0bc',
-  text2: '#545c7a',
-  text3: '#363d57',
-  accent: '#4d9eff',
-  accentLo: '#1a3a6e',
-  green: '#3dca7e',
-  greenLo: '#14311f',
-  amber: '#f5a83a',
-  red: '#e05252',
-  mono: "'IBM Plex Mono', monospace",
-};
-
 function Section({ title, children }: { title: string; children: React.ReactNode }): JSX.Element {
   return (
-    <div style={{ padding: '12px 14px', borderBottom: `1px solid ${S.border}` }}>
-      <div style={{ fontSize: 10, fontFamily: S.mono, color: S.text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 7 }}>
+    <div className="border-b border-border-1 px-3.5 py-3">
+      <div className="mb-[7px] font-mono text-10 uppercase tracking-wider2 text-fg-2">
         {title}
       </div>
       {children}
@@ -32,11 +13,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, value, valueColor }: { label: string; value: string; valueColor?: string }): JSX.Element {
+function Row({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }): JSX.Element {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-      <span style={{ fontSize: 11, fontFamily: S.mono, color: S.text2 }}>{label}</span>
-      <span style={{ fontSize: 10, fontFamily: S.mono, color: valueColor ?? S.text1 }}>{value}</span>
+    <div className="mb-1 flex items-center justify-between">
+      <span className="font-mono text-11 text-fg-2">{label}</span>
+      <span className={`font-mono text-10 ${valueClassName ?? 'text-fg-1'}`}>{value}</span>
     </div>
   );
 }
@@ -79,25 +60,16 @@ export function RightPanel(): JSX.Element {
 
   const selectedProject = projectsQuery.data?.find((p) => p.id === selectedProjectId) ?? null;
 
-  const sessionColor = sessionStatus === 'ready' ? S.green : sessionStatus === 'error' ? S.red : S.amber;
+  const sessionDotCls = sessionStatus === 'ready' ? 'bg-success' : sessionStatus === 'error' ? 'bg-danger' : 'bg-warn';
+  const sessionTextCls = sessionStatus === 'ready' ? 'text-success' : sessionStatus === 'error' ? 'text-danger' : 'text-warn';
 
   return (
-    <div
-      style={{
-        width: 220,
-        flexShrink: 0,
-        background: S.bg1,
-        borderLeft: `1px solid ${S.border}`,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'auto',
-      }}
-    >
+    <div className="flex w-[220px] shrink-0 flex-col overflow-auto border-l border-border-1 bg-surface-1">
       {/* Session */}
       <Section title="Session">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: sessionColor, flexShrink: 0 }} />
-          <span style={{ fontSize: 11, fontFamily: S.mono, color: sessionColor }}>{sessionStatus}</span>
+        <div className="flex items-center gap-1.5">
+          <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${sessionDotCls}`} />
+          <span className={`font-mono text-11 ${sessionTextCls}`}>{sessionStatus}</span>
         </div>
       </Section>
 
@@ -106,22 +78,22 @@ export function RightPanel(): JSX.Element {
         <Row
           label="Anthropic"
           value={settingsQuery.data?.anthropicConfigured ? 'configured' : 'missing'}
-          valueColor={settingsQuery.data?.anthropicConfigured ? S.green : S.red}
+          valueClassName={settingsQuery.data?.anthropicConfigured ? 'text-success' : 'text-danger'}
         />
         <Row
           label="OpenAI"
           value={settingsQuery.data?.openaiConfigured ? 'configured' : 'missing'}
-          valueColor={settingsQuery.data?.openaiConfigured ? S.green : S.red}
+          valueClassName={settingsQuery.data?.openaiConfigured ? 'text-success' : 'text-danger'}
         />
         <Row
           label="LangSmith"
           value={langsmithQuery.data?.configured ? 'configured' : 'inactive'}
-          valueColor={langsmithQuery.data?.configured ? S.green : S.text2}
+          valueClassName={langsmithQuery.data?.configured ? 'text-success' : 'text-fg-2'}
         />
         <Row
           label="Godot"
           value={godotStatus.status}
-          valueColor={godotStatus.status === 'running' ? S.green : S.text2}
+          valueClassName={godotStatus.status === 'running' ? 'text-success' : 'text-fg-2'}
         />
       </Section>
 
@@ -129,31 +101,27 @@ export function RightPanel(): JSX.Element {
       <Section title="Runtime">
         <Row label="Version" value={runtimeQuery.data?.appVersion ?? '—'} />
         <Row label="Updates" value={updateStatus.status} />
-        <div style={{ height: 1, background: S.border, margin: '8px 0' }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 10, fontFamily: S.mono, color: S.text2 }}>Godot Runtime</span>
-          <span style={{ fontSize: 10, fontFamily: S.mono, color: godotStatus.status === 'running' ? S.green : S.text2 }}>
+        <div className="my-2 h-px bg-border-1" />
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="font-mono text-10 text-fg-2">Godot Runtime</span>
+          <span className={`font-mono text-10 ${godotStatus.status === 'running' ? 'text-success' : 'text-fg-2'}`}>
             {godotStatus.status}
           </span>
         </div>
-        <div style={{ fontSize: 10, fontFamily: S.mono, color: S.text2, marginBottom: 8 }}>
+        <div className="mb-2 font-mono text-10 text-fg-2">
           {selectedProject?.title ?? selectedProject?.name ?? (selectedProjectId !== null ? 'loading…' : 'No project')}
         </div>
         {/* Debugger toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 10, fontFamily: S.mono, color: S.text2 }}>Debugger</span>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-mono text-10 text-fg-2">Debugger</span>
           <button
             onClick={() => setGodotDebuggerEnabled(!godotDebuggerEnabled)}
-            style={{
-              fontSize: 10, fontFamily: S.mono,
-              color: godotDebuggerEnabled ? S.accent : S.text2,
-              background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
-            }}
+            className={`cursor-pointer border-0 bg-transparent p-0 font-mono text-10 ${godotDebuggerEnabled ? 'text-accent' : 'text-fg-2'}`}
           >
             {godotDebuggerEnabled ? 'on' : 'off'}
           </button>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div className="flex gap-1.5">
           <button
             onClick={() => {
               if (selectedProjectId === null) return;
@@ -162,15 +130,11 @@ export function RightPanel(): JSX.Element {
               });
             }}
             disabled={godotStatus.status === 'running' || selectedProjectId === null || launchGodot.isPending}
-            style={{
-              flex: 1, padding: '5px 0',
-              background: godotStatus.status === 'running' ? S.bg4 : S.green,
-              color: godotStatus.status === 'running' ? S.text2 : '#fff',
-              border: 'none', borderRadius: 3,
-              fontSize: 10, cursor: godotStatus.status === 'running' ? 'default' : 'pointer',
-              fontFamily: S.mono,
-              opacity: selectedProjectId === null ? 0.4 : 1,
-            }}
+            className={[
+              'flex-1 rounded-[3px] border-0 py-[5px] font-mono text-10',
+              godotStatus.status === 'running' ? 'cursor-default bg-surface-4 text-fg-2' : 'cursor-pointer bg-success text-white',
+              selectedProjectId === null ? 'opacity-40' : '',
+            ].join(' ')}
           >
             ▶ Launch
           </button>
@@ -181,11 +145,7 @@ export function RightPanel(): JSX.Element {
               });
             }}
             disabled={stopGodot.isPending}
-            style={{
-              padding: '5px 10px', background: S.bg4, color: S.text2,
-              border: `1px solid ${S.border}`, borderRadius: 3,
-              fontSize: 10, cursor: 'pointer', fontFamily: S.mono,
-            }}
+            className="cursor-pointer rounded-[3px] border border-border-1 bg-surface-4 px-2.5 py-[5px] font-mono text-10 text-fg-2"
           >
             Stop
           </button>
@@ -200,27 +160,21 @@ export function RightPanel(): JSX.Element {
       </Section>
 
       {/* Actions */}
-      <div style={{ padding: '10px 14px' }}>
+      <div className="px-3.5 py-2.5">
         <button
           onClick={() => void openLogFile.mutateAsync()}
           disabled={openLogFile.isPending}
-          style={{
-            width: '100%', background: S.bg3, border: `1px solid ${S.border2}`,
-            borderRadius: 3, padding: '7px 0', fontSize: 10, fontFamily: S.mono,
-            color: S.text1, cursor: 'pointer', marginBottom: 6,
-          }}
+          className="mb-1.5 w-full cursor-pointer rounded-[3px] border border-border-2 bg-surface-3 py-[7px] font-mono text-10 text-fg-1"
         >
           ⊡ Open Log File
         </button>
         <button
           onClick={() => void restartToInstallUpdate.mutateAsync()}
           disabled={restartToInstallUpdate.isPending || updateStatus.status !== 'downloaded'}
-          style={{
-            width: '100%', background: S.bg3, border: `1px solid ${S.border2}`,
-            borderRadius: 3, padding: '7px 0', fontSize: 10, fontFamily: S.mono,
-            color: updateStatus.status === 'downloaded' ? S.text0 : S.text2,
-            cursor: updateStatus.status === 'downloaded' ? 'pointer' : 'default',
-          }}
+          className={[
+            'w-full rounded-[3px] border border-border-2 bg-surface-3 py-[7px] font-mono text-10',
+            updateStatus.status === 'downloaded' ? 'cursor-pointer text-fg-0' : 'cursor-default text-fg-2',
+          ].join(' ')}
         >
           ↺ Restart to Update
         </button>

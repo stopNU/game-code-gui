@@ -3,23 +3,6 @@ import { trpc } from '@renderer/lib/trpc';
 import { getDefaultConversationConfig } from '@renderer/lib/conversation-defaults';
 import { useConversationStore } from '@renderer/store/conversation-store';
 
-const S = {
-  bg1: '#0d1018',
-  bg3: '#161b28',
-  bg4: '#1c2133',
-  bg5: '#222840',
-  border: '#1a1f30',
-  border2: '#242b3d',
-  text0: '#eceef5',
-  text1: '#9aa0bc',
-  text2: '#545c7a',
-  text3: '#363d57',
-  accent: '#4d9eff',
-  accentLo: '#1a3a6e',
-  green: '#3dca7e',
-  mono: "'IBM Plex Mono', monospace",
-};
-
 export function LeftPanel(): JSX.Element {
   const utils = trpc.useUtils();
   const activeConversationId = useConversationStore((s) => s.activeConversationId);
@@ -56,46 +39,39 @@ export function LeftPanel(): JSX.Element {
   const logRunning = godotStatus.status === 'running';
 
   return (
-    <div
-      style={{
-        width: 210,
-        flexShrink: 0,
-        background: S.bg1,
-        borderRight: `1px solid ${S.border}`,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="flex w-[210px] shrink-0 flex-col overflow-hidden border-r border-border-1 bg-surface-1">
       {/* Project mini-card */}
-      <div style={{ padding: '12px 12px 10px', borderBottom: `1px solid ${S.border}` }}>
-        <div style={{ fontSize: 10, fontFamily: S.mono, color: S.text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 7 }}>
+      <div className="border-b border-border-1 px-3 pb-2.5 pt-3">
+        <div className="mb-[7px] font-mono text-10 uppercase tracking-[0.1em] text-fg-2">
           Project
         </div>
         {selectedProject !== null ? (
-          <div style={{ background: S.bg3, border: `1px solid ${S.border2}`, borderRadius: 4, padding: '8px 10px' }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: S.text0, marginBottom: 3 }}>
+          <div className="rounded border border-border-2 bg-surface-3 px-2.5 py-2">
+            <div className="mb-[3px] text-xs font-medium text-fg-0">
               {selectedProject.title ?? selectedProject.name}
             </div>
-            <div style={{ fontSize: 10, fontFamily: S.mono, color: S.text2, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div className="mb-1.5 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-10 text-fg-2">
               {selectedProject.displayPath ?? selectedProject.path}
             </div>
-            <div style={{ height: 3, background: S.bg5, borderRadius: 2, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${progress * 100}%`, background: S.accent, borderRadius: 2, transition: 'width 0.4s' }} />
+            <div className="h-[3px] overflow-hidden rounded-sm bg-surface-5">
+              <div
+                className="h-full rounded-sm bg-accent transition-[width] duration-[400ms]"
+                style={{ width: `${progress * 100}%` }}
+              />
             </div>
-            <div style={{ fontSize: 9, fontFamily: S.mono, color: S.text2, marginTop: 4 }}>
+            <div className="mt-1 font-mono text-9 text-fg-2">
               {completeCount}/{taskCount} tasks complete
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 11, color: S.text2, fontStyle: 'italic' }}>No project selected</div>
+          <div className="text-11 italic text-fg-2">No project selected</div>
         )}
       </div>
 
       {/* Conversations list */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '10px 10px 4px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-          <span style={{ fontSize: 10, fontFamily: S.mono, color: S.text2, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+      <div className="flex-1 overflow-auto px-2.5 pb-1 pt-2.5">
+        <div className="mb-[7px] flex items-center justify-between">
+          <span className="font-mono text-10 uppercase tracking-[0.1em] text-fg-2">
             Conversations
           </span>
           <button
@@ -106,13 +82,13 @@ export function LeftPanel(): JSX.Element {
               })
             }
             disabled={createConversation.isPending}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: S.text2, fontSize: 15, lineHeight: 1, padding: '0 2px' }}
+            className="cursor-pointer border-0 bg-transparent px-0.5 text-[15px] leading-none text-fg-2"
           >
             +
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div className="flex flex-col gap-px">
           {visibleConversations.map((c) => {
             const isActive = activeConversationId === c.id;
             const live = isRunning[c.id] ?? false;
@@ -120,43 +96,23 @@ export function LeftPanel(): JSX.Element {
               <div
                 key={c.id}
                 onClick={() => setActiveConversationId(c.id)}
-                style={{
-                  padding: '8px 9px',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  background: isActive ? S.bg4 : 'transparent',
-                  borderLeft: `2px solid ${isActive ? S.accent : 'transparent'}`,
-                  transition: 'background 0.12s',
-                }}
+                className={[
+                  'cursor-pointer rounded border-l-2 px-[9px] py-2 transition-colors duration-[120ms]',
+                  isActive ? 'border-accent bg-surface-4' : 'border-transparent bg-transparent',
+                ].join(' ')}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: c.provider !== undefined || c.model !== null ? 3 : 0 }}>
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: isActive ? 500 : 400,
-                    color: isActive ? S.text0 : S.text1,
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
+                <div className={`flex items-center gap-[5px] ${c.provider !== undefined || c.model !== null ? 'mb-[3px]' : ''}`}>
+                  <span className={`flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-11 ${isActive ? 'font-medium text-fg-0' : 'font-normal text-fg-1'}`}>
                     {c.title}
                   </span>
                   {live && (
-                    <span style={{
-                      fontSize: 9,
-                      fontFamily: S.mono,
-                      color: S.accent,
-                      background: S.accentLo,
-                      border: `1px solid ${S.border2}`,
-                      borderRadius: 3,
-                      padding: '2px 5px',
-                    }}>
+                    <span className="shrink-0 rounded-[3px] border border-border-2 bg-accent-lo px-[5px] py-0.5 font-mono text-9 text-accent">
                       Live
                     </span>
                   )}
                 </div>
                 {(c.provider !== undefined || c.model !== null) && (
-                  <div style={{ fontSize: 10, fontFamily: S.mono, color: S.text2 }}>
+                  <div className="font-mono text-10 text-fg-2">
                     {[c.provider, c.model].filter(Boolean).join(' · ')}
                   </div>
                 )}
@@ -164,7 +120,7 @@ export function LeftPanel(): JSX.Element {
             );
           })}
           {visibleConversations.length === 0 && !conversationsQuery.isLoading && (
-            <div style={{ fontSize: 11, color: S.text2, fontStyle: 'italic', padding: '8px 9px' }}>
+            <div className="px-[9px] py-2 text-11 italic text-fg-2">
               No conversations yet.
             </div>
           )}
@@ -172,19 +128,11 @@ export function LeftPanel(): JSX.Element {
       </div>
 
       {/* Godot log */}
-      <div style={{ borderTop: `1px solid ${S.border}`, padding: '10px 12px', flexShrink: 0 }}>
-        <div style={{ fontSize: 10, fontFamily: S.mono, color: S.text2, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+      <div className="shrink-0 border-t border-border-1 px-3 py-2.5">
+        <div className="mb-1.5 font-mono text-10 uppercase tracking-[0.1em] text-fg-2">
           Godot Log
         </div>
-        <div style={{
-          fontSize: 10,
-          fontFamily: S.mono,
-          color: logRunning ? S.green : S.text3,
-          lineHeight: 1.5,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
+        <div className={`overflow-hidden text-ellipsis whitespace-nowrap font-mono text-10 leading-[1.5] ${logRunning ? 'text-success' : 'text-fg-3'}`}>
           {logRunning
             ? (latestLog !== null ? latestLog.line.slice(0, 55) : '▶ Runtime active — streaming')
             : 'No runtime logs yet. Launch a project.'}

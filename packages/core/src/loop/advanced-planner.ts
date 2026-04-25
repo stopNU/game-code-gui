@@ -566,7 +566,16 @@ type ParseOutcome = ParseSuccess | ParseFailure;
 
 function parseDesignerResponse(raw: string): ParseOutcome {
   const candidates = extractJsonCandidates(raw);
-  const parseTargets = candidates.length > 0 ? candidates : [extractJson(raw)];
+  const rawTargets = candidates.length > 0 ? candidates : [extractJson(raw)];
+
+  // Prefer object candidates — the plan schema is an object, not an array.
+  // If the model emits an example JSON array (e.g. acceptanceCriteria) before
+  // the actual plan object, source-order iteration would fail on the array first.
+  const parseTargets = [
+    ...rawTargets.filter((c) => c.trimStart().startsWith('{')),
+    ...rawTargets.filter((c) => !c.trimStart().startsWith('{')),
+  ];
+
   let fallbackIssues: Array<{ path: string[]; message: string }> | undefined;
 
   for (const candidate of parseTargets) {
@@ -580,7 +589,9 @@ function parseDesignerResponse(raw: string): ParseOutcome {
     const result = AdvancedDesignerPlanSchema.safeParse(parsed);
     if (result.success) return { success: true, data: result.data };
 
-    if (fallbackIssues === undefined) {
+    // Only collect issues from object-shaped candidates — array root-level
+    // mismatches aren't useful feedback for the model on retry.
+    if (fallbackIssues === undefined && candidate.trimStart().startsWith('{')) {
       fallbackIssues = result.error.issues.map((i) => ({
         path: i.path.map(String),
         message: i.message,
@@ -592,6 +603,17 @@ function parseDesignerResponse(raw: string): ParseOutcome {
     return {
       success: false,
       issues: fallbackIssues,
+    };
+  }
+
+  // No object candidate was found at all — the response was prose-only or an array.
+  if (parseTargets.some((c) => c.trimStart().startsWith('['))) {
+    return {
+      success: false,
+      issues: [{
+        path: [],
+        message: 'Response was a JSON array, not the expected plan object. Return a single JSON object with top-level keys "gameTitle", "genre", "phases", etc. — not just an array.',
+      }],
     };
   }
 

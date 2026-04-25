@@ -275,56 +275,43 @@ export function App(): JSX.Element {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       {/* Flat top bar */}
-      <header
-        className="flex shrink-0 items-center gap-2 px-3"
-        style={{
-          height: 46,
-          background: '#0d1018',
-          borderBottom: '1px solid #1a1f30',
-          zIndex: 10,
-        }}
-      >
+      <header className="z-10 flex h-[46px] shrink-0 items-center gap-2 border-b border-border-1 bg-surface-1 px-3">
         {/* Back to home */}
         <button
           onClick={goHome}
-          className="flex items-center gap-1.5 rounded px-2 py-1"
+          className="flex cursor-pointer items-center gap-1.5 rounded border-0 bg-transparent px-2 py-1"
           title="Back to home"
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
         >
-          <span className="font-mono text-[11px] font-semibold tracking-[0.14em]" style={{ color: '#4d9eff' }}>
+          <span className="font-mono text-11 font-semibold tracking-[0.14em] text-accent">
             HARNESS
           </span>
-          <span className="font-mono text-[10px]" style={{ color: '#363d57' }}>←</span>
+          <span className="font-mono text-10 text-fg-3">←</span>
         </button>
 
-        <div className="h-4 w-px" style={{ background: '#1a1f30', margin: '0 2px' }} />
+        <div className="mx-0.5 h-4 w-px bg-border-1" />
 
         {/* Project name + status */}
         {selectedProject !== null ? (
           <div className="flex items-center gap-2">
-            <span className="text-[13px] font-medium" style={{ color: '#eceef5' }}>
+            <span className="text-13 font-medium text-fg-0">
               {selectedProject.title ?? selectedProject.name}
             </span>
             <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{
-                background: selectedProject.status === 'ready' ? '#3dca7e' : '#363d57',
-                boxShadow: selectedProject.status === 'ready' ? '0 0 6px #3dca7e66' : 'none',
-              }}
+              className={`inline-block h-1.5 w-1.5 rounded-full ${selectedProject.status === 'ready' ? 'bg-success' : 'bg-fg-3'}`}
+              style={selectedProject.status === 'ready' ? { boxShadow: '0 0 6px #3dca7e66' } : undefined}
             />
             <Badge
-              className="h-5 rounded border px-1.5 font-mono text-[10px]"
-              style={{
-                color: selectedProject.status === 'ready' ? '#3dca7e' : '#545c7a',
-                background: selectedProject.status === 'ready' ? '#14311f' : '#1c2133',
-                borderColor: selectedProject.status === 'ready' ? '#1d4a2c' : '#242b3d',
-              }}
+              className={`h-5 rounded border px-1.5 font-mono text-10 ${
+                selectedProject.status === 'ready'
+                  ? 'border-[#1d4a2c] bg-success-lo text-success'
+                  : 'border-border-2 bg-surface-4 text-fg-2'
+              }`}
             >
               {selectedProject.status}
             </Badge>
           </div>
         ) : (
-          <span className="text-[13px]" style={{ color: '#545c7a' }}>No project</span>
+          <span className="text-13 text-fg-2">No project</span>
         )}
 
         <div className="flex-1" />
@@ -332,13 +319,13 @@ export function App(): JSX.Element {
         {/* Provider / model badges from active conversation */}
         {activeConvoPrefs !== null && (
           <>
-            <Badge className="h-5 rounded border px-1.5 font-mono text-[10px]" style={{ color: '#9aa0bc', background: '#161b28', borderColor: '#242b3d' }}>
+            <Badge className="h-5 rounded border border-border-2 bg-surface-3 px-1.5 font-mono text-10 text-fg-1">
               {activeConvoPrefs.provider}
             </Badge>
-            <Badge className="h-5 rounded border px-1.5 font-mono text-[10px]" style={{ color: '#4d9eff', background: '#1a3a6e', borderColor: '#1a3a6e' }}>
+            <Badge className="h-5 rounded border border-accent-lo bg-accent-lo px-1.5 font-mono text-10 text-accent">
               {activeConvoPrefs.model}
             </Badge>
-            <div className="h-4 w-px" style={{ background: '#1a1f30', margin: '0 2px' }} />
+            <div className="mx-0.5 h-4 w-px bg-border-1" />
           </>
         )}
 
@@ -347,8 +334,7 @@ export function App(): JSX.Element {
           <button
             onClick={handleGodotStop}
             disabled={stopGodot.isPending}
-            className="rounded px-2.5 py-1 font-mono text-[10px]"
-            style={{ background: 'transparent', border: '1px solid #3a1010', color: '#e05252', cursor: 'pointer' }}
+            className="cursor-pointer rounded border border-[#3a1010] bg-transparent px-2.5 py-1 font-mono text-10 text-danger"
           >
             ■ Stop
           </button>
@@ -356,46 +342,27 @@ export function App(): JSX.Element {
           <button
             onClick={handleGodotLaunch}
             disabled={selectedProjectId === null || launchGodot.isPending}
-            className="rounded px-2.5 py-1 font-mono text-[10px]"
-            style={{
-              background: '#3dca7e',
-              border: 'none',
-              color: '#fff',
-              cursor: selectedProjectId === null ? 'default' : 'pointer',
-              opacity: selectedProjectId === null ? 0.4 : 1,
-            }}
+            className={`rounded border-0 bg-success px-2.5 py-1 font-mono text-10 text-white ${selectedProjectId === null ? 'cursor-default opacity-40' : 'cursor-pointer'}`}
           >
             {launchGodot.isPending ? '◷ Starting…' : '▶ Launch'}
           </button>
         )}
 
-        <div className="h-4 w-px" style={{ background: '#1a1f30', margin: '0 2px' }} />
+        <div className="mx-0.5 h-4 w-px bg-border-1" />
 
         {/* Sidebar toggles */}
         <button
           onClick={() => setSidebarOpen((s) => !s)}
           title="Toggle conversations"
-          className="rounded px-2 py-1 font-mono text-[11px]"
-          style={{
-            background: sidebarOpen ? '#1c2133' : 'transparent',
-            border: `1px solid ${sidebarOpen ? '#242b3d' : 'transparent'}`,
-            color: sidebarOpen ? '#9aa0bc' : '#545c7a',
-            cursor: 'pointer',
-          }}
+          className={`cursor-pointer rounded px-2 py-1 font-mono text-11 ${sidebarOpen ? 'border border-border-2 bg-surface-4 text-fg-1' : 'border border-transparent bg-transparent text-fg-2'}`}
         >⊟</button>
         <button
           onClick={() => setRightOpen((r) => !r)}
           title="Toggle status panel"
-          className="rounded px-2 py-1 font-mono text-[11px]"
-          style={{
-            background: rightOpen ? '#1c2133' : 'transparent',
-            border: `1px solid ${rightOpen ? '#242b3d' : 'transparent'}`,
-            color: rightOpen ? '#9aa0bc' : '#545c7a',
-            cursor: 'pointer',
-          }}
+          className={`cursor-pointer rounded px-2 py-1 font-mono text-11 ${rightOpen ? 'border border-border-2 bg-surface-4 text-fg-1' : 'border border-transparent bg-transparent text-fg-2'}`}
         >⊞</button>
 
-        <div className="h-4 w-px" style={{ background: '#1a1f30', margin: '0 2px' }} />
+        <div className="mx-0.5 h-4 w-px bg-border-1" />
 
         <Button
           variant="ghost"
