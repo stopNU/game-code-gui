@@ -58,6 +58,13 @@ export async function runCodexLoop(
   const streamedText = new Map<string, string>();
   const reportedToolItems = new Set<string>();
 
+  // Hard cap on tool calls to prevent runaway loops. Codex has no equivalent of LangChain's
+  // ReAct iteration limit — without this, a model that can't satisfy a task's verification
+  // criteria will keep retrying indefinitely (we observed 43+ command_executions on a single
+  // verification task with no progress). The runner passes maxIterations=30; Codex tool calls
+  // are finer-grained than ReAct turns, so allow at least 60 before bailing.
+  const toolCallCap = Math.max(opts.maxIterations ?? 30, 60);
+
   try {
     const { events } = await thread.runStreamed(buildCodexPrompt(ctx), {
       ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
@@ -70,6 +77,16 @@ export async function runCodexLoop(
           output: totalOutput,
           cached: totalCached,
         });
+      }
+
+      if (toolCallCount >= toolCallCap) {
+        return {
+          success: false,
+          summary: `Codex loop hit the tool-call cap (${toolCallCap}) without completing the task. The model is likely stuck in a verification retry loop. Inspect filesModified and any error logs to diagnose what verification keeps failing.`,
+          filesModified: [...filesModified],
+          toolCallCount,
+          tokensUsed: { input: totalInput, output: totalOutput, cached: totalCached },
+        };
       }
 
       switch (event.type) {
