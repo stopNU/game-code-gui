@@ -149,6 +149,20 @@ Studio agent uses **LangChain** providers (`@langchain/anthropic`, `@langchain/o
 
 `TEMPLATES_ROOT` in `packages/game-adapter/src/scaffold/template-registry.ts` resolves `../../../../templates` relative to `dist/scaffold` (4 levels up to monorepo root). Keep in sync with the scaffolder's copy path.
 
+# GitNexus scope (read this BEFORE the auto-generated section below)
+
+GitNexus indexes **only the harness TypeScript/JavaScript code** under `packages/` and `apps/` (excluding `apps/studio/projects/`). The following are **NOT in the index**:
+
+- `templates/deckbuilder/**` — Godot/GDScript template
+- `apps/studio/projects/**` — generated game projects
+- Any `.gd`, `.tscn`, `.tres`, `.godot`, or `.import` file anywhere
+
+**Do not call any `gitnexus_*` tool against files in those locations.** GDScript symbols will not resolve, the calls only burn time, and a per-project `CLAUDE.md` or `AGENTS.md` (when present) is authoritative for that project. For generated-game work use direct file reads, grep, and scene-tree inspection instead.
+
+The gitnexus MCP tools are also **only available inside Claude Code sessions** that have the gitnexus MCP server registered. Codex and other LangChain-based agents do not have access to `gitnexus_*` tools — do not pretend to call them, and do not report "cancelled" failures for tools you cannot invoke. If you have no `gitnexus_*` tool available, skip the impact-analysis step entirely and proceed with a small, well-scoped edit.
+
+The "MUST run impact analysis before editing any symbol" rule below applies **only to harness TS/JS code, and only when the gitnexus MCP tools are actually present in your tool list.**
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

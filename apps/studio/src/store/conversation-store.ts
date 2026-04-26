@@ -5,6 +5,9 @@ import {
   DEFAULT_CONVERSATION_PROVIDER,
   getDefaultModelForProvider,
 } from '@renderer/lib/conversation-defaults';
+import { splitContentBlocksIntoMessages } from '@renderer/lib/message-content';
+
+let godotLogSeq = 0;
 
 export interface ConversationMessage {
   id: string;
@@ -494,6 +497,38 @@ export const useConversationStore = create<ConversationStore>((set) => ({
       }
 
       if (event.type === 'message-complete') {
+        if (event.contentBlocks !== undefined) {
+          const existing = getConversationMessages(state.messages, event.conversationId);
+          const filtered = existing.filter((message) => message.id !== event.messageId);
+          const split = splitContentBlocksIntoMessages({
+            baseId: event.messageId,
+            conversationId: event.conversationId,
+            role: 'assistant',
+            contentBlocks: event.contentBlocks,
+            createdAt: event.completedAt,
+            status: 'complete',
+          });
+          const next = split.length > 0
+            ? split
+            : [
+                {
+                  id: event.messageId,
+                  conversationId: event.conversationId,
+                  role: 'assistant' as const,
+                  content: event.fullText,
+                  createdAt: event.completedAt,
+                  status: 'complete' as const,
+                },
+              ];
+
+          return {
+            messages: {
+              ...state.messages,
+              [event.conversationId]: [...filtered, ...next],
+            },
+          };
+        }
+
         return {
           messages: {
             ...state.messages,
@@ -539,7 +574,7 @@ export const useConversationStore = create<ConversationStore>((set) => ({
           godotLogs: [
             ...state.godotLogs.slice(-199),
             {
-              id: `${event.timestamp}-${state.godotLogs.length}`,
+              id: `${event.timestamp}-${++godotLogSeq}`,
               line: event.line,
               stream: event.stream,
               timestamp: event.timestamp,

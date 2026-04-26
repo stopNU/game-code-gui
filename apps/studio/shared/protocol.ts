@@ -30,6 +30,7 @@ export interface MessageCompleteEvent {
   messageId: string;
   fullText: string;
   completedAt: string;
+  contentBlocks?: unknown[];
 }
 
 export interface NoticeEvent {

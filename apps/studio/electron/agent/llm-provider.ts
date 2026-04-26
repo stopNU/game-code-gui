@@ -1,6 +1,6 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatOpenAI } from '@langchain/openai';
-import { SystemMessage, HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages';
+import { SystemMessage, HumanMessage, AIMessage, AIMessageChunk, ToolMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage } from '@langchain/core/messages';
 import { DEFAULT_RETRY_POLICY, withRetry } from '@agent-harness/core';
@@ -211,30 +211,35 @@ export class AnthropicProvider implements LLMProvider {
           ? (model as any).bindTools(toLC(args.tools)) as unknown as BaseChatModel
           : model;
 
-        let streamedText = '';
         const stream = modelWithTools.stream(lcMessages, {
           signal: args.signal,
         });
 
-        const chunks = [];
+        let accumulated: AIMessageChunk | undefined;
         for await (const chunk of await stream) {
           if (typeof chunk.content === 'string' && chunk.content.length > 0) {
-            streamedText += chunk.content;
             args.onEvent({ type: 'text-delta', delta: chunk.content });
           } else if (Array.isArray(chunk.content)) {
             for (const part of chunk.content as Array<{ type?: string; text?: string }>) {
               if (part.type === 'text' && typeof part.text === 'string' && part.text.length > 0) {
-                streamedText += part.text;
                 args.onEvent({ type: 'text-delta', delta: part.text });
               }
             }
           }
-          chunks.push(chunk);
+          accumulated = accumulated === undefined ? chunk : accumulated.concat(chunk);
         }
 
-        // Get final message with full structure (including tool calls)
-        const response = await model.invoke(lcMessages, { signal: args.signal }) as AIMessage;
+        if (accumulated === undefined) {
+          // Stream produced nothing — fall back to a non-streaming call.
+          const response = await model.invoke(lcMessages, { signal: args.signal }) as AIMessage;
+          return {
+            message: lcToClaudeMessage(response),
+            stopReason: (response.response_metadata?.['stop_reason'] as string | undefined) ?? 'end_turn',
+            tokens: extractTokens(response),
+          };
+        }
 
+        const response = accumulated as unknown as AIMessage;
         return {
           message: lcToClaudeMessage(response),
           stopReason: (response.response_metadata?.['stop_reason'] as string | undefined) ?? 'end_turn',
@@ -303,14 +308,30 @@ export class OpenAIProvider implements LLMProvider {
 
         const stream = modelWithTools.stream(lcMessages, { signal: args.signal });
 
+        let accumulated: AIMessageChunk | undefined;
         for await (const chunk of await stream) {
           if (typeof chunk.content === 'string' && chunk.content.length > 0) {
             args.onEvent({ type: 'text-delta', delta: chunk.content });
+          } else if (Array.isArray(chunk.content)) {
+            for (const part of chunk.content as Array<{ type?: string; text?: string }>) {
+              if (part.type === 'text' && typeof part.text === 'string' && part.text.length > 0) {
+                args.onEvent({ type: 'text-delta', delta: part.text });
+              }
+            }
           }
+          accumulated = accumulated === undefined ? chunk : accumulated.concat(chunk);
         }
 
-        const response = await model.invoke(lcMessages, { signal: args.signal }) as AIMessage;
+        if (accumulated === undefined) {
+          const response = await model.invoke(lcMessages, { signal: args.signal }) as AIMessage;
+          return {
+            message: lcToClaudeMessage(response),
+            stopReason: 'end_turn',
+            tokens: extractTokens(response),
+          };
+        }
 
+        const response = accumulated as unknown as AIMessage;
         return {
           message: lcToClaudeMessage(response),
           stopReason: 'end_turn',

@@ -331,6 +331,9 @@ export class ConversationAgent {
         conversationId: args.conversationId,
         messageId,
         fullText: streamedText.length > 0 ? streamedText : getTextFromContent(llmResult.message.content),
+        contentBlocks: Array.isArray(llmResult.message.content)
+          ? (llmResult.message.content as unknown[])
+          : [{ type: 'text', text: typeof llmResult.message.content === 'string' ? llmResult.message.content : '' }],
         completedAt: new Date().toISOString(),
       });
 

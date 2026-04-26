@@ -40,7 +40,10 @@ export function LeftPanel(): JSX.Element {
   const completeCount = selectedProject?.completeCount ?? 0;
   const progress = taskCount > 0 ? completeCount / taskCount : 0;
 
-  const recentLogs = godotLogs.slice(-5);
+  const recentLogLines = godotLogs
+    .flatMap((log) => log.line.split('\n').map((line, lineIndex) => ({ id: `${log.id}-${lineIndex}`, line })))
+    .filter((entry) => entry.line.trim().length > 0)
+    .slice(-5);
   const logRunning = godotStatus.status === 'running';
 
   return (
@@ -150,16 +153,16 @@ export function LeftPanel(): JSX.Element {
         <div className="mb-1.5 font-mono text-10 uppercase tracking-[0.1em] text-fg-2">
           Godot Log
         </div>
-        <div className={`flex flex-col gap-px font-mono text-10 leading-[1.5] ${logRunning ? 'text-success' : 'text-fg-3'}`}>
+        <div className={`flex max-h-[75px] flex-col gap-px overflow-hidden font-mono text-10 leading-[1.5] ${logRunning ? 'text-success' : 'text-fg-3'}`}>
           {logRunning ? (
-            recentLogs.length > 0 ? (
-              recentLogs.map((log) => (
+            recentLogLines.length > 0 ? (
+              recentLogLines.map((entry) => (
                 <div
-                  key={log.id}
+                  key={entry.id}
                   className="overflow-hidden text-ellipsis whitespace-nowrap"
-                  title={log.line}
+                  title={entry.line}
                 >
-                  {log.line.slice(0, 55)}
+                  {entry.line.slice(0, 55)}
                 </div>
               ))
             ) : (

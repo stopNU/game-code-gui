@@ -246,12 +246,32 @@ function handleTextEvent(
 
   const previous = streamedText.get(textState.id) ?? '';
   const next = textState.text;
-  if (!next.startsWith(previous)) {
-    if (next.length > 0) {
-      opts.onText?.(next);
+
+  // Debug: log every text event we receive from Codex so we can see whether reasoning /
+  // agent_message items actually stream during a run, and whether updates are incremental.
+  // Remove once Codex chat streaming is confirmed working end-to-end.
+  // eslint-disable-next-line no-console
+  console.log(
+    `[codex-text] kind=${textState.kind} id=${textState.id} event=${event.type} prevLen=${previous.length} nextLen=${next.length} incremental=${next.startsWith(previous)}`,
+  );
+
+  if (next.startsWith(previous)) {
+    // Incremental: emit only the new suffix.
+    if (next.length > previous.length) {
+      opts.onText?.(next.slice(previous.length));
     }
-  } else if (next.length > previous.length) {
-    opts.onText?.(next.slice(previous.length));
+  } else {
+    // Non-incremental rewrite of this item. We've already emitted `previous` and can't
+    // retract it from the UI — emit only the portion beyond the previous length, if any,
+    // and log a warning. Emitting the full `next` here (as the old code did) caused the
+    // entire text to be appended a second time, producing visible duplicates in the bubble.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[codex-text] non-incremental update for id=${textState.id} kind=${textState.kind}; previous and next diverge. Emitting tail-only diff to avoid duplication.`,
+    );
+    if (next.length > previous.length) {
+      opts.onText?.(next.slice(previous.length));
+    }
   }
 
   streamedText.set(textState.id, next);

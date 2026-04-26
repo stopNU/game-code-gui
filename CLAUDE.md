@@ -184,6 +184,18 @@ game-harness generate-assets -p ./my-game -r "a glowing red sword" --key cards_i
 
 `TEMPLATES_ROOT` in `packages/game-adapter/src/scaffold/template-registry.ts` resolves `../../../../templates` relative to `dist/scaffold` (4 levels up to monorepo root). Keep in sync with the scaffolder's copy path.
 
+# GitNexus scope (read this BEFORE the auto-generated section below)
+
+GitNexus indexes **only the harness TypeScript/JavaScript code** under `packages/` and `apps/` (excluding `apps/studio/projects/`). The following are **NOT in the index**:
+
+- `templates/deckbuilder/**` — Godot/GDScript template
+- `apps/studio/projects/**` — generated game projects
+- Any `.gd`, `.tscn`, `.tres`, `.godot`, or `.import` file anywhere
+
+**Do not call any `gitnexus_*` tool against files in those locations.** GDScript symbols will not resolve, the calls only burn time, and a per-project `CLAUDE.md` (when present) is authoritative for that project. For generated-game work use `Read` + `Grep` + scene-tree inspection instead.
+
+The "MUST run impact analysis before editing any symbol" rule below applies **only to harness TS/JS code**, not to GDScript or any file under the paths listed above.
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

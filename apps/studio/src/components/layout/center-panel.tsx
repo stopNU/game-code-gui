@@ -3,7 +3,7 @@ import type { ConversationMessage } from '@renderer/store/conversation-store';
 import { Separator } from '@renderer/components/ui/separator';
 import { Skeleton } from '@renderer/components/ui/skeleton';
 import { trpc } from '@renderer/lib/trpc';
-import { serializeContentBlocks } from '@renderer/lib/message-content';
+import { splitContentBlocksIntoMessages } from '@renderer/lib/message-content';
 import {
   DEFAULT_CONVERSATION_PROVIDER,
   getDefaultModelForProvider,
@@ -27,14 +27,16 @@ function normalizeDbMessages(
     createdAt: string;
   }>,
 ): ConversationMessage[] {
-  return messages.map((message) => ({
-    id: message.id,
-    conversationId: message.conversationId,
-    role: message.role === 'error' ? 'system' : message.role,
-    content: serializeContentBlocks(message.contentBlocks),
-    createdAt: message.createdAt,
-    status: 'complete',
-  }));
+  return messages.flatMap((message) =>
+    splitContentBlocksIntoMessages({
+      baseId: message.id,
+      conversationId: message.conversationId,
+      role: message.role === 'error' ? 'system' : message.role,
+      contentBlocks: message.contentBlocks,
+      createdAt: message.createdAt,
+      status: 'complete',
+    }),
+  );
 }
 
 interface ProjectInfo {
