@@ -223,6 +223,7 @@ export function CenterPanel(): JSX.Element {
   const sessionStatus = useConversationStore((state) => state.sessionStatus);
   const godotLogs = useConversationStore((state) => state.godotLogs);
   const hydrateMessages = useConversationStore((state) => state.hydrateMessages);
+  const clearGodotLogs = useConversationStore((state) => state.clearGodotLogs);
   const addUserMessage = useConversationStore((state) => state.upsertUserMessage);
   const updateConversationPreferences = useConversationStore((state) => state.updateConversationPreferences);
   const settingsStatusQuery = trpc.settings.getStatus.useQuery();
@@ -395,28 +396,42 @@ export function CenterPanel(): JSX.Element {
           )}
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto bg-surface-1 p-3 font-mono text-11 leading-[1.5]">
-          {godotLogs.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-fg-3">
-              No runtime logs yet. Launch Godot to stream stdout/stderr here.
-            </div>
-          ) : (
-            <div className="flex flex-col gap-px">
-              {godotLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex gap-2 whitespace-pre-wrap break-all"
-                >
-                  <span className={`shrink-0 ${log.stream === 'stderr' ? 'text-warning' : 'text-fg-3'}`}>
-                    [{log.stream}]
-                  </span>
-                  <span className={log.stream === 'stderr' ? 'text-warning' : 'text-fg-1'}>
-                    {log.line}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="flex min-h-0 flex-1 flex-col bg-surface-1">
+          <div className="flex shrink-0 items-center justify-between border-b border-border-1 px-3 py-1.5">
+            <span className="font-mono text-10 uppercase tracking-[0.1em] text-fg-3">
+              {godotLogs.length} {godotLogs.length === 1 ? 'line' : 'lines'}
+            </span>
+            <button
+              onClick={() => clearGodotLogs()}
+              disabled={godotLogs.length === 0}
+              className="cursor-pointer rounded border border-border-2 bg-surface-3 px-2 py-0.5 font-mono text-10 text-fg-1 transition-colors duration-[120ms] hover:bg-surface-4 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface-3"
+            >
+              Clear logs
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 font-mono text-11 leading-[1.5]">
+            {godotLogs.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-fg-3">
+                No runtime logs yet. Launch Godot to stream stdout/stderr here.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-px">
+                {godotLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex gap-2 whitespace-pre-wrap break-all"
+                  >
+                    <span className={`shrink-0 ${log.stream === 'stderr' ? 'text-warning' : 'text-fg-3'}`}>
+                      [{log.stream}]
+                    </span>
+                    <span className={log.stream === 'stderr' ? 'text-warning' : 'text-fg-1'}>
+                      {log.line}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

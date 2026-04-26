@@ -113,6 +113,7 @@ interface ConversationStore {
     }>;
   }) => void;
   upsertUserMessage: (conversationId: string, content: string) => void;
+  clearGodotLogs: () => void;
   applyEvent: (event: StreamEvent) => void;
   reset: () => void;
 }
@@ -268,6 +269,9 @@ export const useConversationStore = create<ConversationStore>((set) => ({
       godotStatus: status,
       godotLogs: logs,
     });
+  },
+  clearGodotLogs: () => {
+    set({ godotLogs: [] });
   },
   upsertUserMessage: (conversationId, content) => {
     set((state) => ({
