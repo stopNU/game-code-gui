@@ -15,6 +15,7 @@ import type { AgentContext, AgentLoopOptions, ClaudeMessage } from '../types/age
 import type { TaskResult } from '../types/task.js';
 import type { ToolContract, ToolExecutionContext } from '../types/tool.js';
 import { buildTaskPrompt } from './task-prompt.js';
+import { verifyCompleteness, formatCompletenessReprompt } from './completeness-verifier.js';
 
 export interface AgentLoopDeps {
   tools: ToolContract[];
@@ -48,6 +49,7 @@ export async function runAgentLoop(
   let totalOutput = 0;
   let totalCached = 0;
   let toolCallCount = 0;
+  let completenessRetries = 0;
   const filesModified: string[] = [];
 
   // Build initial messages
@@ -99,13 +101,37 @@ export async function runAgentLoop(
     // Done?
     const hasCalls = response.tool_calls && response.tool_calls.length > 0;
     if (!hasCalls) {
-      return {
-        success: true,
-        summary: getTextContent(response),
-        filesModified,
-        toolCallCount,
-        tokensUsed: { input: totalInput, output: totalOutput, cached: totalCached },
-      };
+      // Completeness gate: if the agent declared itself done but the files
+      // it touched are still stubs, push a re-prompt and continue. After
+      // MAX_COMPLETENESS_RETRIES we give up and surface the failure so the
+      // orchestrator can decide whether to retry the whole task.
+      const verification = await verifyCompleteness(ctx.task.context.projectPath, filesModified);
+      if (verification.passed) {
+        return {
+          success: true,
+          summary: getTextContent(response),
+          filesModified,
+          toolCallCount,
+          tokensUsed: { input: totalInput, output: totalOutput, cached: totalCached },
+        };
+      }
+
+      if (completenessRetries >= MAX_COMPLETENESS_RETRIES) {
+        const issuesSummary = verification.issues
+          .map((i) => `${i.filePath}: ${i.reason}`)
+          .join('; ');
+        return {
+          success: false,
+          summary: `Completeness check failed after ${completenessRetries + 1} attempts. ${issuesSummary}`,
+          filesModified,
+          toolCallCount,
+          tokensUsed: { input: totalInput, output: totalOutput, cached: totalCached },
+        };
+      }
+
+      completenessRetries++;
+      messages.push(new HumanMessage(formatCompletenessReprompt(verification.issues)));
+      continue;
     }
 
     // Budget check
@@ -235,6 +261,12 @@ export async function runAgentLoop(
 
 const KEEP_EXCHANGES = 10;
 const READFILE_HISTORY_PREVIEW = 20;
+/**
+ * Max times the loop will re-prompt the agent after the completeness
+ * verifier rejects its "done" signal. Set to 2 so the agent gets a real
+ * chance to recover (3 total attempts) without burning unbounded tokens.
+ */
+const MAX_COMPLETENESS_RETRIES = 2;
 
 function windowMessages(messages: BaseMessage[]): BaseMessage[] {
   if (messages.length === 0) return messages;

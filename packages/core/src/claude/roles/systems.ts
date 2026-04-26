@@ -135,6 +135,36 @@ func tick_end_of_turn(entity_id: String) -> void:
                 EventBus.status_ticked.emit(entity_id, status_id, _stacks[entity_id][status_id])
 \`\`\``;
 
+export const SYSTEMS_STUB_RULES = `## Replacing template stubs (REQUIRED)
+
+The scaffolder ships every systems file (CombatEngine, CardZoneManager,
+DamageCalculator, EnemyAI, MapGenerator, StatusEffectSystem) as a stub:
+
+\`\`\`gdscript
+## CombatEngine — TODO: implement
+## STUB — must be replaced before any flow constructs it.
+extends RefCounted
+
+func _init() -> void:
+    push_error("[stub] CombatEngine instantiated but not implemented — fill src/systems/CombatEngine.gd")
+    assert(false, "CombatEngine is a stub — implement before instantiation")
+\`\`\`
+
+When implementing a systems task, you MUST:
+
+1. Replace the ENTIRE file body, including the leading \`## TODO\` comment, the
+   docstring "STUB — must be replaced…" block, and the asserting \`_init()\`.
+2. Leave behind no \`assert(false, "… is a stub …")\` line. The completeness
+   verifier scans for \`is a stub\` and \`STUB — must be replaced\` and will
+   reject the task as unfilled.
+3. The file's leading docstring should describe what the system does, not
+   reference the stub.
+
+If you only need to wire one method and the rest is genuinely "not yet" rather
+than "never," still remove the assert — write a no-op or sensible default
+instead, and document the "not yet" in a clear comment that does NOT contain
+the words "TODO: implement" or "STUB".`;
+
 // ── Build function ────────────────────────────────────────────────────────────
 
 export function buildSystemsPrompt(): string {
@@ -146,6 +176,7 @@ export function buildSystemsPrompt(): string {
     SYSTEMS_CONTENT_RULES,
     SYSTEMS_GDSCRIPT_PATTERNS,
     SYSTEMS_STATUS_RULES,
+    SYSTEMS_STUB_RULES,
     SHARED_DISCIPLINE,
   );
 }

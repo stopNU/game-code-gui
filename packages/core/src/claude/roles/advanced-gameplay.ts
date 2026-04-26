@@ -118,6 +118,96 @@ func _load_card_texture(card: Dictionary) -> Texture2D:
     return load("res://src/assets/placeholder_card.png")
 \`\`\``;
 
+export const ADVANCED_GAMEPLAY_STUB_RULES = `## Replacing template scene stubs (REQUIRED)
+
+The scaffolder ships CombatScene, CardRewardScene, ShopScene, RestScene, and
+RunSummaryScene as crashing stubs:
+
+\`\`\`gdscript
+## TODO: implement this scene
+## STUB — must be replaced before any flow reaches it.
+extends Node
+
+const _SCENE_NAME := "CombatScene"
+
+func _ready() -> void:
+    push_error("[stub] CombatScene reached but not implemented — fill src/scenes/CombatScene.gd")
+    assert(false, "CombatScene is a stub — implement before any flow can reach this scene")
+\`\`\`
+
+When implementing a scene task, you MUST:
+
+1. Replace the ENTIRE file body, including the leading \`## TODO\` comment, the
+   "STUB — must be replaced…" docstring, the \`_SCENE_NAME\` constant, and the
+   asserting \`_ready()\`.
+2. Leave behind no \`assert(false, "… is a stub …")\` line and no
+   \`push_error("[stub] …")\` line. The completeness verifier scans for
+   \`is a stub\` and \`STUB — must be replaced\` and will reject the task as
+   unfilled.
+3. The replacement must \`extends Control\` (not \`Node\`) and follow the theme
+   rules below — root Control, theme = ExtResource("..."), Background ColorRect.
+4. The replacement \`.tscn\` must have a real layout (CenterContainer / VBox /
+   HBox + the controls the milestone scene's primaryAction requires), not a
+   single Node attaching the script.
+
+If a scene is genuinely outside this task's scope, leave the stub untouched —
+do not partially fill it. The next agent on the next task picks it up.`;
+
+export const ADVANCED_GAMEPLAY_THEME_RULES = `## Visual theme — required, no exceptions
+
+The template ships a theme at \`res://src/theme/main.tres\` and a colour-token
+class at \`res://src/theme/palette.gd\` (use as \`Palette.ACCENT\` etc — no
+preload needed, it has \`class_name Palette\`).
+
+EVERY scene you create or modify MUST:
+
+1. In the \`.tscn\`, declare the theme as an external resource and set it on the
+   root Control node:
+\`\`\`
+[ext_resource type="Theme" path="res://src/theme/main.tres" id="2"]
+
+[node name="..." type="Control"]
+theme = ExtResource("2")
+\`\`\`
+
+2. Place a full-screen \`ColorRect\` named \`Background\` as the FIRST child of
+   the root, with \`color = Color(0.071, 0.086, 0.118, 1)\` (matches
+   \`Palette.BG_DEEP\`). Default Godot grey is never acceptable.
+
+3. Use the typography scale via \`theme_override_font_sizes/font_size\`:
+   - Scene title: 48
+   - Section heading: 32
+   - Body / button: 18 (theme default — omit override)
+   - Small / caption: 14
+
+4. Use spacing constants for VBox/HBox \`theme_override_constants/separation\`:
+   small 8, medium 16, large 24. Avoid arbitrary values like 12 or 20.
+
+5. For dim/muted text, override colour with
+   \`theme_override_colors/font_color = Color(0.604, 0.639, 0.722, 1)\`
+   (\`Palette.TEXT_DIM\`). For accent/danger text use
+   \`Color(0.819, 0.294, 0.235, 1)\` (\`Palette.ACCENT\`).
+
+6. NEVER write \`node.theme_override_constants.x = v\` at runtime. That syntax
+   only works as a \`.tscn\` declaration. From code use
+   \`node.add_theme_constant_override("separation", 16)\`,
+   \`add_theme_color_override("font_color", Palette.TEXT_DIM)\`,
+   \`add_theme_font_size_override("font_size", 32)\`.
+
+7. Card/relic/enemy panels use \`Panel\` or \`PanelContainer\` (the theme styles
+   them with rounded corners, dark fill, subtle border) — NOT raw ColorRect.
+
+8. Buttons: use the theme defaults. The theme already supplies normal/hover/
+   pressed/disabled stylebox + a hover colour shift to accent. Do not add
+   inline \`theme_override_styles/*\` unless the button is a card or has a
+   genuinely distinct role.
+
+9. When generating a NEW \`.tscn\` from scratch (e.g. CombatScene rebuilds),
+   keep \`load_steps\` accurate and bump it by 1 for each ext_resource you add.
+
+These rules apply to BootScene through RunSummaryScene. Skipping the theme
+on any scene is a defect.`;
+
 export const ADVANCED_GAMEPLAY_ANIMATION_RULES = `## Animations with Tween
 
 Use create_tween() for all card and UI animations.
@@ -151,6 +241,8 @@ export function buildAdvancedGameplayPrompt(): string {
     ADVANCED_GAMEPLAY_HARNESS_RULES,
     ADVANCED_GAMEPLAY_SCENE_LIFECYCLE,
     ADVANCED_GAMEPLAY_CARD_RULES,
+    ADVANCED_GAMEPLAY_STUB_RULES,
+    ADVANCED_GAMEPLAY_THEME_RULES,
     ADVANCED_GAMEPLAY_ANIMATION_RULES,
     SHARED_DISCIPLINE,
   );

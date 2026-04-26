@@ -15,6 +15,7 @@ Return a JSON object with exactly these top-level fields:
 - gameBrief: string - expanded description (3-5 sentences)
 - genre: string - always "deckbuilder-roguelike"
 - coreLoop: string - one sentence describing the primary player action and feedback cycle
+- styleNote: StyleNote - visual direction; see style note rules below
 - controls: string[] - player interaction descriptions (e.g. "Click a card to play it", "Click an enemy to target it", "Click End Turn button")
 - scenes: string[] - always ["BootScene","MainMenuScene","MapScene","CombatScene","CardRewardScene","ShopScene","RestScene","RunSummaryScene"] plus any game-specific additions
 - milestoneScenes: MilestoneScene[] - scene-level acceptance criteria for the core milestone screens; see milestone rules below
@@ -162,6 +163,32 @@ Use these step types:
 
 Keep verificationSteps to 4-6 steps. Verify content loaded, BootScene completed, and the milestone flow reaches the earliest core screens.`;
 
+export const ADVANCED_DESIGNER_STYLE_RULES = `## Style note rules
+
+The styleNote field commits the game to a visual direction up front so the
+gameplay agent has concrete art-direction guidance when it builds scenes.
+
+styleNote is an object with:
+- mood: 1-2 word vibe (e.g. "grim arcane", "neon cyberpunk", "warm folkloric")
+- palette: object with hex colours for each token below — pick colours that
+  match the mood, not the template defaults:
+    bgDeep, bgPanel, accent, success, warning, danger, text, textDim
+  Each value is a hex string like "#1a1226" (no alpha).
+- typographyNote: one sentence guidance (e.g. "Use a heavy display font
+  feel for titles; keep body legible at 18px").
+- artDirection: 1-2 sentences describing card/enemy/relic art style — this
+  is later prepended to artPrompt fields by the asset agent (e.g. "Painterly
+  digital illustration with chunky outlines and high-contrast key lighting").
+
+The template ships with a neutral dark theme at res://src/theme/main.tres.
+The gameplay agent will override theme colours per-scene using the styleNote
+palette via theme_override_colors and Palette token additions, so pick
+intentional contrasting colours rather than minor variations on grey.
+
+Concrete acceptance: the styleNote palette MUST differ from the default
+neutral palette (bgDeep #12161e, accent #d14b3c). Pick colours that read as
+"this game's identity" not "any deckbuilder".`;
+
 export const ADVANCED_DESIGNER_CONTENT_RULES = `## Content manifest rules
 
 contentManifest declares the initial data files the scaffolder should write.
@@ -185,6 +212,7 @@ export function buildAdvancedDesignerPrompt(): string {
     ADVANCED_DESIGNER_MILESTONE_RULES,
     ADVANCED_DESIGNER_SCENE_RULES,
     ADVANCED_DESIGNER_VERIFICATION_RULES,
+    ADVANCED_DESIGNER_STYLE_RULES,
     ADVANCED_DESIGNER_CONTENT_RULES,
     SHARED_DISCIPLINE,
   );

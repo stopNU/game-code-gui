@@ -330,6 +330,27 @@ export interface AdvancedSharedContext {
   stretchFeatures: string[];
 }
 
+/**
+ * Visual direction for the game, committed up front by the designer phase so
+ * the gameplay agent has concrete art-direction guidance when building scenes.
+ * Palette values are 6-digit hex strings without alpha (e.g. "#1a1226").
+ */
+export interface StyleNote {
+  mood: string;
+  palette: {
+    bgDeep: string;
+    bgPanel: string;
+    accent: string;
+    success: string;
+    warning: string;
+    danger: string;
+    text: string;
+    textDim: string;
+  };
+  typographyNote: string;
+  artDirection: string;
+}
+
 export interface TaskPlan {
   gameTitle: string;
   gameBrief: string;
@@ -344,6 +365,8 @@ export interface TaskPlan {
   /** Game-specific playtest steps that verify core input/mechanics work after generation. */
   verificationSteps: VerificationStep[];
   // -- Advanced mode fields (all optional for backward compatibility) --
+  /** Visual direction (palette, mood, art-direction) for the gameplay and asset agents. */
+  styleNote?: StyleNote;
   /** Subsystems decomposed from the design document. */
   subsystems?: SubsystemDef[];
   /** Data schemas extracted from the design document (cards, enemies, relics, etc.). */
@@ -632,6 +655,21 @@ export const TaskPlanSchema = z.object({
     }),
   ),
   verificationSteps: z.array(VerificationStepSchema).default([]),
+  styleNote: z.object({
+    mood: z.string(),
+    palette: z.object({
+      bgDeep: z.string(),
+      bgPanel: z.string(),
+      accent: z.string(),
+      success: z.string(),
+      warning: z.string(),
+      danger: z.string(),
+      text: z.string(),
+      textDim: z.string(),
+    }),
+    typographyNote: z.string(),
+    artDirection: z.string(),
+  }).optional(),
   subsystems: z.array(SubsystemDefSchema).optional(),
   dataSchemas: z.array(DataSchemaDefSchema).optional(),
   contentManifest: z.array(ContentEntrySchema).optional(),
