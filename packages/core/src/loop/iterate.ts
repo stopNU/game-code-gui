@@ -12,11 +12,17 @@ import type { ToolGroupName } from '../types/tool.js';
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Phase number reserved for bug-fix iteration tasks. */
+/** Phase number reserved for bug-fix iteration tasks (all bugs share one phase). */
 export const BUG_PHASE = 90;
 
-/** Phase number reserved for new-feature iteration tasks. */
-export const FEATURE_PHASE = 91;
+/** First phase number used for feature iterations. Each new feature gets its own incrementing phase. */
+export const FEATURE_PHASE_BASE = 91;
+
+/**
+ * @deprecated Use {@link nextFeaturePhase}. Kept only as a starting hint; each
+ * feature iteration now lands in its own phase >= FEATURE_PHASE_BASE.
+ */
+export const FEATURE_PHASE = FEATURE_PHASE_BASE;
 
 export type IterationType = 'bug' | 'feature';
 
@@ -43,7 +49,57 @@ type IterationTask = z.infer<typeof IterationTaskSchema>;
 // Helpers
 // ---------------------------------------------------------------------------
 
-function inflateIterationTask(t: IterationTask, type: IterationType): TaskState {
+/**
+ * Compute the next phase number to use for a feature iteration. Bugs always
+ * share phase 90; features each get their own slot starting at 91 so each
+ * feature's tasks form a coherent group with their own label.
+ */
+export function nextFeaturePhase(plan: TaskPlan): number {
+  let max = FEATURE_PHASE_BASE - 1;
+  for (const phase of plan.phases) {
+    if (phase.phase >= FEATURE_PHASE_BASE && phase.phase > max) {
+      max = phase.phase;
+    }
+  }
+  return max + 1;
+}
+
+/** Extract every task id present in a plan, for collision detection. */
+function collectExistingTaskIds(plan: TaskPlan): Set<string> {
+  const ids = new Set<string>();
+  for (const phase of plan.phases) {
+    for (const t of phase.tasks) {
+      ids.add(t.id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Rewrite a task id so it is unique within the target phase and clearly
+ * attributable to its iteration:
+ *
+ * - Bugs keep the `bug-` prefix the planner produces; if the resulting id
+ *   collides with an existing task we append `-2`, `-3`, ... until unique.
+ * - Features get their phase number folded in (`feat-<phase>-...`) so two
+ *   features with overlapping descriptions (e.g. both about "double jump")
+ *   never collide across iterations.
+ */
+function rewriteTaskId(originalId: string, type: IterationType, phase: number, taken: Set<string>): string {
+  const stripped = originalId.replace(/^(bug-|feat-)/, '');
+  const base = type === 'bug' ? `bug-${stripped}` : `feat-${phase}-${stripped}`;
+
+  if (!taken.has(base)) {
+    return base;
+  }
+  let n = 2;
+  while (taken.has(`${base}-${n}`)) {
+    n += 1;
+  }
+  return `${base}-${n}`;
+}
+
+function inflateIterationTask(t: IterationTask): TaskState {
   const now = new Date().toISOString();
 
   // Ensure minimum tool access for code-touching roles
@@ -53,10 +109,10 @@ function inflateIterationTask(t: IterationTask, type: IterationType): TaskState 
     if (!toolsAllowed.includes('npm')) toolsAllowed = [...toolsAllowed, 'npm'];
   }
 
+  // Phase is a placeholder here — appendIterationTasks rewrites it to the
+  // resolved target phase as it stamps tasks into the plan.
   return {
     ...t,
-    // Force the phase to the correct iteration bucket in case the LLM drifts
-    phase: type === 'bug' ? BUG_PHASE : FEATURE_PHASE,
     toolsAllowed: toolsAllowed as ToolGroupName[],
     status: 'pending',
     brief: t.description,
@@ -79,7 +135,7 @@ function inflateIterationTask(t: IterationTask, type: IterationType): TaskState 
  * Read the most recent eval report from harness/baselines/ and return a
  * compact failure summary string, or null if none found / all passing.
  */
-async function readLatestEvalFailures(projectPath: string): Promise<string | null> {
+export async function readLatestEvalFailures(projectPath: string): Promise<string | null> {
   const baselinesDir = join(projectPath, 'harness', 'baselines');
   try {
     const files = await readdir(baselinesDir);
@@ -117,6 +173,14 @@ async function readLatestEvalFailures(projectPath: string): Promise<string | nul
   }
 }
 
+/** Default phase label when the caller doesn't supply one. Truncates long descriptions for legibility. */
+function defaultPhaseLabel(type: IterationType, description: string): string {
+  if (type === 'bug') return 'Bugs';
+  const trimmed = description.trim().replace(/\s+/g, ' ');
+  const head = trimmed.length > 40 ? `${trimmed.slice(0, 40).trimEnd()}…` : trimmed;
+  return `Feature: ${head}`;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -132,8 +196,9 @@ export interface PlanIterationOptions {
  * report for failure context (bug type only), calls the LLM to produce
  * targeted tasks, and returns them ready to be appended to the plan.
  *
- * The caller is responsible for writing the updated plan back to disk via
- * `appendIterationTasks`.
+ * The returned tasks carry a placeholder phase value — the actual target phase
+ * is resolved by {@link appendIterationTasks} when the tasks are written, so
+ * each feature iteration lands in its own phase slot.
  */
 export async function planIteration(
   projectPath: string,
@@ -217,7 +282,7 @@ Return ONLY the JSON array of tasks.`.trim();
       // Best-effort: skip invalid tasks rather than crashing
       continue;
     }
-    tasks.push(inflateIterationTask(result.data, type));
+    tasks.push(inflateIterationTask(result.data));
   }
 
   if (tasks.length === 0) {
@@ -227,34 +292,96 @@ Return ONLY the JSON array of tasks.`.trim();
   return tasks;
 }
 
+export interface AppendIterationOptions {
+  /**
+   * Display label for the resulting phase. Defaults to "Bugs" for bugs and
+   * "Feature: <description>" for features.
+   */
+  label?: string;
+  /**
+   * Optional description used to build a default feature label when `label`
+   * isn't supplied. Ignored for bugs.
+   */
+  description?: string;
+}
+
+export interface AppendIterationResult {
+  plan: TaskPlan;
+  phase: number;
+  label: string;
+  taskIds: string[];
+}
+
 /**
- * Append a set of iteration tasks to the plan's bugs (90) or features (91)
- * phase, creating the phase entry if it doesn't exist, then persist to disk.
+ * Append iteration tasks to the plan and persist to disk.
+ *
+ * - `bug` tasks all land in {@link BUG_PHASE} (90). The phase entry is created
+ *   on first use and reused for subsequent bug iterations.
+ * - `feature` tasks always land in a brand-new phase at the next available
+ *   slot >= 91, so each feature is a coherent collapsible group with its own
+ *   label.
+ *
+ * Task ids are rewritten to be unique across the whole plan; dependency
+ * references between newly generated tasks are remapped accordingly so the
+ * scheduler can still resolve them.
  */
 export async function appendIterationTasks(
   projectPath: string,
   type: IterationType,
   newTasks: TaskState[],
-): Promise<TaskPlan> {
+  opts: AppendIterationOptions = {},
+): Promise<AppendIterationResult> {
   const tasksPath = join(projectPath, 'harness', 'tasks.json');
   const raw = await readFile(tasksPath, 'utf8');
   const plan = JSON.parse(raw) as TaskPlan;
 
-  const targetPhase = type === 'bug' ? BUG_PHASE : FEATURE_PHASE;
-  const phaseLabel = type === 'bug' ? 'Bugs' : 'Features';
+  const targetPhase = type === 'bug' ? BUG_PHASE : nextFeaturePhase(plan);
+  const label = opts.label ?? defaultPhaseLabel(type, opts.description ?? '');
 
-  const existing = plan.phases.find((p) => p.phase === targetPhase);
-  if (existing) {
-    existing.tasks.push(...newTasks);
+  const existingIds = collectExistingTaskIds(plan);
+
+  // First pass: figure out new id for each task. Reserve them in `existingIds`
+  // so two new tasks in the same batch don't collide either.
+  const idRemap = new Map<string, string>();
+  for (const task of newTasks) {
+    const newId = rewriteTaskId(task.id, type, targetPhase, existingIds);
+    idRemap.set(task.id, newId);
+    existingIds.add(newId);
+  }
+
+  // Second pass: clone tasks with rewritten ids, remapped dependencies, and
+  // the resolved target phase stamped on every task.
+  const stamped: TaskState[] = newTasks.map((task) => ({
+    ...task,
+    id: idRemap.get(task.id) ?? task.id,
+    phase: targetPhase,
+    dependencies: task.dependencies.map((dep) => idRemap.get(dep) ?? dep),
+  }));
+
+  if (type === 'bug') {
+    const existing = plan.phases.find((p) => p.phase === BUG_PHASE);
+    if (existing) {
+      existing.tasks.push(...stamped);
+      // Keep the existing label if one was already set.
+      if (existing.label === undefined || existing.label.length === 0) {
+        existing.label = label;
+      }
+    } else {
+      const newPhase: PhasePlan = { phase: BUG_PHASE, label, tasks: stamped };
+      plan.phases.push(newPhase);
+    }
   } else {
-    const newPhase: PhasePlan = {
-      phase: targetPhase,
-      label: phaseLabel,
-      tasks: newTasks,
-    };
+    // Features always start a fresh phase so each feature is self-contained.
+    const newPhase: PhasePlan = { phase: targetPhase, label, tasks: stamped };
     plan.phases.push(newPhase);
   }
 
   await writeFile(tasksPath, JSON.stringify(plan, null, 2), 'utf8');
-  return plan;
+
+  return {
+    plan,
+    phase: targetPhase,
+    label,
+    taskIds: stamped.map((t) => t.id),
+  };
 }

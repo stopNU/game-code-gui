@@ -100,8 +100,11 @@ function toClaudeMessage(record: DbMessageRecord): ClaudeMessage {
 }
 
 function getToolRiskLevel(toolName: string): ToolRiskLevel {
-  if (toolName === 'read_task_plan' || toolName === 'launch_game' || toolName === 'plan_game') {
-    return toolName === 'read_task_plan' ? 'low' : 'medium';
+  if (toolName === 'read_task_plan') {
+    return 'low';
+  }
+  if (toolName === 'launch_game' || toolName === 'plan_game' || toolName === 'plan_iteration') {
+    return 'medium';
   }
 
   return 'high';
@@ -380,6 +383,23 @@ export class ConversationAgent {
     // false-trigger. Multiple ids in one message are run sequentially — the user can fire a
     // whole phase with one prompt.
     if (args.projectId !== undefined) {
+      // Iteration fast-path: file a bug or feature request with an explicit prefix. Runs the
+      // iteration planner in-process and appends tasks to the plan, mirroring the implement-task
+      // interceptor below. Must run BEFORE parseImplementTaskIntents so a `bug: …` line is never
+      // mistaken for a kebab-case id reference.
+      const iterationIntent = parseIterationIntent(args.userMessage);
+      if (iterationIntent !== null) {
+        await this.runStructuredPlanIteration({
+          conversationId: args.conversationId,
+          projectId: args.projectId,
+          type: iterationIntent.type,
+          description: iterationIntent.description,
+          model: args.model,
+          signal: args.signal,
+        });
+        return;
+      }
+
       const planRecord = await this.bridge.getTaskPlan(args.projectId);
       const validIds = new Set<string>();
       if (planRecord !== null) {
@@ -775,6 +795,127 @@ export class ConversationAgent {
   }
 
   /**
+   * Run a plan_iteration request directly through the in-process structured tool. Used by the
+   * Codex fast-path so iteration planning works regardless of which provider is selected — the
+   * underlying planner is Anthropic-only today, and going through the tool keeps the UI events
+   * identical to a normal LLM-driven tool call.
+   */
+  private async runStructuredPlanIteration(args: {
+    conversationId: string;
+    projectId: string;
+    type: 'bug' | 'feature';
+    description: string;
+    label?: string;
+    model: string;
+    signal: AbortSignal;
+  }): Promise<void> {
+    const tool = this.tools.find((candidate) => candidate.name === 'plan_iteration');
+    if (tool === undefined) {
+      throw new Error('plan_iteration tool is not registered.');
+    }
+
+    const messageId = randomUUID();
+    const toolCallId = randomUUID();
+    const toolInput: Record<string, unknown> = {
+      projectId: args.projectId,
+      type: args.type,
+      description: args.description,
+    };
+    if (args.label !== undefined) toolInput['label'] = args.label;
+
+    this.bridge.emit({
+      type: 'message-start',
+      conversationId: args.conversationId,
+      messageId,
+      role: 'assistant',
+      createdAt: new Date().toISOString(),
+    });
+
+    this.bridge.emit({
+      type: 'tool-call',
+      conversationId: args.conversationId,
+      toolCallId,
+      toolName: 'plan_iteration',
+      input: toolInput,
+    });
+
+    const ctx = buildToolExecutionContext({
+      conversationId: args.conversationId,
+      projectId: args.projectId,
+      toolCallId,
+      signal: args.signal,
+      bridge: {
+        workspaceRoot: this.bridge.workspaceRoot,
+        emit: (event) => this.bridge.emit(event),
+        getProject: (projectId) => this.bridge.getProject(projectId),
+        upsertProject: (toolArgs) => this.bridge.upsertProject(toolArgs),
+        getTaskPlan: (projectId) => this.bridge.getTaskPlan(projectId),
+        upsertTaskPlan: (toolArgs) => this.bridge.upsertTaskPlan(toolArgs),
+        launchGodot: (toolArgs) => this.bridge.launchGodot(toolArgs),
+        stopGodot: (toolArgs) => this.bridge.stopGodot(toolArgs),
+        getAnthropicApiKey: () => this.bridge.getApiKey('anthropic'),
+      },
+    });
+
+    let summaryText: string;
+    let success = false;
+
+    try {
+      const result = (await tool.execute(toolInput, ctx)) as {
+        ok: boolean;
+        phase: number;
+        label: string;
+        taskIds: string[];
+        taskCount: number;
+      };
+      success = result.ok === true;
+      const verb = args.type === 'bug' ? 'Filed bug' : 'Queued feature';
+      summaryText = success
+        ? `${verb} in phase ${result.phase} ("${result.label}"). ${result.taskCount} task(s) ready: ${result.taskIds
+            .map((id) => `\`${id}\``)
+            .join(', ')}.`
+        : `Failed to plan iteration.`;
+
+      this.bridge.emit({
+        type: 'tool-result',
+        conversationId: args.conversationId,
+        toolCallId,
+        success,
+        output: result,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      summaryText = `Failed to plan iteration: ${message}`;
+      this.bridge.emit({
+        type: 'tool-result',
+        conversationId: args.conversationId,
+        toolCallId,
+        success: false,
+        output: { error: message },
+      });
+    }
+
+    await this.bridge.createMessage({
+      conversationId: args.conversationId,
+      role: 'assistant',
+      contentBlocks: [{ type: 'text', text: summaryText }],
+    });
+
+    this.bridge.emit({
+      type: 'message-complete',
+      conversationId: args.conversationId,
+      messageId,
+      fullText: summaryText,
+      completedAt: new Date().toISOString(),
+    });
+
+    this.bridge.emit({
+      type: 'done',
+      conversationId: args.conversationId,
+    });
+  }
+
+  /**
    * Map a demonstrative reference ("this", "that", "those tasks") back to plan task ids using a
    * fast LLM call. We feed it the recent transcript (with tool-use/tool-result content
    * preserved by the new {@link extractTranscriptContent}) and the set of valid plan ids, and
@@ -907,6 +1048,51 @@ export function parseImplementTaskIntents(message: string, validIds?: ReadonlySe
     ids.push(id);
   }
   return ids;
+}
+
+/**
+ * Parse an iteration request from a chat message. Returns `null` when the message is not a
+ * structured iteration request — the caller then falls back to free-form chat.
+ *
+ * Recognised triggers (case-insensitive, must start the message after optional whitespace):
+ *   "bug: <description>"
+ *   "feature: <description>"
+ *   "feat: <description>"
+ *   "file as bug: <description>"
+ *   "file bug: <description>"
+ *   "add feature: <description>"
+ *   "request feature: <description>"
+ *
+ * Prefix-only matching (no natural-language inference) keeps this conservative — same shape
+ * as {@link parseImplementTaskIntents}. The eval-suggestion banner injects messages using the
+ * `bug: ` prefix so its CTA flows through the same code path.
+ */
+export function parseIterationIntent(
+  message: string,
+): { type: 'bug' | 'feature'; description: string } | null {
+  const trimmed = message.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const bugPattern = /^(?:bug|file(?:\s+as)?\s+bug)\s*:\s*([\s\S]+)$/i;
+  const featurePattern = /^(?:feature|feat|add\s+feature|request\s+feature)\s*:\s*([\s\S]+)$/i;
+
+  const bugMatch = bugPattern.exec(trimmed);
+  if (bugMatch !== null) {
+    const description = bugMatch[1]?.trim() ?? '';
+    if (description.length === 0) return null;
+    return { type: 'bug', description };
+  }
+
+  const featureMatch = featurePattern.exec(trimmed);
+  if (featureMatch !== null) {
+    const description = featureMatch[1]?.trim() ?? '';
+    if (description.length === 0) return null;
+    return { type: 'feature', description };
+  }
+
+  return null;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { existsSync } from 'fs';
 import { basename, isAbsolute, join, resolve } from 'path';
-import { preprocessBrief, createAdvancedPlan, normalizeTaskPlan, type PreprocessedBrief, type TaskPlan, type TaskState, type ToolContract } from '@agent-harness/core';
+import { preprocessBrief, createAdvancedPlan, normalizeTaskPlan, planIteration, appendIterationTasks, type PreprocessedBrief, type TaskPlan, type TaskState, type ToolContract, type IterationType } from '@agent-harness/core';
 import { scaffoldGame } from '@agent-harness/game-adapter';
 import { planGameService, runTask } from '@agent-harness/services';
 import { normalizePath } from '../db/normalize-path.js';
@@ -505,7 +505,111 @@ export function createStudioTools(dependencies: Partial<StudioToolDependencies> 
     },
   };
 
-  return [planGameTool, scaffoldGameTool, readTaskPlanTool, implementTaskTool, launchGameTool];
+  const planIterationTool: ToolContract = {
+    name: 'plan_iteration',
+    group: 'project',
+    description:
+      'Plan a bug fix or new feature against an existing project. Generates targeted tasks and appends them to the task plan. Bugs land in phase 90 (shared); each feature gets its own incrementing phase (>= 91) so its tasks form a coherent group. Use after the initial build is in place. Does NOT run the tasks — call implement_task afterwards if the user wants them executed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string' },
+        type: { type: 'string', enum: ['bug', 'feature'] },
+        description: {
+          type: 'string',
+          description: 'Plain-English description of the bug or feature. The planner uses this verbatim to generate tasks.',
+        },
+        label: {
+          type: 'string',
+          description: 'Optional display label for the new phase (e.g. "Feature: Daily challenge"). Defaults: "Bugs" / "Feature: <description>".',
+        },
+        model: { type: 'string' },
+      },
+      required: ['projectId', 'type', 'description'],
+      additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean' },
+        phase: { type: 'number' },
+        label: { type: 'string' },
+        taskIds: { type: 'array', items: { type: 'string' } },
+        taskCount: { type: 'number' },
+      },
+      required: ['ok', 'phase', 'label', 'taskIds', 'taskCount'],
+    },
+    permissions: ['fs:read', 'fs:write'],
+    execute: async (input: unknown, rawCtx: unknown) => {
+      const ctx = rawCtx as StudioToolContext;
+      const toolInput = input as {
+        projectId: string;
+        type: IterationType;
+        description: string;
+        label?: string;
+        model?: string;
+      };
+      throwIfAborted(ctx.signal);
+
+      const apiKey = await ctx.bridge.getAnthropicApiKey();
+      if (apiKey !== null) {
+        process.env['ANTHROPIC_API_KEY'] = apiKey;
+      }
+
+      const project = await getProjectOrRecoverFromWorkspace(ctx.bridge, toolInput.projectId);
+      if (project === null) {
+        throw new Error(`Unknown project ${toolInput.projectId}.`);
+      }
+
+      ctx.bridge.emit({
+        type: 'tool-progress',
+        conversationId: ctx.conversationId,
+        toolCallId: ctx.toolCallId,
+        message: `Planning ${toolInput.type === 'bug' ? 'bug fix' : 'feature'}: ${toolInput.description.slice(0, 80)}`,
+      });
+
+      const planOpts = toolInput.model !== undefined ? { model: toolInput.model } : {};
+      const tasks = await planIteration(
+        project.displayPath,
+        toolInput.type,
+        toolInput.description,
+        planOpts,
+      );
+
+      throwIfAborted(ctx.signal);
+
+      const appendOpts: { label?: string; description?: string } = { description: toolInput.description };
+      if (toolInput.label !== undefined) appendOpts.label = toolInput.label;
+      const result = await appendIterationTasks(
+        project.displayPath,
+        toolInput.type,
+        tasks,
+        appendOpts,
+      );
+
+      // Persist the refreshed plan to the SQLite cache so the UI reflects the new phase immediately.
+      await ctx.bridge.upsertTaskPlan({
+        projectId: toolInput.projectId,
+        planJson: JSON.stringify(result.plan),
+      });
+
+      ctx.bridge.emit({
+        type: 'notice',
+        conversationId: ctx.conversationId,
+        message: `Queued ${result.taskIds.length} ${toolInput.type === 'bug' ? 'bug-fix' : 'feature'} task(s) in phase ${result.phase} ("${result.label}").`,
+      });
+
+      return {
+        ok: true,
+        phase: result.phase,
+        label: result.label,
+        taskIds: result.taskIds,
+        taskCount: result.taskIds.length,
+      };
+    },
+  };
+
+  return [planGameTool, scaffoldGameTool, readTaskPlanTool, implementTaskTool, planIterationTool, launchGameTool];
 }
 
 export function buildToolExecutionContext(args: {

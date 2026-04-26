@@ -13,6 +13,7 @@ import { ConversationHeader } from '@renderer/components/chat/conversation-heade
 import { MessageList } from '@renderer/components/chat/message-list';
 import { ChatComposer } from '@renderer/components/chat/chat-composer';
 import { TaskPlanCard } from '@renderer/components/project/task-plan-card';
+import { EvalSuggestionBanner } from '@renderer/components/project/eval-suggestion-banner';
 
 import type { TaskPlan } from '@agent-harness/core';
 
@@ -373,6 +374,9 @@ export function CenterPanel(): JSX.Element {
         </div>
       ) : activeTab === 'chat' ? (
         <>
+          {selectedProjectId !== null && (
+            <EvalSuggestionBanner projectId={selectedProjectId} onSendMessage={(msg) => void handleSend(msg)} />
+          )}
           {messagesQuery.isLoading ? (
             <div className="flex flex-1 flex-col gap-4 p-5">
               <Skeleton className="h-20 w-[72%]" />

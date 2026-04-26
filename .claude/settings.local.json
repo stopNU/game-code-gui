@@ -141,7 +141,10 @@
       "Bash(python -m json.tool)",
       "Bash(python -c \"import json; d=json.load\\(open\\('D:/dev/game-code-gui/apps/studio/projects/test-game/harness/test-output.json'\\)\\); print\\('Critical flow passed:', d['criticalFlow'].get\\('passed'\\)\\); print\\('Failure step:', d['criticalFlow'].get\\('failureStepId', 'none'\\)\\); print\\('Error log entries:', len\\(d.get\\('errorLog',[]\\)\\)\\)\")",
       "mcp__gitnexus__impact",
-      "Bash(pnpm --filter @agent-harness/evals run test)"
+      "Bash(pnpm --filter @agent-harness/evals run test)",
+      "Bash(pnpm --filter @agent-harness/core exec vitest run src/loop/iterate.test.ts)",
+      "Bash(pnpm --filter @agent-harness/core exec vitest run)",
+      "Bash(pnpm --filter @agent-harness/studio exec vitest run electron/agent/tool-registry.test.ts)"
     ]
   }
 }

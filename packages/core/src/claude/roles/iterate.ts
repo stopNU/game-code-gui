@@ -17,7 +17,8 @@ Return a JSON array of task objects. Each object must have EXACTLY these fields 
 - id: kebab-case unique identifier.
   - Bug tasks must be prefixed "bug-" (e.g. "bug-enemy-damage")
   - Feature tasks must be prefixed "feat-" (e.g. "feat-double-jump")
-- phase: JSON number — use 90 for bug tasks, 91 for feature tasks
+  - The harness rewrites ids to guarantee uniqueness across iterations; you do not need to suffix them yourself.
+- phase: JSON number — set to 0; the harness resolves the actual phase (bugs → phase 90, each feature → its own phase ≥ 91) and overwrites this field on append.
 - role: one of "gameplay" | "asset" | "qa" | "systems" | "designer"
   - Use "gameplay" for GDScript code changes
   - Use "asset" for sprite/audio/visual-only changes

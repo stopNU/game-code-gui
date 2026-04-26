@@ -1,6 +1,6 @@
 import { basename, join } from 'path';
-import { existsSync, readFileSync, readdirSync } from 'fs';
-import type { ProjectDetails, ProjectPlanSummary, ProjectSummary } from '../../shared/domain.js';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import type { EvalSummary, ProjectDetails, ProjectPlanSummary, ProjectSummary } from '../../shared/domain.js';
 import { isPathInsideRoot, normalizePath } from '../db/normalize-path.js';
 import type { ProjectsRepository } from '../db/repositories/projects-repository.js';
 import type { TaskPlanRecord, TaskPlansRepository } from '../db/repositories/task-plans-repository.js';
@@ -129,6 +129,77 @@ export class ProjectScanner {
       completeCount: planSummary.completeCount,
       updatedAt: new Date(Math.max(project.updatedAt, taskPlan?.updatedAt ?? project.updatedAt)).toISOString(),
       hasTaskPlan: taskPlan !== null,
+    };
+  }
+
+  /**
+   * Read the most recent eval report from `harness/baselines/` and return a compact summary
+   * for the UI banner. Returns `null` if the project doesn't exist, has no reports yet, or the
+   * report file is malformed. We deliberately do NOT include the failure prose here — the
+   * banner just needs which layers failed and a stable `reportId` so it can suppress duplicates
+   * after the user dismisses one.
+   */
+  public getEvalSummary(projectId: string): EvalSummary | null {
+    const project = this.projectsRepository.getById(projectId);
+    if (project === null) {
+      return null;
+    }
+
+    const baselinesDir = join(project.displayPath, 'harness', 'baselines');
+    if (!existsSync(baselinesDir)) {
+      return null;
+    }
+
+    let entries: string[];
+    try {
+      entries = readdirSync(baselinesDir);
+    } catch {
+      return null;
+    }
+
+    const reports = entries.filter((f) => f.startsWith('report-') && f.endsWith('.json')).sort();
+    if (reports.length === 0) {
+      return null;
+    }
+
+    const latest = reports[reports.length - 1]!;
+    const reportPath = join(baselinesDir, latest);
+    const reportId = latest.replace(/\.json$/, '');
+
+    let raw: string;
+    let mtimeMs: number;
+    try {
+      raw = readFileSync(reportPath, 'utf8');
+      mtimeMs = statSync(reportPath).mtimeMs;
+    } catch {
+      return null;
+    }
+
+    let parsed: { scores?: Array<{ layer?: unknown; passed?: unknown; summary?: unknown }> };
+    try {
+      parsed = JSON.parse(raw) as typeof parsed;
+    } catch {
+      return null;
+    }
+
+    const failedLayers: string[] = [];
+    const passedLayers: string[] = [];
+    for (const score of parsed.scores ?? []) {
+      const layer = typeof score.layer === 'string' ? score.layer : null;
+      if (layer === null) continue;
+      if (score.passed === false) {
+        failedLayers.push(layer);
+      } else if (score.passed === true) {
+        passedLayers.push(layer);
+      }
+    }
+
+    return {
+      reportId,
+      hasFailures: failedLayers.length > 0,
+      failedLayers,
+      passedLayers,
+      generatedAt: new Date(mtimeMs).toISOString(),
     };
   }
 

@@ -36,8 +36,21 @@ export { runCodexLoop } from './loop/codex-loop.js';
 export type { AgentLoopDeps } from './loop/agent-loop.js';
 export { withRetry } from './loop/retry.js';
 export { decomposeTasks } from './loop/planner.js';
-export { planIteration, appendIterationTasks, BUG_PHASE, FEATURE_PHASE } from './loop/iterate.js';
-export type { IterationType, PlanIterationOptions } from './loop/iterate.js';
+export {
+  planIteration,
+  appendIterationTasks,
+  nextFeaturePhase,
+  readLatestEvalFailures,
+  BUG_PHASE,
+  FEATURE_PHASE,
+  FEATURE_PHASE_BASE,
+} from './loop/iterate.js';
+export type {
+  IterationType,
+  PlanIterationOptions,
+  AppendIterationOptions,
+  AppendIterationResult,
+} from './loop/iterate.js';
 export { preprocessBrief } from './loop/brief-preprocessor.js';
 export type { PreprocessedBrief, BriefSection, StateMachineDef } from './loop/brief-preprocessor.js';
 export { createAdvancedPlan } from './loop/advanced-planner.js';

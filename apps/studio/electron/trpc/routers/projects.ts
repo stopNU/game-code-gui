@@ -164,4 +164,11 @@ export const projectsRouter = router({
       }),
     )
     .query(({ ctx, input }) => ctx.projectScanner.getPlan(input.id)),
+  getEvalSummary: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .query(({ ctx, input }) => ctx.projectScanner.getEvalSummary(input.id)),
 });

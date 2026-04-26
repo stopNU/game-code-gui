@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, ClipboardList, Maximize2, Play, X } from 'lucide-react';
+import { Bug, ChevronDown, ChevronRight, ClipboardList, Hammer, Maximize2, Play, Sparkles, X } from 'lucide-react';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
@@ -24,6 +24,68 @@ const STATUS_STYLES: Record<TaskStatus, string> = {
 };
 
 const RUNNABLE_STATUSES = new Set<TaskStatus>(['pending', 'failed', 'blocked']);
+
+/** Phase 90 holds bug-fix iteration tasks; phases >= 91 each hold one feature iteration. */
+const BUG_PHASE = 90;
+const FEATURE_PHASE_BASE = 91;
+
+type PhaseKind = 'build' | 'bug' | 'feature';
+
+function getPhaseKind(phase: PhasePlan): PhaseKind {
+  if (phase.phase === BUG_PHASE) return 'bug';
+  if (phase.phase >= FEATURE_PHASE_BASE) return 'feature';
+  return 'build';
+}
+
+interface PhaseGroup {
+  kind: PhaseKind;
+  label: string;
+  Icon: typeof Hammer;
+  phases: PhasePlan[];
+}
+
+function groupPhases(plan: TaskPlan): PhaseGroup[] {
+  const build: PhasePlan[] = [];
+  const bug: PhasePlan[] = [];
+  const feature: PhasePlan[] = [];
+  for (const phase of plan.phases) {
+    switch (getPhaseKind(phase)) {
+      case 'bug':
+        bug.push(phase);
+        break;
+      case 'feature':
+        feature.push(phase);
+        break;
+      default:
+        build.push(phase);
+    }
+  }
+  // Sort each bucket by phase number for stable rendering.
+  build.sort((a, b) => a.phase - b.phase);
+  bug.sort((a, b) => a.phase - b.phase);
+  feature.sort((a, b) => a.phase - b.phase);
+
+  const groups: PhaseGroup[] = [];
+  if (build.length > 0) groups.push({ kind: 'build', label: 'Build', Icon: Hammer, phases: build });
+  if (bug.length > 0) groups.push({ kind: 'bug', label: 'Bugs', Icon: Bug, phases: bug });
+  if (feature.length > 0) groups.push({ kind: 'feature', label: 'Features', Icon: Sparkles, phases: feature });
+  return groups;
+}
+
+function summarizeGroup(phases: PhasePlan[]): { complete: number; total: number; runnable: number } {
+  let complete = 0;
+  let total = 0;
+  let runnable = 0;
+  for (const phase of phases) {
+    for (const t of phase.tasks) {
+      total += 1;
+      const s = getTaskStatus(t);
+      if (s === 'complete') complete += 1;
+      if (RUNNABLE_STATUSES.has(s)) runnable += 1;
+    }
+  }
+  return { complete, total, runnable };
+}
 
 function getTaskStatus(task: TaskState): TaskStatus {
   switch (task.status) {
@@ -67,7 +129,10 @@ function PhaseSection({
 }) {
   const [open, setOpen] = useState(false);
   const completeCount = phase.tasks.filter((t) => getTaskStatus(t) === 'complete').length;
-  const label = phase.label ?? `Phase ${phase.phase}`;
+  const kind = getPhaseKind(phase);
+  // Bugs share a phase, so the label is just "Bugs". For features the per-phase label is the
+  // feature name. For build phases we keep the existing "Phase N"-style fallback.
+  const label = phase.label ?? (kind === 'feature' ? `Feature ${phase.phase}` : `Phase ${phase.phase}`);
   const runnableCount = phase.tasks.filter((t) => RUNNABLE_STATUSES.has(getTaskStatus(t))).length;
 
   return (
@@ -181,63 +246,85 @@ function TaskPlanModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
-          {plan.phases.map((phase) => {
-            const phaseComplete = phase.tasks.filter((t) => getTaskStatus(t) === 'complete').length;
-            const phaseLabel = phase.label ?? `Phase ${phase.phase}`;
-            const phaseRunnable = phase.tasks.filter((t) => RUNNABLE_STATUSES.has(getTaskStatus(t))).length;
+          {groupPhases(plan).map((group, groupIdx) => {
+            const groupSummary = summarizeGroup(group.phases);
+            const GroupIcon = group.Icon;
             return (
-              <div key={phase.phase} className="mb-4 last:mb-0">
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
-                    Phase {phase.phase}
+              <div key={group.kind} className={groupIdx > 0 ? 'mt-6' : ''}>
+                <div className="mb-3 flex items-center gap-2 border-b border-border pb-2">
+                  <GroupIcon className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-primary">
+                    {group.label}
                   </span>
-                  <span className="flex-1 text-xs font-medium text-foreground">{phaseLabel}</span>
+                  <span className="flex-1" />
                   <span className="text-[10px] tabular-nums text-muted-foreground">
-                    {phaseComplete}/{phase.tasks.length}
+                    {groupSummary.complete}/{groupSummary.total} complete
                   </span>
-                  {phaseRunnable > 0 && (
-                    <Button
-                      variant="ghost"
-                      className="h-5 w-5 shrink-0 p-0"
-                      disabled={isRunning}
-                      onClick={() => void onRunPhase(phase)}
-                      title={`Run remaining ${phaseRunnable} task(s) in ${phaseLabel}`}
-                    >
-                      <Play className="h-3 w-3" />
-                    </Button>
-                  )}
                 </div>
-                <div className="rounded-lg border border-border">
-                  {phase.tasks.map((task, i) => {
-                    const taskLabel = getTaskLabel(task);
-                    const taskStatus = getTaskStatus(task);
-                    return (
-                      <div
-                        key={task.id}
-                        className={`flex items-start gap-3 px-3 py-2.5 ${i < phase.tasks.length - 1 ? 'border-b border-border' : ''}`}
-                      >
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="text-xs font-medium text-foreground">{taskLabel}</span>
-                          <span className="text-[10px] text-muted-foreground">{task.id}</span>
-                        </div>
-                        <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[taskStatus]}`}>
-                          {taskStatus}
+                {group.phases.map((phase) => {
+                  const phaseComplete = phase.tasks.filter((t) => getTaskStatus(t) === 'complete').length;
+                  const kind = getPhaseKind(phase);
+                  const phaseLabel =
+                    phase.label ?? (kind === 'feature' ? `Feature ${phase.phase}` : `Phase ${phase.phase}`);
+                  const phaseRunnable = phase.tasks.filter((t) => RUNNABLE_STATUSES.has(getTaskStatus(t))).length;
+                  return (
+                    <div key={phase.phase} className="mb-4 last:mb-0">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
+                          Phase {phase.phase}
                         </span>
-                        {RUNNABLE_STATUSES.has(taskStatus) && (
+                        <span className="flex-1 text-xs font-medium text-foreground">{phaseLabel}</span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">
+                          {phaseComplete}/{phase.tasks.length}
+                        </span>
+                        {phaseRunnable > 0 && (
                           <Button
                             variant="ghost"
-                            className="mt-0.5 h-5 w-5 shrink-0 p-0"
+                            className="h-5 w-5 shrink-0 p-0"
                             disabled={isRunning}
-                            onClick={() => void onRunTask(task)}
-                            title={`Implement: ${taskLabel}`}
+                            onClick={() => void onRunPhase(phase)}
+                            title={`Run remaining ${phaseRunnable} task(s) in ${phaseLabel}`}
                           >
                             <Play className="h-3 w-3" />
                           </Button>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="rounded-lg border border-border">
+                        {phase.tasks.map((task, i) => {
+                          const taskLabel = getTaskLabel(task);
+                          const taskStatus = getTaskStatus(task);
+                          return (
+                            <div
+                              key={task.id}
+                              className={`flex items-start gap-3 px-3 py-2.5 ${i < phase.tasks.length - 1 ? 'border-b border-border' : ''}`}
+                            >
+                              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <span className="text-xs font-medium text-foreground">{taskLabel}</span>
+                                <span className="text-[10px] text-muted-foreground">{task.id}</span>
+                              </div>
+                              <span
+                                className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[taskStatus]}`}
+                              >
+                                {taskStatus}
+                              </span>
+                              {RUNNABLE_STATUSES.has(taskStatus) && (
+                                <Button
+                                  variant="ghost"
+                                  className="mt-0.5 h-5 w-5 shrink-0 p-0"
+                                  disabled={isRunning}
+                                  onClick={() => void onRunTask(task)}
+                                  title={`Implement: ${taskLabel}`}
+                                >
+                                  <Play className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -407,16 +494,31 @@ export function TaskPlanCard({ projectId }: TaskPlanCardProps): JSX.Element | nu
       </div>
 
       <div className="max-h-[50vh] min-h-48 overflow-y-auto rounded-md border border-border">
-        {plan.phases.map((phase) => (
-          <PhaseSection
-            key={phase.phase}
-            phase={phase}
-            projectId={projectId}
-            onRunTask={handleRunTask}
-            onRunPhase={handleRunPhase}
-            isRunning={isRunning}
-          />
-        ))}
+        {groupPhases(plan).map((group, idx) => {
+          const summary = summarizeGroup(group.phases);
+          const Icon = group.Icon;
+          return (
+            <div key={group.kind} className={idx > 0 ? 'border-t border-border' : ''}>
+              <div className="flex items-center gap-1.5 bg-muted/30 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                <Icon className="h-3 w-3" />
+                <span className="flex-1">{group.label}</span>
+                <span className="tabular-nums">
+                  {summary.complete}/{summary.total}
+                </span>
+              </div>
+              {group.phases.map((phase) => (
+                <PhaseSection
+                  key={phase.phase}
+                  phase={phase}
+                  projectId={projectId}
+                  onRunTask={handleRunTask}
+                  onRunPhase={handleRunPhase}
+                  isRunning={isRunning}
+                />
+              ))}
+            </div>
+          );
+        })}
       </div>
     </Card>
     </>

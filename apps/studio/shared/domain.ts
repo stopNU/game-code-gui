@@ -78,3 +78,19 @@ export interface ProjectPlanSummary {
   taskCount: number;
   completeCount: number;
 }
+
+/**
+ * Compact summary of the most recent eval report under `harness/baselines/`.
+ * Used by the eval-suggestion banner to nudge users to file failures as bugs
+ * via `plan_iteration`. Stable `reportId` lets the renderer track per-report
+ * dismissals in localStorage so a banner does not reappear after dismissal.
+ */
+export interface EvalSummary {
+  /** Filename of the report without extension, e.g. `report-1234abcd`. Stable across reads. */
+  reportId: string;
+  hasFailures: boolean;
+  failedLayers: string[];
+  passedLayers: string[];
+  /** ISO timestamp of the report file's mtime. */
+  generatedAt: string;
+}
