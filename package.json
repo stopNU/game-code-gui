@@ -14,6 +14,7 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
+    "gitnexus": "^1.6.3",
     "prettier": "^3.4.0",
     "rimraf": "^6.0.0",
     "turbo": "^2.3.0",
