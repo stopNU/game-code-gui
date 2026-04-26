@@ -140,7 +140,8 @@
       "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --path . -- --harness-test --harness-output \"D:/dev/game-code-gui/apps/studio/projects/test-game/harness/test-output.json\")",
       "Bash(python -m json.tool)",
       "Bash(python -c \"import json; d=json.load\\(open\\('D:/dev/game-code-gui/apps/studio/projects/test-game/harness/test-output.json'\\)\\); print\\('Critical flow passed:', d['criticalFlow'].get\\('passed'\\)\\); print\\('Failure step:', d['criticalFlow'].get\\('failureStepId', 'none'\\)\\); print\\('Error log entries:', len\\(d.get\\('errorLog',[]\\)\\)\\)\")",
-      "mcp__gitnexus__impact"
+      "mcp__gitnexus__impact",
+      "Bash(pnpm --filter @agent-harness/evals run test)"
     ]
   }
 }

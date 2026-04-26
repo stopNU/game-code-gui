@@ -15,6 +15,7 @@ Return a JSON object with exactly these top-level fields:
 - gameBrief: string - expanded description (3-5 sentences)
 - genre: string - always "deckbuilder-roguelike"
 - coreLoop: string - one sentence describing the primary player action and feedback cycle
+- targets: ContentTargets - content counts the eval grades against; see target rules below
 - styleNote: StyleNote - visual direction; see style note rules below
 - controls: string[] - player interaction descriptions (e.g. "Click a card to play it", "Click an enemy to target it", "Click End Turn button")
 - scenes: string[] - always ["BootScene","MainMenuScene","MapScene","CombatScene","CardRewardScene","ShopScene","RestScene","RunSummaryScene"] plus any game-specific additions
@@ -163,6 +164,38 @@ Use these step types:
 
 Keep verificationSteps to 4-6 steps. Verify content loaded, BootScene completed, and the milestone flow reaches the earliest core screens.`;
 
+export const ADVANCED_DESIGNER_TARGETS_RULES = `## Content target rules
+
+The targets field commits the design to specific content counts so the data
+eval grades this game against its own promise — not against a fixed Slay-the-
+Spire-sized yardstick. A 12-card prototype and a 75-card full game both pass
+their own bar; neither is forced to ship inflated content to satisfy a
+hardcoded threshold.
+
+targets is an object with:
+- cardCount: integer — total cards the design promises
+- enemyCount: integer — total enemies across all acts
+- relicCount: integer — total relics
+- actCount: integer (optional, default 3) — used to check at-least-one enemy per act
+- requiredCardCosts: array of integers (optional, default [0,1,2]) — energy
+  costs that MUST appear in the deck for power-curve variety
+
+Pick numbers proportional to the brief's scope. Examples:
+
+- "Tiny prototype, just the combat loop" → cardCount 8-12, enemyCount 3-4,
+  relicCount 2-3, actCount 1, requiredCardCosts [0,1]
+- "Roguelike like Slay the Spire" → cardCount 60-80, enemyCount 20-30,
+  relicCount 30-50, actCount 3, requiredCardCosts [0,1,2,3]
+- "Drafting-focused puzzler" → cardCount 30-40, enemyCount 8-12,
+  relicCount 4-6, actCount 1, requiredCardCosts [0,1,2]
+
+Be honest about scope. The phases array MUST contain enough Phase 5 content
+tasks to actually produce these counts — if you commit to 75 cards, plan
+multiple cards.json content tasks (one per archetype/character/act).
+
+The eval will report \`actual / target\` for each count. Below 80% of target
+is a warning; below 50% is an error.`;
+
 export const ADVANCED_DESIGNER_STYLE_RULES = `## Style note rules
 
 The styleNote field commits the game to a visual direction up front so the
@@ -212,6 +245,7 @@ export function buildAdvancedDesignerPrompt(): string {
     ADVANCED_DESIGNER_MILESTONE_RULES,
     ADVANCED_DESIGNER_SCENE_RULES,
     ADVANCED_DESIGNER_VERIFICATION_RULES,
+    ADVANCED_DESIGNER_TARGETS_RULES,
     ADVANCED_DESIGNER_STYLE_RULES,
     ADVANCED_DESIGNER_CONTENT_RULES,
     SHARED_DISCIPLINE,

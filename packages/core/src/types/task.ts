@@ -331,6 +331,25 @@ export interface AdvancedSharedContext {
 }
 
 /**
+ * Content targets the planner commits to per game. Drives the data eval
+ * thresholds so a 12-card mini-deckbuilder isn't graded against a Slay-the-
+ * Spire-shaped yardstick. Optional fields fall back to genre defaults in the
+ * eval if the planner doesn't supply them.
+ */
+export interface ContentTargets {
+  /** Total card count the design promises (e.g. 12, 20, 75). */
+  cardCount: number;
+  /** Total enemy count the design promises across all acts. */
+  enemyCount: number;
+  /** Total relic count the design promises. */
+  relicCount: number;
+  /** Number of acts in the run; enemies are checked for at-least-one per act. */
+  actCount?: number;
+  /** Card energy costs that MUST appear in the deck (e.g. [0, 1, 2]). Defaults to [0, 1, 2]. */
+  requiredCardCosts?: number[];
+}
+
+/**
  * Visual direction for the game, committed up front by the designer phase so
  * the gameplay agent has concrete art-direction guidance when building scenes.
  * Palette values are 6-digit hex strings without alpha (e.g. "#1a1226").
@@ -365,6 +384,8 @@ export interface TaskPlan {
   /** Game-specific playtest steps that verify core input/mechanics work after generation. */
   verificationSteps: VerificationStep[];
   // -- Advanced mode fields (all optional for backward compatibility) --
+  /** Content targets (card/enemy/relic counts) the eval grades against. */
+  targets?: ContentTargets;
   /** Visual direction (palette, mood, art-direction) for the gameplay and asset agents. */
   styleNote?: StyleNote;
   /** Subsystems decomposed from the design document. */
@@ -655,6 +676,13 @@ export const TaskPlanSchema = z.object({
     }),
   ),
   verificationSteps: z.array(VerificationStepSchema).default([]),
+  targets: z.object({
+    cardCount: z.number().int().nonnegative(),
+    enemyCount: z.number().int().nonnegative(),
+    relicCount: z.number().int().nonnegative(),
+    actCount: z.number().int().positive().optional(),
+    requiredCardCosts: z.array(z.number().int().nonnegative()).optional(),
+  }).optional(),
   styleNote: z.object({
     mood: z.string(),
     palette: z.object({
