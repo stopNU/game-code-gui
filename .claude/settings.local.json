@@ -144,7 +144,8 @@
       "Bash(pnpm --filter @agent-harness/evals run test)",
       "Bash(pnpm --filter @agent-harness/core exec vitest run src/loop/iterate.test.ts)",
       "Bash(pnpm --filter @agent-harness/core exec vitest run)",
-      "Bash(pnpm --filter @agent-harness/studio exec vitest run electron/agent/tool-registry.test.ts)"
+      "Bash(pnpm --filter @agent-harness/studio exec vitest run electron/agent/tool-registry.test.ts)",
+      "Bash(pnpm --filter @agent-harness/assets run test)"
     ]
   }
 }

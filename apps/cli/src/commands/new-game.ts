@@ -5,6 +5,7 @@ import type { PlanGameStage } from '@agent-harness/services';
 import { planGameService } from '@agent-harness/services';
 import prompts from 'prompts';
 import { runScript } from '@agent-harness/tools';
+import { runAutoAssetPass } from '@agent-harness/assets';
 import { loadHarnessConfig } from '../utils/config-loader.js';
 import { c, printSection, spinner } from '../utils/output.js';
 import { resolveProjectOutputPath } from '../utils/project-name.js';
@@ -174,7 +175,18 @@ export async function newGame(opts: NewGameOptions): Promise<void> {
 
   console.log(c.info(`Running ${tasksToRun.length} tasks across all phases...`));
 
+  // Track phase transitions so we can run the auto-asset pass at the
+  // boundary between content tasks (≤5) and scene-UI tasks (≥6). This
+  // makes art exist before the gameplay agent tries to reference it.
+  let assetPassRun = false;
+  let lastTaskPhase = 0;
+
   for (const task of tasksToRun) {
+    if (task.phase >= 6 && lastTaskPhase < 6 && !assetPassRun) {
+      await runAssetPassStep(outputPath, plan);
+      assetPassRun = true;
+    }
+    lastTaskPhase = task.phase;
     const blockedBy = task.dependencies.find(
       (dependency) => !completedIds.has(dependency) && tasksToRun.some((candidate) => candidate.id === dependency),
     );
@@ -227,6 +239,12 @@ export async function newGame(opts: NewGameOptions): Promise<void> {
     }
   }
 
+  // Catch-all asset pass for plans that finished without crossing the 5→6
+  // phase boundary (e.g. content-only or scene-only plans). Idempotent.
+  if (!assetPassRun) {
+    await runAssetPassStep(outputPath, plan);
+  }
+
   printSection('Validating build');
   const typecheckSpinner = spinner('Running typecheck...');
   try {
@@ -265,6 +283,36 @@ async function verifyAndFix(
   _maxIterations = 3,
 ): Promise<void> {
   // TODO Phase 6: implement Godot headless playtest + fix loop
+}
+
+/**
+ * Run the auto-asset pass and report what happened. Pulled into its own
+ * helper so it can be invoked at the phase boundary AND as a catch-all at
+ * the end of the loop without duplicating the spinner / logging.
+ *
+ * Reads `styleNote.artDirection` if present and forwards it as the asset
+ * pipeline's style guide so generated art matches the game's identity.
+ */
+async function runAssetPassStep(outputPath: string, plan: TaskPlan): Promise<void> {
+  const assetSpinner = spinner('Generating content art (cards / enemies / relics)...');
+  try {
+    const styleGuide = plan.styleNote?.artDirection;
+    const result = styleGuide !== undefined
+      ? await runAutoAssetPass(outputPath, { styleGuide })
+      : await runAutoAssetPass(outputPath);
+    if (!result.ran) {
+      assetSpinner.succeed(`Asset pass: nothing pending (${result.skipReason ?? 'no work'})`);
+      return;
+    }
+    const generated = result.pendingBefore - result.pendingAfter;
+    if (result.pendingAfter === 0) {
+      assetSpinner.succeed(`Asset pass: generated ${generated} asset(s)`);
+    } else {
+      assetSpinner.fail(`Asset pass: ${generated}/${result.pendingBefore} generated, ${result.pendingAfter} still missing artKey`);
+    }
+  } catch (err) {
+    assetSpinner.fail(`Asset pass failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 function collectAllTasks(plan: TaskPlan): TaskState[] {

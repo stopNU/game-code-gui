@@ -86,9 +86,83 @@ func _on_end_turn_pressed() -> void:
     _set_state(CombatState.ENEMY_TURN)
 \`\`\``;
 
-export const ADVANCED_GAMEPLAY_CARD_RULES = `## Card display and interaction
+export const ADVANCED_GAMEPLAY_CARD_RULES = `## Card display and interaction — REQUIRED
 
-Card nodes are instances of src/ui/CardDisplay.tscn.
+Every card in the player's hand MUST render with its art. This is non-
+negotiable: a card without a TextureRect referencing
+\`res://src/assets/generated/{card.artKey}.png\` is a defect, not a stylistic
+choice.
+
+### Path construction (READ THIS)
+
+The artKey field on each card is set by the asset pipeline and follows the
+convention \`{type}_{id}\` — e.g. \`cards_strike\`, \`cards_defend\`. The
+texture path is \`res://src/assets/generated/{card.artKey}.png\`.
+
+NEVER construct the path from \`card.id\` alone. \`card.id\` is "strike";
+the file on disk is "cards_strike.png". Using card.id silently fails:
+ResourceLoader.exists() returns false, the texture stays null, your card
+renders as an empty button. This is a real bug we have shipped before.
+
+### Required structure
+
+Each card button is a Panel-based control:
+
+1. Outer container: \`PanelContainer\` (NOT a flat Button — flat=true
+   removes the theme stylebox and makes the card invisible). The theme's
+   PanelContainer style supplies the rounded corners, border, and dark fill.
+2. Inside the panel, layered top-to-bottom:
+   - \`TextureRect\` filling the panel — references
+     \`res://src/assets/generated/{card.artKey}.png\` via ResourceLoader.exists
+     check. \`stretch_mode = STRETCH_KEEP_ASPECT_COVERED\`,
+     \`mouse_filter = MOUSE_FILTER_IGNORE\`.
+   - \`Label\` for the card name at the top.
+   - \`Label\` for the cost in the corner.
+   - \`Label\` for the description at the bottom.
+3. Click handling: connect a \`Button\`-typed child OR detect via
+   \`gui_input\` on the PanelContainer. NEVER set \`flat = true\` on a
+   card button.
+
+### Missing-art fallback (also REQUIRED)
+
+If \`ResourceLoader.exists(path)\` returns false, render a visible
+placeholder, NOT an empty space:
+
+\`\`\`gdscript
+func _build_card_art(card: Dictionary) -> Control:
+    var art_key: String = card.get("artKey", "")
+    var path := "res://src/assets/generated/%s.png" % art_key
+    if art_key != "" and ResourceLoader.exists(path):
+        var tex := TextureRect.new()
+        tex.texture = load(path)
+        tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+        tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        return tex
+    # Fallback: solid coloured panel keyed off card type so the player
+    # can still tell attack from skill from power.
+    var fallback := ColorRect.new()
+    fallback.color = _card_type_tint(String(card.get("type", "skill")))
+    fallback.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    return fallback
+
+func _card_type_tint(card_type: String) -> Color:
+    match card_type:
+        "attack": return Palette.CARD_ATTACK
+        "skill":  return Palette.CARD_SKILL
+        "power":  return Palette.CARD_POWER
+        _:        return Palette.BG_PANEL
+\`\`\`
+
+### Standard card sizing
+
+Card size: 140 × 200. Smaller than 100 × 140 makes the art unreadable;
+larger than 180 × 240 packs too few cards in the hand on a 1280-wide
+viewport.
+
+---
+
+Card nodes can also be instances of src/ui/CardDisplay.tscn when present.
 Instantiate them from the packed scene:
 
 \`\`\`gdscript

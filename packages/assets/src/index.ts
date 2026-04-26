@@ -5,4 +5,6 @@ export { runAssetPipeline } from './pipeline/pipeline-runner.js';
 export type { PipelineOptions, PipelineResult } from './pipeline/pipeline-runner.js';
 export { generateContentArt, generateAllContentArt } from './pipeline/content-art-generator.js';
 export type { ContentArtOptions, ContentArtResult, ContentType } from './pipeline/content-art-generator.js';
+export { runAutoAssetPass } from './pipeline/auto-asset-pass.js';
+export type { AutoAssetPassResult } from './pipeline/auto-asset-pass.js';
 export type { AssetEntry, AssetManifest, AssetRequest, AssetGenerationResult, AssetType, AssetStatus } from './types/asset.js';

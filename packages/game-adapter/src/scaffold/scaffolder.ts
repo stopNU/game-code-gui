@@ -19,6 +19,7 @@ import type {
 import type { GodotProject } from '../types/project.js';
 import { selectTemplate } from './template-registry.js';
 import { mergeStarterScenes } from './starter-scenes.js';
+import { buildThemeAssets } from './theme-generator.js';
 import { getDefaultRuntimeLayoutConfig } from '../build/runtime-layout.js';
 import { writeRuntimeManifest } from '../build/runtime-manifest.js';
 
@@ -110,6 +111,24 @@ export async function scaffoldGame(opts: ScaffoldOptions): Promise<GodotProject>
   );
 
   await scaffoldAdvancedExtras(outputPath, scaffoldPlan, project, opts.preprocessedBrief);
+
+  // Per-game theme: if the planner committed to a styleNote palette, overwrite
+  // the template's neutral default theme with one driven by that palette.
+  // Deterministic file generation, no agent involvement.
+  if (scaffoldPlan.styleNote !== undefined) {
+    const themeDir = join(outputPath, 'src', 'theme');
+    await mkdir(themeDir, { recursive: true });
+    try {
+      const generated = buildThemeAssets(scaffoldPlan.styleNote);
+      await writeFile(join(themeDir, 'palette.gd'), generated.paletteGd, 'utf8');
+      await writeFile(join(themeDir, 'main.tres'), generated.themeTres, 'utf8');
+    } catch (err) {
+      // Invalid hex from the planner — keep the template default rather
+      // than crashing the scaffold. Log so the planner can see it failed.
+      console.warn(`[scaffold] styleNote palette rejected, keeping template theme: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   await writeRuntimeManifest(outputPath);
 
   return project;
