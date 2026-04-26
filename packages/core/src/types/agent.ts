@@ -77,6 +77,20 @@ export interface AgentLoopOptions {
   onMessage?: (message: ClaudeMessage) => void;
   onTokens?: (tokens: InputOutputTokens) => void;
   onText?: (delta: string) => void;
+  /**
+   * Per-item text streaming, used by codex-loop to expose distinct text-producing items
+   * (each `agent_message` / `reasoning` / `error` item gets its own id, so consumers can
+   * render one chat bubble per item instead of merging the whole run into one bubble).
+   * - `delta` is the new text appended since the previous event for this item id
+   *   (empty string allowed when `finished` is true and there's no new content).
+   * - `finished` is true on the `item.completed` event for that item.
+   */
+  onTextItem?: (event: {
+    itemId: string;
+    kind: 'agent_message' | 'reasoning' | 'error';
+    delta: string;
+    finished: boolean;
+  }) => void;
   onComplete?: (result: import('./task.js').TaskResult) => void;
   /** Called when the token budget is exhausted mid-loop. Return `continue` to extend, `abort` to fail.
    *  `filesWritten` is the number of files modified so far — if 0, extending rarely helps. */

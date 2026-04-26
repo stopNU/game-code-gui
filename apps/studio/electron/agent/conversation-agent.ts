@@ -536,17 +536,21 @@ export class ConversationAgent {
     const storedMessages = await this.bridge.listMessages(args.conversationId);
     const cliEntryPath = resolvePath(this.bridge.workspaceRoot, 'apps/cli/bin/game-harness.js');
     const systemPrompt = buildConversationAgentPrompt({ project, provider: 'codex', cliEntryPath, model: args.model });
-    const messageId = randomUUID();
-    let streamedText = '';
     const codexToolCalls: Array<{ id: string; name: string }> = [];
 
-    this.bridge.emit({
-      type: 'message-start',
-      conversationId: args.conversationId,
-      messageId,
-      role: 'assistant',
-      createdAt: new Date().toISOString(),
-    });
+    // One assistant chat bubble per Codex text item (agent_message / reasoning / error),
+    // instead of merging the whole run into a single bubble. We lazily emit message-start
+    // when the first delta for an item arrives, then text-delta for each subsequent delta,
+    // and message-complete when the item finishes.
+    interface CodexItemBubble {
+      messageId: string;
+      kind: 'agent_message' | 'reasoning' | 'error';
+      text: string;
+      started: boolean;
+      completed: boolean;
+    }
+    const itemBubbles = new Map<string, CodexItemBubble>();
+    const itemOrder: string[] = [];
 
     const result = await runCodexLoop(
       buildCodexAgentContext({
@@ -561,14 +565,46 @@ export class ConversationAgent {
         maxIterations: 1,
         retryPolicy: DEFAULT_RETRY_POLICY,
         signal: args.signal,
-        onText: (delta) => {
-          streamedText += delta;
-          this.bridge.emit({
-            type: 'text-delta',
-            conversationId: args.conversationId,
-            messageId,
-            delta,
-          });
+        onTextItem: ({ itemId, kind, delta, finished }) => {
+          let bubble = itemBubbles.get(itemId);
+          if (bubble === undefined) {
+            bubble = { messageId: randomUUID(), kind, text: '', started: false, completed: false };
+            itemBubbles.set(itemId, bubble);
+            itemOrder.push(itemId);
+          }
+
+          if (!bubble.started && (delta.length > 0 || finished)) {
+            this.bridge.emit({
+              type: 'message-start',
+              conversationId: args.conversationId,
+              messageId: bubble.messageId,
+              role: 'assistant',
+              createdAt: new Date().toISOString(),
+            });
+            bubble.started = true;
+          }
+
+          if (delta.length > 0) {
+            bubble.text += delta;
+            this.bridge.emit({
+              type: 'text-delta',
+              conversationId: args.conversationId,
+              messageId: bubble.messageId,
+              delta,
+            });
+          }
+
+          if (finished && !bubble.completed) {
+            bubble.completed = true;
+            this.bridge.emit({
+              type: 'message-complete',
+              conversationId: args.conversationId,
+              messageId: bubble.messageId,
+              fullText: bubble.text,
+              contentBlocks: [{ type: 'text', text: bubble.text }],
+              completedAt: new Date().toISOString(),
+            });
+          }
         },
         onToolCall: (call) => {
           const toolCallId = randomUUID();
@@ -626,7 +662,54 @@ export class ConversationAgent {
       throw new Error(result.summary);
     }
 
-    const finalText = streamedText.trim().length > 0 ? streamedText : result.summary;
+    // Close out any text item that was started but never completed (defensive — ordinarily
+    // every item.started has a matching item.completed). The bubble would otherwise stay in
+    // 'streaming' state in the UI.
+    for (const itemId of itemOrder) {
+      const bubble = itemBubbles.get(itemId);
+      if (bubble === undefined || bubble.completed) {
+        continue;
+      }
+      bubble.completed = true;
+      this.bridge.emit({
+        type: 'message-complete',
+        conversationId: args.conversationId,
+        messageId: bubble.messageId,
+        fullText: bubble.text,
+        contentBlocks: [{ type: 'text', text: bubble.text }],
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    // Persist one DB content block per text item, so reloading the conversation re-renders
+    // the same set of bubbles. If Codex emitted no text items at all (e.g. tool-only turn),
+    // fall back to the run summary so the conversation still has a record.
+    const persistedBlocks: Array<{ type: 'text'; text: string }> = itemOrder
+      .map((id) => itemBubbles.get(id))
+      .filter((bubble): bubble is CodexItemBubble => bubble !== undefined && bubble.text.length > 0)
+      .map((bubble) => ({ type: 'text' as const, text: bubble.text }));
+
+    if (persistedBlocks.length === 0) {
+      persistedBlocks.push({ type: 'text', text: result.summary });
+      // Also surface the summary as a chat bubble so the user sees something.
+      const fallbackMessageId = randomUUID();
+      this.bridge.emit({
+        type: 'message-start',
+        conversationId: args.conversationId,
+        messageId: fallbackMessageId,
+        role: 'assistant',
+        createdAt: new Date().toISOString(),
+      });
+      this.bridge.emit({
+        type: 'message-complete',
+        conversationId: args.conversationId,
+        messageId: fallbackMessageId,
+        fullText: result.summary,
+        contentBlocks: [{ type: 'text', text: result.summary }],
+        completedAt: new Date().toISOString(),
+      });
+    }
+
     // Token tracking (LangSmith auto-traces via env vars set by applyLangSmithEnv)
     await this.bridge.addConversationTokens({
       conversationId: args.conversationId,
@@ -637,14 +720,7 @@ export class ConversationAgent {
     await this.bridge.createMessage({
       conversationId: args.conversationId,
       role: 'assistant',
-      contentBlocks: [{ type: 'text', text: finalText }],
-    });
-    this.bridge.emit({
-      type: 'message-complete',
-      conversationId: args.conversationId,
-      messageId,
-      fullText: finalText,
-      completedAt: new Date().toISOString(),
+      contentBlocks: persistedBlocks,
     });
     this.bridge.emit({
       type: 'done',

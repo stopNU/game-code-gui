@@ -94,12 +94,12 @@ export async function runCodexLoop(
           handleToolEvent(event, opts, reportedToolItems, () => {
             toolCallCount++;
           });
-          handleTextEvent(event, opts, streamedText, (text) => {
+          handleTextEvent(event, opts, streamedText, false, (text) => {
             finalResponse = text;
           });
           break;
         case 'item.updated':
-          handleTextEvent(event, opts, streamedText, (text) => {
+          handleTextEvent(event, opts, streamedText, false, (text) => {
             finalResponse = text;
           });
           break;
@@ -107,7 +107,7 @@ export async function runCodexLoop(
           handleToolEvent(event, opts, reportedToolItems, () => {
             toolCallCount++;
           });
-          handleTextEvent(event, opts, streamedText, (text) => {
+          handleTextEvent(event, opts, streamedText, true, (text) => {
             finalResponse = text;
           });
           if (event.item.type === 'file_change' && event.item.status === 'completed') {
@@ -237,6 +237,7 @@ function handleTextEvent(
   event: ItemStartedEvent | ItemUpdatedEvent | ItemCompletedEvent,
   opts: AgentLoopOptions,
   streamedText: Map<string, string>,
+  finished: boolean,
   onFinalText: (text: string) => void,
 ): void {
   const textState = getTextState(event.item);
@@ -255,10 +256,10 @@ function handleTextEvent(
     `[codex-text] kind=${textState.kind} id=${textState.id} event=${event.type} prevLen=${previous.length} nextLen=${next.length} incremental=${next.startsWith(previous)}`,
   );
 
+  let delta = '';
   if (next.startsWith(previous)) {
-    // Incremental: emit only the new suffix.
     if (next.length > previous.length) {
-      opts.onText?.(next.slice(previous.length));
+      delta = next.slice(previous.length);
     }
   } else {
     // Non-incremental rewrite of this item. We've already emitted `previous` and can't
@@ -270,8 +271,20 @@ function handleTextEvent(
       `[codex-text] non-incremental update for id=${textState.id} kind=${textState.kind}; previous and next diverge. Emitting tail-only diff to avoid duplication.`,
     );
     if (next.length > previous.length) {
-      opts.onText?.(next.slice(previous.length));
+      delta = next.slice(previous.length);
     }
+  }
+
+  if (delta.length > 0) {
+    opts.onText?.(delta);
+  }
+  if (delta.length > 0 || finished) {
+    opts.onTextItem?.({
+      itemId: textState.id,
+      kind: textState.kind,
+      delta,
+      finished,
+    });
   }
 
   streamedText.set(textState.id, next);
