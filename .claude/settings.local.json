@@ -121,7 +121,25 @@
       "Bash(pnpm --filter @agent-harness/studio run test:unit)",
       "Bash(pnpm --filter @agent-harness/studio run test:unit -- electron/agent/tool-registry.test.ts)",
       "Bash(pnpm --filter @agent-harness/game-adapter run test)",
-      "Bash(pnpm --filter @agent-harness/services run test)"
+      "Bash(pnpm --filter @agent-harness/services run test)",
+      "Bash(rm -f harness/test-output.json)",
+      "Bash(timeout 30 godot --headless --path . -- --harness-test)",
+      "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --path . -- --harness-test)",
+      "Bash(tasklist)",
+      "Bash(timeout 15 \"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --check-only --path .)",
+      "Bash(taskkill //PID 1356 //F)",
+      "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --check-only --path . --script \"res://src/autoload/HarnessPlugin.gd\")",
+      "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --check-only --path .)",
+      "Bash(pkill -f Godot_v4)",
+      "Bash(taskkill //F //IM Godot_v4.6.2-stable_win64.exe)",
+      "Bash(npx gitnexus *)",
+      "mcp__gitnexus__list_repos",
+      "Bash(C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe --headless --check-only --path D:/dev/game-code-gui/apps/studio/projects/test-game --script res://__TRACKED_VAR__)",
+      "Bash(grep -qE \"===\\\\s*$|src/game/cards/Card.gd\" \"C:/Users/Michael/AppData/Local/Temp/claude/D--dev-game-code-gui/76a723b6-3519-4cd1-ab1e-004298063f26/tasks/b3c7ei8a9.output\")",
+      "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --import --path .)",
+      "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --path . -- --harness-test --harness-output \"D:/dev/game-code-gui/apps/studio/projects/test-game/harness/test-output.json\")",
+      "Bash(python -m json.tool)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('D:/dev/game-code-gui/apps/studio/projects/test-game/harness/test-output.json'\\)\\); print\\('Critical flow passed:', d['criticalFlow'].get\\('passed'\\)\\); print\\('Failure step:', d['criticalFlow'].get\\('failureStepId', 'none'\\)\\); print\\('Error log entries:', len\\(d.get\\('errorLog',[]\\)\\)\\)\")"
     ]
   }
 }

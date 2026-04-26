@@ -35,7 +35,7 @@ export function LeftPanel(): JSX.Element {
   const completeCount = selectedProject?.completeCount ?? 0;
   const progress = taskCount > 0 ? completeCount / taskCount : 0;
 
-  const latestLog = godotLogs.length > 0 ? (godotLogs[godotLogs.length - 1] ?? null) : null;
+  const recentLogs = godotLogs.slice(-5);
   const logRunning = godotStatus.status === 'running';
 
   return (
@@ -132,10 +132,24 @@ export function LeftPanel(): JSX.Element {
         <div className="mb-1.5 font-mono text-10 uppercase tracking-[0.1em] text-fg-2">
           Godot Log
         </div>
-        <div className={`overflow-hidden text-ellipsis whitespace-nowrap font-mono text-10 leading-[1.5] ${logRunning ? 'text-success' : 'text-fg-3'}`}>
-          {logRunning
-            ? (latestLog !== null ? latestLog.line.slice(0, 55) : '▶ Runtime active — streaming')
-            : 'No runtime logs yet. Launch a project.'}
+        <div className={`flex flex-col gap-px font-mono text-10 leading-[1.5] ${logRunning ? 'text-success' : 'text-fg-3'}`}>
+          {logRunning ? (
+            recentLogs.length > 0 ? (
+              recentLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="overflow-hidden text-ellipsis whitespace-nowrap"
+                  title={log.line}
+                >
+                  {log.line.slice(0, 55)}
+                </div>
+              ))
+            ) : (
+              <div>▶ Runtime active — streaming</div>
+            )
+          ) : (
+            <div>No runtime logs yet. Launch a project.</div>
+          )}
         </div>
       </div>
     </div>
