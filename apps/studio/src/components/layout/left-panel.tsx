@@ -22,6 +22,11 @@ export function LeftPanel(): JSX.Element {
       await utils.conversations.list.invalidate();
     },
   });
+  const deleteConversation = trpc.conversations.delete.useMutation({
+    onSuccess: async () => {
+      await utils.conversations.list.invalidate();
+    },
+  });
 
   const selectedProject = projectsQuery.data?.find((p) => p.id === selectedProjectId) ?? null;
 
@@ -97,7 +102,7 @@ export function LeftPanel(): JSX.Element {
                 key={c.id}
                 onClick={() => setActiveConversationId(c.id)}
                 className={[
-                  'cursor-pointer rounded border-l-2 px-[9px] py-2 transition-colors duration-[120ms]',
+                  'group cursor-pointer rounded border-l-2 px-[9px] py-2 transition-colors duration-[120ms]',
                   isActive ? 'border-accent bg-surface-4' : 'border-transparent bg-transparent',
                 ].join(' ')}
               >
@@ -110,6 +115,19 @@ export function LeftPanel(): JSX.Element {
                       Live
                     </span>
                   )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!confirm(`Delete conversation "${c.title}"?`)) return;
+                      if (isActive) setActiveConversationId(null);
+                      void deleteConversation.mutateAsync({ id: c.id });
+                    }}
+                    disabled={deleteConversation.isPending || live}
+                    title={live ? 'Stop the run before deleting' : 'Delete conversation'}
+                    className="shrink-0 cursor-pointer border-0 bg-transparent px-1 py-0 text-11 leading-none text-red-500 opacity-0 hover:text-red-400 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    ×
+                  </button>
                 </div>
                 {(c.provider !== undefined || c.model !== null) && (
                   <div className="font-mono text-10 text-fg-2">
