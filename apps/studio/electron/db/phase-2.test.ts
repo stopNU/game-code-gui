@@ -31,7 +31,7 @@ describe('studio phase 2 database', () => {
     const tempDir = createTempDir();
     const database = openStudioDatabase(path.join(tempDir, 'studio.sqlite3'));
 
-    expect(readPragmaValue(database.db, 'user_version')).toBe(2);
+    expect(readPragmaValue(database.db, 'user_version')).toBe(3);
     expect(readPragmaValue(database.db, 'journal_mode')).toBe('wal');
     expect(readPragmaValue(database.db, 'foreign_keys')).toBe(1);
 

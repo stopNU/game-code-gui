@@ -2,6 +2,8 @@ import { Writable } from 'stream';
 import type { MessagePortMain } from 'electron';
 import pino from 'pino';
 import { ConversationAgent } from './agent/conversation-agent.js';
+import { StudioCheckpointer } from './agent/checkpointer.js';
+import { DatabaseSyncCtor, type DatabaseConnection } from './db/sqlite.js';
 import type { AgentDbRequest, AgentPortMessage, MainDbResponseMessage, StreamEvent } from '../shared/protocol.js';
 
 let port: MessagePortMain | null = null;
@@ -80,9 +82,32 @@ async function requestDb<T>(request: AgentDbRequest): Promise<T> {
   });
 }
 
+// dbPath comes in as `--db=<path>` from session-manager.ts. Falls back to undefined if the
+// flag isn't present, in which case ConversationAgent runs without a checkpointer (graph state
+// is then reseeded from the DB messages table per turn — old behaviour, still correct).
+function readDbPath(): string | undefined {
+  const flag = process.argv.find((arg) => arg.startsWith('--db='));
+  return flag === undefined ? undefined : flag.slice('--db='.length);
+}
+
+let agentCheckpointer: StudioCheckpointer | undefined;
+let agentDbConnection: DatabaseConnection | undefined;
+const dbPath = readDbPath();
+if (dbPath !== undefined) {
+  try {
+    agentDbConnection = new DatabaseSyncCtor(dbPath);
+    agentDbConnection.exec('PRAGMA journal_mode = WAL');
+    agentDbConnection.exec('PRAGMA busy_timeout = 5000');
+    agentCheckpointer = new StudioCheckpointer(agentDbConnection);
+  } catch (err) {
+    logger.error({ err: String(err) }, 'Failed to open agent-side DB connection; running without checkpointer.');
+  }
+}
+
 const agent = new ConversationAgent({
   workspaceRoot: process.cwd(),
   emit,
+  ...(agentCheckpointer !== undefined ? { checkpointer: agentCheckpointer } : {}),
   ensureConversation: async (args) =>
     await requestDb<{
       id: string;

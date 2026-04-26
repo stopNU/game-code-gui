@@ -11,9 +11,12 @@ import {
 } from '@agent-harness/core';
 import { buildConversationAgentPrompt } from './conversation-agent-prompt.js';
 import { ApprovalGate, type ToolRiskLevel } from './approval-gate.js';
-import { AnthropicProvider, OpenAIProvider, type LLMProvider } from './llm-provider.js';
-import { buildToolExecutionContext, createStudioTools, summarizeToolResult } from './tool-registry.js';
+import { AnthropicProvider, OpenAIProvider, claudeToLC, type LLMProvider } from './llm-provider.js';
+import { buildToolExecutionContext, createStudioTools } from './tool-registry.js';
 import { applyLangSmithEnv } from './langsmith/env.js';
+import { buildConversationGraph, CapExceededError } from './conversation-graph.js';
+import type { StudioCheckpointer } from './checkpointer.js';
+import { HumanMessage } from '@langchain/core/messages';
 import type { StreamEvent } from '../../shared/protocol.js';
 
 interface DbMessageRecord {
@@ -28,6 +31,11 @@ interface DbMessageRecord {
 interface ConversationAgentBridge {
   workspaceRoot: string;
   emit(event: StreamEvent): void;
+  /**
+   * Optional. When present, the Anthropic/OpenAI graph runs with this checkpointer so prior
+   * turns are rehydrated automatically instead of replayed from the messages table each turn.
+   */
+  checkpointer?: StudioCheckpointer;
   ensureConversation(args: {
     conversationId: string;
     projectId?: string;
@@ -89,30 +97,6 @@ function toClaudeMessage(record: DbMessageRecord): ClaudeMessage {
     role: record.role === 'error' || record.role === 'system' ? 'assistant' : record.role,
     content: contentBlocks,
   };
-}
-
-function truncateToolResultBlocks(blocks: ClaudeContentBlock[]): ClaudeContentBlock[] {
-  return blocks.map((block) => {
-    if (block.type !== 'tool_result' || typeof block.content !== 'string' || block.content.length <= 8_000) {
-      return block;
-    }
-
-    return {
-      ...block,
-      content: `${block.content.slice(0, 8_000)}\n[truncated - full result stored in the database]`,
-    };
-  });
-}
-
-function getTextFromContent(content: string | ClaudeContentBlock[]): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  return content
-    .filter((block) => block.type === 'text' && typeof block.text === 'string')
-    .map((block) => block.text)
-    .join('');
 }
 
 function getToolRiskLevel(toolName: string): ToolRiskLevel {
@@ -239,218 +223,111 @@ export class ConversationAgent {
 
     const cliEntryPath = resolvePath(this.bridge.workspaceRoot, 'apps/cli/bin/game-harness.js');
     const systemPrompt = buildConversationAgentPrompt({ project, provider: args.provider, cliEntryPath, model: args.model });
-    const initialMessages = await this.bridge.listMessages(args.conversationId);
-    const initialHistory = initialMessages.map(toClaudeMessage);
-
     const provider = this.createProvider(args.provider);
-    const startedAt = Date.now();
-    let toolCallCount = 0;
 
-    while (!args.signal.aborted) {
-      if (Date.now() - startedAt > 15 * 60 * 1000) {
-        this.bridge.emit({
-          type: 'cap-exceeded',
-          conversationId: args.conversationId,
-          cap: 'wall-clock',
-        });
-        return;
-      }
+    // Caps live in the driver via a closure so the graph nodes can mutate the counter and
+    // throw `CapExceededError` to short-circuit the turn. The driver catches and emits the
+    // matching `cap-exceeded` event.
+    const caps = {
+      startedAt: Date.now(),
+      wallClockMs: 15 * 60 * 1000,
+      maxToolCalls: 50,
+      toolCallCount: { value: 0 },
+    };
 
-      if (toolCallCount > 50) {
-        this.bridge.emit({
-          type: 'cap-exceeded',
-          conversationId: args.conversationId,
-          cap: 'tool-calls',
-        });
-        return;
-      }
+    const checkpointer = this.bridge.checkpointer;
 
-      const storedMessages = await this.bridge.listMessages(args.conversationId);
-      const history = storedMessages.map(toClaudeMessage);
-      const messageId = randomUUID();
-      let streamedText = '';
+    const graph = buildConversationGraph({
+      provider,
+      tools: this.tools,
+      system: systemPrompt,
+      model: args.model,
+      conversationId: args.conversationId,
+      ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+      ...(project?.displayPath !== undefined ? { projectDisplayPath: project.displayPath } : {}),
+      signal: args.signal,
+      bridge: {
+        workspaceRoot: this.bridge.workspaceRoot,
+        emit: (event) => this.bridge.emit(event),
+        createMessage: (createArgs) => this.bridge.createMessage(createArgs),
+        addConversationTokens: (toolArgs) => this.bridge.addConversationTokens(toolArgs),
+        getProject: (projectId) => this.bridge.getProject(projectId),
+        upsertProject: (toolArgs) => this.bridge.upsertProject(toolArgs),
+        getTaskPlan: (projectId) => this.bridge.getTaskPlan(projectId),
+        upsertTaskPlan: (toolArgs) => this.bridge.upsertTaskPlan(toolArgs),
+        launchGodot: (toolArgs) => this.bridge.launchGodot(toolArgs),
+        stopGodot: (toolArgs) => this.bridge.stopGodot(toolArgs),
+        getAnthropicApiKey: () => this.bridge.getApiKey('anthropic'),
+      },
+      approvalGate: this.approvalGate,
+      caps,
+      getToolRiskLevel,
+      ...(checkpointer !== undefined ? { checkpointer } : {}),
+    });
 
-      this.bridge.emit({
-        type: 'message-start',
-        conversationId: args.conversationId,
-        messageId,
-        role: 'assistant',
-        createdAt: new Date().toISOString(),
-      });
+    const invokeConfig: {
+      signal: AbortSignal;
+      runName: string;
+      tags: string[];
+      recursionLimit: number;
+      configurable?: { thread_id: string };
+    } = {
+      signal: args.signal,
+      runName: 'studio-turn',
+      tags: [args.provider, args.model],
+      // High enough not to be hit normally; cap enforcement is what stops runaway turns.
+      recursionLimit: 200,
+      ...(checkpointer !== undefined
+        ? { configurable: { thread_id: args.conversationId } }
+        : {}),
+    };
 
-      const llmResult = await provider.streamMessage({
-        messages: history.map((message) =>
-          message.role === 'user' ? message : { ...message, content: truncateToolResultBlocks(message.content as ClaudeContentBlock[]) },
-        ),
-        tools: this.tools,
-        system: buildConversationAgentPrompt({ project, provider: args.provider, cliEntryPath, model: args.model }),
-        model: args.model,
-        signal: args.signal,
-        onEvent: (event) => {
-          if (event.type === 'text-delta') {
-            streamedText += event.delta;
-            this.bridge.emit({
-              type: 'text-delta',
-              conversationId: args.conversationId,
-              messageId,
-              delta: event.delta,
-            });
-            return;
-          }
-
-          this.bridge.emit({
-            type: 'retrying',
-            conversationId: args.conversationId,
-            attempt: event.attempt,
-            reason: event.reason,
-          });
-        },
-      });
-
-      await this.bridge.addConversationTokens({
-        conversationId: args.conversationId,
-        inputTokens: llmResult.tokens.input,
-        outputTokens: llmResult.tokens.output,
-        cachedTokens: llmResult.tokens.cached,
-      });
-      this.bridge.emit({
-        type: 'tokens',
-        conversationId: args.conversationId,
-        input: llmResult.tokens.input,
-        output: llmResult.tokens.output,
-        cached: llmResult.tokens.cached,
-      });
-
-      await this.bridge.createMessage({
-        conversationId: args.conversationId,
-        role: 'assistant',
-        contentBlocks: llmResult.message.content as unknown[],
-      });
-      this.bridge.emit({
-        type: 'message-complete',
-        conversationId: args.conversationId,
-        messageId,
-        fullText: streamedText.length > 0 ? streamedText : getTextFromContent(llmResult.message.content),
-        contentBlocks: Array.isArray(llmResult.message.content)
-          ? (llmResult.message.content as unknown[])
-          : [{ type: 'text', text: typeof llmResult.message.content === 'string' ? llmResult.message.content : '' }],
-        completedAt: new Date().toISOString(),
-      });
-
-      const toolBlocks = (llmResult.message.content as ClaudeContentBlock[]).filter((block) => block.type === 'tool_use');
-      if (toolBlocks.length === 0) {
-        this.bridge.emit({
-          type: 'done',
-          conversationId: args.conversationId,
-        });
-        return;
-      }
-
-      for (const block of toolBlocks) {
-        if (block.id === undefined || block.name === undefined || block.input === undefined) {
-          continue;
-        }
-
-        toolCallCount += 1;
-        const tool = this.tools.find((candidate) => candidate.name === block.name);
-        if (tool === undefined) {
-          throw new Error(`Unknown Studio tool "${block.name}".`);
-        }
-
-        this.bridge.emit({
-          type: 'tool-call',
-          conversationId: args.conversationId,
-          toolCallId: block.id,
-          toolName: block.name,
-          input: block.input,
-        });
-
-        const approvalDecision = await this.approvalGate.ensureApproved({
-          conversationId: args.conversationId,
-          toolCallId: block.id,
-          toolName: block.name,
-          input: block.input,
-          ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
-          riskLevel: getToolRiskLevel(block.name),
-          rationale: `This tool can modify code, generate a project, or launch external processes.`,
-          signal: args.signal,
-        });
-        if (approvalDecision !== 'approved') {
-          const output = {
-            ok: false,
-            message: `Tool ${block.name} was ${approvalDecision}.`,
-          };
-          await this.bridge.createMessage({
-            conversationId: args.conversationId,
-            role: 'user',
-            contentBlocks: [
-              {
-                type: 'tool_result',
-                tool_use_id: block.id,
-                content: JSON.stringify(output),
-              },
-            ],
-          });
-          this.bridge.emit({
-            type: 'tool-result',
-            conversationId: args.conversationId,
-            toolCallId: block.id,
-            success: false,
-            output,
-          });
-          continue;
-        }
-
-        let toolOutput: unknown;
-        let toolSuccess = true;
-
-        try {
-          toolOutput = await tool.execute(
-            block.input,
-            buildToolExecutionContext({
-              conversationId: args.conversationId,
-              ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
-              ...(project?.displayPath !== undefined ? { projectPath: project.displayPath } : {}),
-              toolCallId: block.id as string,
-              signal: args.signal,
-              bridge: {
-                workspaceRoot: this.bridge.workspaceRoot,
-                emit: (event) => this.bridge.emit(event),
-                getProject: (projectId) => this.bridge.getProject(projectId),
-                upsertProject: (toolArgs) => this.bridge.upsertProject(toolArgs),
-                getTaskPlan: (projectId) => this.bridge.getTaskPlan(projectId),
-                upsertTaskPlan: (toolArgs) => this.bridge.upsertTaskPlan(toolArgs),
-                launchGodot: (toolArgs) => this.bridge.launchGodot(toolArgs),
-                stopGodot: (toolArgs) => this.bridge.stopGodot(toolArgs),
-                getAnthropicApiKey: () => this.bridge.getApiKey('anthropic'),
-              },
-            }),
+    // With a checkpointer: seed the graph state once on first turn from existing DB messages,
+    // then `invoke` only with the new HumanMessage — the checkpointer rehydrates the rest.
+    // Without a checkpointer: fall back to the previous behaviour (re-seed from DB every turn).
+    let invokeInput: { messages: ReturnType<typeof claudeToLC>[] | [HumanMessage] };
+    if (checkpointer !== undefined) {
+      const existing = await graph.getState(invokeConfig);
+      const existingMessages = existing.values?.messages as unknown[] | undefined;
+      if (existingMessages === undefined || existingMessages.length === 0) {
+        const records = await this.bridge.listMessages(args.conversationId);
+        // Drop the just-inserted user message — graph.invoke will add it below.
+        const seedRecords = records.slice(0, -1);
+        if (seedRecords.length > 0) {
+          await graph.updateState(
+            invokeConfig,
+            { messages: seedRecords.map(toClaudeMessage).map(claudeToLC) },
           );
-        } catch (error) {
-          toolSuccess = false;
-          toolOutput = { ok: false, error: String(error) };
         }
-
-        await this.bridge.createMessage({
-          conversationId: args.conversationId,
-          role: 'user',
-          contentBlocks: [
-            {
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: summarizeToolResult(toolOutput),
-            },
-          ],
-        });
-        this.bridge.emit({
-          type: 'tool-result',
-          conversationId: args.conversationId,
-          toolCallId: block.id,
-          success: toolSuccess,
-          output: toolOutput,
-        });
       }
+      invokeInput = { messages: [new HumanMessage(args.userMessage)] };
+    } else {
+      const initialRecords = await this.bridge.listMessages(args.conversationId);
+      invokeInput = { messages: initialRecords.map(toClaudeMessage).map(claudeToLC) };
     }
+
+    try {
+      await graph.invoke(invokeInput, invokeConfig);
+    } catch (error) {
+      if (error instanceof CapExceededError) {
+        this.bridge.emit({
+          type: 'cap-exceeded',
+          conversationId: args.conversationId,
+          cap: error.cap,
+        });
+        return;
+      }
+      throw error;
+    }
+
+    if (args.signal.aborted) {
+      return;
+    }
+
+    this.bridge.emit({
+      type: 'done',
+      conversationId: args.conversationId,
+    });
   }
 
   public abortConversation(conversationId: string): void {
@@ -530,6 +407,30 @@ export class ConversationAgent {
           signal: args.signal,
         });
         return;
+      }
+
+      // No literal kebab-case ids in the message, but the user may be using a demonstrative
+      // ("this", "that", "those") to refer back to a plan from a prior assistant turn. Ask a
+      // fast model to map the demonstrative to plan ids using the prior transcript. Only fires
+      // when there's at least one valid task id in the plan and the message looks referential.
+      if (validIds.size > 0 && messageHasDemonstrative(args.userMessage)) {
+        const priorMessages = await this.bridge.listMessages(args.conversationId);
+        const resolvedIds = await this.resolveTaskReferences({
+          userMessage: args.userMessage,
+          validIds,
+          priorMessages: priorMessages.slice(0, -1),
+          signal: args.signal,
+        });
+        if (resolvedIds.length > 0) {
+          await this.runStructuredImplementTaskBatch({
+            conversationId: args.conversationId,
+            projectId: args.projectId,
+            taskIds: resolvedIds,
+            model: args.model,
+            signal: args.signal,
+          });
+          return;
+        }
       }
     }
 
@@ -872,6 +773,97 @@ export class ConversationAgent {
       conversationId: args.conversationId,
     });
   }
+
+  /**
+   * Map a demonstrative reference ("this", "that", "those tasks") back to plan task ids using a
+   * fast LLM call. We feed it the recent transcript (with tool-use/tool-result content
+   * preserved by the new {@link extractTranscriptContent}) and the set of valid plan ids, and
+   * ask for a strict JSON `{taskIds: string[]}` response. Any id not in `validIds` is dropped.
+   *
+   * Returns an empty array on any failure (parse error, network error, abort, no Anthropic key
+   * available). Caller falls back to free-form Codex chat in that case.
+   */
+  private async resolveTaskReferences(args: {
+    userMessage: string;
+    validIds: ReadonlySet<string>;
+    priorMessages: DbMessageRecord[];
+    signal: AbortSignal;
+  }): Promise<string[]> {
+    const apiKey = await this.bridge.getApiKey('anthropic');
+    if (apiKey === null) {
+      return [];
+    }
+
+    const transcript = buildCondensedCodexHistory(args.priorMessages, {
+      tokenBudget: 4000,
+      minMessages: 6,
+      maxMessages: 30,
+    });
+    const ids = Array.from(args.validIds);
+
+    const system =
+      'You map a user message that uses a demonstrative reference ("this", "that", "those", "these", "it") to plan task ids. ' +
+      'Reply with strict JSON of the shape {"taskIds": string[]} and nothing else. ' +
+      'Use only ids from the supplied list. Return an empty array if the reference is unclear or does not point at one or more plan tasks.';
+    const user = [
+      `Valid plan task ids: ${JSON.stringify(ids)}`,
+      '',
+      'Recent conversation:',
+      transcript.length > 0 ? transcript : '[no prior context]',
+      '',
+      `User's latest message: ${args.userMessage}`,
+    ].join('\n');
+
+    try {
+      const { ChatAnthropic } = await import('@langchain/anthropic');
+      const model = new ChatAnthropic({
+        model: 'claude-haiku-4-5',
+        maxTokens: 256,
+        temperature: 0,
+        apiKey,
+      });
+      const response = await model.invoke(
+        [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        { signal: args.signal },
+      );
+      const text =
+        typeof response.content === 'string'
+          ? response.content
+          : Array.isArray(response.content)
+            ? response.content
+                .filter((b) => typeof b === 'object' && (b as { type?: string }).type === 'text')
+                .map((b) => (b as { text?: string }).text ?? '')
+                .join('')
+            : '';
+
+      const match = /\{[\s\S]*\}/.exec(text);
+      if (match === null) {
+        return [];
+      }
+      const parsed = JSON.parse(match[0]) as { taskIds?: unknown };
+      if (!Array.isArray(parsed.taskIds)) {
+        return [];
+      }
+      return parsed.taskIds.filter(
+        (id): id is string => typeof id === 'string' && args.validIds.has(id),
+      );
+    } catch (err) {
+      this.log('resolveTaskReferences: LLM call failed', err);
+      return [];
+    }
+  }
+}
+
+/**
+ * Returns true when the message contains a demonstrative pronoun likely to refer to prior
+ * conversation context. Used to gate the slower {@link ConversationAgent.resolveTaskReferences}
+ * LLM call so we only pay for it when ambiguity is plausible.
+ */
+function messageHasDemonstrative(message: string): boolean {
+  return /\b(this|that|these|those|it)\b/i.test(message);
 }
 
 /**
@@ -925,31 +917,79 @@ export function parseImplementTaskIntent(message: string, validIds?: ReadonlySet
   return parseImplementTaskIntents(message, validIds)[0] ?? null;
 }
 
-function buildCondensedCodexHistory(messages: DbMessageRecord[], limit = 6): string {
-  const tail = messages.slice(-limit);
-  if (tail.length === 0) {
+/**
+ * Token-budgeted (rough chars/4 estimate) walk-back through prior messages. Replaces the old
+ * fixed `slice(-6)` cap which dropped the original turn whenever the assistant emitted >5
+ * intermediate narration bubbles in between, breaking referential phrases like "this into
+ * harness tasks". Floors at `minMessages` so very short threads still get full context, and
+ * hard-caps at `maxMessages` to bound worst-case prompt size.
+ */
+export function buildCondensedCodexHistory(
+  messages: DbMessageRecord[],
+  opts: { tokenBudget?: number; minMessages?: number; maxMessages?: number } = {},
+): string {
+  const tokenBudget = opts.tokenBudget ?? 6000;
+  const minMessages = opts.minMessages ?? 10;
+  const maxMessages = opts.maxMessages ?? 40;
+  const charBudget = tokenBudget * 4;
+
+  if (messages.length === 0) {
     return '';
   }
 
-  return tail
-    .map((message) => {
-      const content = extractTranscriptContent(message.contentBlocks as ClaudeContentBlock[]);
-      const label = message.role === 'assistant' || message.role === 'system' || message.role === 'error' ? 'Assistant' : 'User';
-      return `${label}: ${content}`;
-    })
+  const rendered: Array<{ label: string; content: string }> = [];
+  let chars = 0;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i] as DbMessageRecord;
+    const content = extractTranscriptContent(message.contentBlocks as ClaudeContentBlock[]);
+    const label =
+      message.role === 'assistant' || message.role === 'system' || message.role === 'error'
+        ? 'Assistant'
+        : 'User';
+    const segmentChars = label.length + 2 + content.length;
+
+    if (rendered.length >= minMessages && chars + segmentChars > charBudget) {
+      break;
+    }
+    rendered.push({ label, content });
+    chars += segmentChars;
+
+    if (rendered.length >= maxMessages) {
+      break;
+    }
+  }
+
+  return rendered
+    .reverse()
+    .map(({ label, content }) => `${label}: ${content}`)
     .join('\n\n');
 }
 
-function extractTranscriptContent(blocks: ClaudeContentBlock[]): string {
+/**
+ * Extract a Codex-friendly text rendering of a stored message. Tool uses and tool results are
+ * preserved (truncated) instead of being collapsed to opaque placeholders — without this, a
+ * plan written via the `write_file` tool is invisible on the next turn and the model can't
+ * resolve referential phrases like "this".
+ */
+export function extractTranscriptContent(blocks: ClaudeContentBlock[]): string {
   const parts = blocks.flatMap((block) => {
     if (block.type === 'text' && typeof block.text === 'string' && block.text.trim().length > 0) {
       return [block.text.trim()];
     }
     if (block.type === 'tool_use' && block.name !== undefined) {
-      return [`[tool use: ${block.name}]`];
+      const args = block.input === undefined ? '' : JSON.stringify(block.input);
+      const argsTrunc = args.length > 500 ? `${args.slice(0, 500)}…` : args;
+      return [`[tool use: ${block.name}(${argsTrunc})]`];
     }
     if (block.type === 'tool_result') {
-      return ['[tool result]'];
+      const raw =
+        typeof block.content === 'string'
+          ? block.content
+          : block.content === undefined
+            ? ''
+            : JSON.stringify(block.content);
+      const trunc = raw.length > 1500 ? `${raw.slice(0, 1500)}…` : raw;
+      return [`[tool result: ${trunc}]`];
     }
     return [];
   });

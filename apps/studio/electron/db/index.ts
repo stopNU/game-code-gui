@@ -11,6 +11,7 @@ import { ConversationTokensRepository } from './repositories/conversation-tokens
 
 export interface StudioDatabase {
   db: DatabaseConnection;
+  dbPath: string;
   approvals: ApprovalsRepository;
   conversations: ConversationsRepository;
   conversationTokens: ConversationTokensRepository;
@@ -33,6 +34,7 @@ export function openStudioDatabase(dbPath: string): StudioDatabase {
 
   return {
     db,
+    dbPath,
     approvals: new ApprovalsRepository(db),
     conversations: new ConversationsRepository(db),
     conversationTokens: new ConversationTokensRepository(db),

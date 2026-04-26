@@ -93,7 +93,9 @@ export class SessionManager {
   }
 
   private spawnChild(): void {
-    const child = utilityProcess.fork(this.utilityEntryPath, [], {
+    // Pass the studio db path so the agent process can open its own DatabaseSync connection
+    // for graph checkpoints. Two connections to the same WAL-mode SQLite file are safe.
+    const child = utilityProcess.fork(this.utilityEntryPath, [`--db=${this.database.dbPath}`], {
       serviceName: 'harness-studio-agent',
     });
     this.child = child;

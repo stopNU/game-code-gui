@@ -27,7 +27,7 @@ export interface LLMProvider {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-function claudeToLC(msg: ClaudeMessage): BaseMessage {
+export function claudeToLC(msg: ClaudeMessage): BaseMessage {
   if (typeof msg.content === 'string') {
     return msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content);
   }
