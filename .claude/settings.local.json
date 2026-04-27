@@ -145,7 +145,25 @@
       "Bash(pnpm --filter @agent-harness/core exec vitest run src/loop/iterate.test.ts)",
       "Bash(pnpm --filter @agent-harness/core exec vitest run)",
       "Bash(pnpm --filter @agent-harness/studio exec vitest run electron/agent/tool-registry.test.ts)",
-      "Bash(pnpm --filter @agent-harness/assets run test)"
+      "Bash(pnpm --filter @agent-harness/assets run test)",
+      "Bash(node --env-file=.env scripts/patch-project-fix3.mjs apps/studio/projects/simple-test-2 --force-assets)",
+      "Bash(command -v godot)",
+      "Bash(godot --headless --check-only --path D:/dev/game-code-gui/apps/studio/projects/simple-test-2)",
+      "Bash(pnpm --filter @agent-harness/evals test)",
+      "Bash(pnpm --filter @agent-harness/assets test)",
+      "Bash(node apps/cli/bin/game-harness.js generate-assets -p /tmp/anim-test --content --max-enemies 1)",
+      "Bash(gh repo *)",
+      "Bash(pnpm --filter @agent-harness/assets-compiler run typecheck)",
+      "Bash(pnpm --filter @agent-harness/assets-compiler run build)",
+      "Bash(node ./bin/assets-compiler.js compile --prompt \"rust-armored skeleton knight, slow heavy attacks\" --output ./test-out/skeleton_knight)",
+      "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --version)",
+      "Bash(pnpm --filter @agent-harness/assets-compiler run test)",
+      "Bash(rm -rf ./test-out)",
+      "Bash(node ./bin/assets-compiler.js compile --prompt \"stoic bone-armored humanoid sentinel\" --output \"D:/dev/game-code-gui/templates/deckbuilder/src/assets/generated/enemies/sample_humanoid\")",
+      "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --check-only --path D:/dev/game-code-gui/templates/deckbuilder)",
+      "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --check-only --script D:/dev/game-code-gui/templates/deckbuilder/src/scenes/EnemySkeletalDemo.gd --path D:/dev/game-code-gui/templates/deckbuilder)",
+      "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --quit --path D:/dev/game-code-gui/templates/deckbuilder src/scenes/EnemySkeletalDemo.tscn)",
+      "Bash(node --check D:/dev/game-code-gui/apps/assets-compiler/scripts/preview.js)"
     ]
   }
 }
