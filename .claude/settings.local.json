@@ -53,8 +53,6 @@
       "Bash(node -e \"import\\('@anthropic-ai/claude-code'\\).then\\(m => console.log\\(Object.keys\\(m\\)\\)\\)\")",
       "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\('exports:', list\\(p.get\\('exports',{}\\).keys\\(\\)\\)[:10]\\); print\\('main:', p.get\\('main'\\)\\); print\\('types:', p.get\\('types'\\)\\)\")",
       "Bash(node \"D:/dev/agent-harness/packages/core/node_modules/@anthropic-ai/claude-code/cli.js\" --help)",
-      "Bash(env -u CLAUDECODE claude --print --output-format stream-json --include-partial-messages --model claude-sonnet-4-6 --dangerously-skip-permissions --no-session-persistence \"say hi\")",
-      "Bash(env -u CLAUDECODE claude --print --output-format stream-json --verbose --include-partial-messages --model claude-sonnet-4-6 --dangerously-skip-permissions --no-session-persistence \"say hi\")",
       "Bash(wc -l /d/dev/agent-harness/apps/cli/src/tui/screens/*.tsx)",
       "Bash(node apps/cli/bin/game-harness.js tui)",
       "Bash(powershell -Command \"Get-ChildItem 'C:\\\\', 'D:\\\\' -Recurse -Filter 'Godot*.exe' -ErrorAction SilentlyContinue | Select-Object FullName\")",
@@ -67,20 +65,16 @@
       "Bash(powershell -Command \"Get-ChildItem 'D:\\\\dev\\\\agent-harness\\\\apps\\\\cli\\\\slay-the-cats\\\\src' -Recurse -Filter '*.gd' | Select-Object FullName\")",
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
       "Bash(find \"D:\\\\dev\\\\game-code-gui\" -name \"package.json\" -type f -exec grep -l \"electron-trpc\\\\|sqlite-vec\\\\|better-sqlite3\" {} \\\\;)",
-      "Bash(npm test *)",
       "Bash(xargs wc *)",
       "Bash(node -e \"require\\('esbuild'\\)\")",
       "Bash(pnpm --filter @agent-harness/studio add -D esbuild)",
       "Bash(pnpm --filter @agent-harness/studio run dev)",
       "Bash(node -e ' *)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\); [print\\(k, ':', type\\(v\\).__name__, str\\(v\\)[:80] if not isinstance\\(v,dict\\) else list\\(v.keys\\(\\)\\)\\) for k,v in d.items\\(\\)]\")",
-      "Bash(node -e \"const d = JSON.parse\\(require\\('fs'\\).readFileSync\\(process.env.HOME+'/.claude/.credentials.json','utf8'\\)\\); console.log\\('keys:', Object.keys\\(d\\)\\); Object.entries\\(d\\).forEach\\(\\([k,v]\\) => console.log\\(k, ':', typeof v, JSON.stringify\\(v\\).slice\\(0,120\\)\\)\\)\")",
-      "Read(//c/Users/Michael/AppData/Roaming/**)",
-      "Read(//c/Users/Michael/AppData/Roaming//**)",
+      "Read(//c/Users/Michael/AppData/Roaming/@agent-harness/**)",
       "Bash(sqlite3 \"/c/Users/Michael/AppData/Roaming/@agent-harness/studio/studio.sqlite3\" \"SELECT id, display_path, title FROM projects;\")",
       "Bash(node D:/dev/game-code-gui/fix-project-path.mjs)",
       "Bash(find \"D:\\\\dev\\\\game-code-gui\\\\apps\\\\studio\\\\src\\\\components\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec grep -l \"getPlan\\\\|plan\\\\.\\\\|phases\\\\|tasks\" {} \\\\;)",
-      "Bash(git stash *)",
       "Bash(pnpm --filter @agent-harness/studio run typecheck)",
       "Bash(pnpm --filter @agent-harness/studio run build)",
       "Bash(pnpm --filter @agent-harness/core add @langchain/core @langchain/anthropic @langchain/openai @langchain/langgraph)",
@@ -164,8 +158,8 @@
       "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --check-only --script D:/dev/game-code-gui/templates/deckbuilder/src/scenes/EnemySkeletalDemo.gd --path D:/dev/game-code-gui/templates/deckbuilder)",
       "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --quit --path D:/dev/game-code-gui/templates/deckbuilder src/scenes/EnemySkeletalDemo.tscn)",
       "Bash(node --check D:/dev/game-code-gui/apps/assets-compiler/scripts/preview.js)",
-      "Bash(git mv *)",
-      "Bash(ASSETS_COMPILER_BG_REMOVAL=color-key node ./bin/assets-compiler.js compile --prompt \"rust-armored skeleton knight\" --output ./out/p2-smoke)"
+      "Bash(ASSETS_COMPILER_BG_REMOVAL=color-key node ./bin/assets-compiler.js compile --prompt \"rust-armored skeleton knight\" --output ./out/p2-smoke)",
+      "Bash(git -C D:/dev/game-code-gui ls-files .claude/)"
     ]
   }
 }
