@@ -9,8 +9,8 @@ dist/
 apps/*/output/
 
 # assets-compiler local outputs
-apps/assets-compiler/out/
-apps/assets-compiler/test-out/
+packages/assets-compiler/out/
+packages/assets-compiler/test-out/
 
 # Playwright artifacts
 test-results/

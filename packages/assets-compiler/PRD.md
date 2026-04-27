@@ -1,6 +1,6 @@
 # PRD: Assets Compiler
 
-**Package:** `apps/assets-compiler`
+**Package:** `packages/assets-compiler`
 **Status:** Draft
 **Owner:** stopNU
 **Date:** 2026-04-27
@@ -161,7 +161,7 @@ Each stage:
 ### Directory structure
 
 ```
-apps/assets-compiler/
+packages/assets-compiler/
 ├── src/
 │   ├── index.ts                     # public API: compileEnemy()
 │   ├── orchestrator/
@@ -567,9 +567,23 @@ The compiler produces a humanoid Godot scene bundle from a prompt, loadable in s
 ```
 apps/
 ├── cli/
-├── studio/
-└── assets-compiler/   ← this package
+└── studio/
+
+packages/
+├── core/
+├── tools/
+├── game-adapter/
+├── assets/
+├── assets-compiler/   ← this package
+├── playtest/
+├── evals/
+└── services/
 ```
+
+Lives in `packages/` because it's a library consumed by apps (Phase 4 wires
+it into the deckbuilder template; eventual Studio integration imports it as
+`@agent-harness/assets-compiler`). The `bin` field keeps it directly runnable
+during development.
 
 Builds after `core` and `assets`, before consumers. Turbo dependency chain:
 `core → tools → game-adapter → assets → assets-compiler → cli, studio`.
