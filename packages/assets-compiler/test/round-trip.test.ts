@@ -149,6 +149,15 @@ describe('assets-compiler round-trip (textured path with stub silhouette + color
         expect(meta.scores.segment).toBeGreaterThan(0);
         expect(meta.scores.mesh).toBeGreaterThan(0);
         expect(meta.scores.atlas).toBeGreaterThan(0);
+
+        // Phase 3: rig stage ran and reports its source. The stub silhouette
+        // has clean T-pose proportions, so landmarks should detect.
+        const rigArtifact = JSON.parse(
+          await readFile(resolve(out, '.compiler/rig/output.json'), 'utf8'),
+        );
+        expect(rigArtifact.source).toBe('procedural');
+        expect(rigArtifact.landmarks).toBeDefined();
+        expect(rigArtifact.bones?.length).toBe(20);
       } finally {
         if (prevBg === undefined) delete process.env['ASSETS_COMPILER_BG_REMOVAL'];
         else process.env['ASSETS_COMPILER_BG_REMOVAL'] = prevBg;

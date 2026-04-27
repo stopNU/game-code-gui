@@ -30,6 +30,7 @@ program
   .option('--retries <n>', 'per-stage retry budget', (v) => parseInt(v, 10))
   .option('--flat', 'skip image gen / segmentation / mesh / atlas — emit flat-colored polygons (Phase 1 path)', false)
   .option('--no-llm', 'use rule-based prompt parser only (skip ANTHROPIC_API_KEY usage)')
+  .option('--no-procedural-rig', 'skip landmark detection; always use the template skeleton')
   .option('--bg-removal <mode>', 'background removal adapter: "rmbg" (default) or "color-key"', 'rmbg')
   .option('--bundle-subdir <path>', 'sub-path inside the consuming Godot project (e.g. "enemies/cultist"); used to prefix atlas ext_resource path')
   .option('--json', 'emit JSON progress to stdout', false)
@@ -57,6 +58,7 @@ program
         ...(opts.retries !== undefined ? { retries: { perStage: opts.retries } } : {}),
         ...(opts.flat ? { flatOnly: true } : {}),
         ...(opts.llm === false ? { useLlm: false } : {}),
+        ...(opts.proceduralRig === false ? { noProceduralRig: true } : {}),
         ...(opts.bundleSubdir ? { bundleSubdir: opts.bundleSubdir } : {}),
         onEvent: (evt) => {
           if (useJson) {
@@ -113,6 +115,12 @@ program
           const segPath = resolve(result.bundlePath, '.compiler/segment/output.json');
           const segOut = JSON.parse(await fs.readFile(segPath, 'utf8')).adapter;
           if (segOut) log(`  segment: ${segOut}`);
+          try {
+            const rigArtifact = JSON.parse(
+              await fs.readFile(resolve(result.bundlePath, '.compiler/rig/output.json'), 'utf8'),
+            );
+            log(`  rig:     ${rigArtifact.source ?? 'unknown'}`);
+          } catch { /* no rig artifact in flat-only path */ }
         } catch {
           // Intermediate artifacts not present (flat-only or stage failed).
         }

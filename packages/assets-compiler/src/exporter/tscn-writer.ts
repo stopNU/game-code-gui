@@ -24,6 +24,20 @@ import type { AtlasOutput, RegionMesh } from '../types/visual.js';
  *                 dynamic mesh (Delaunay triangulated) with UVs into the atlas.
  */
 
+export interface ProceduralRigInfo {
+  /** Absolute canvas position of each bone (used to map region pixels into bone-local space). */
+  boneAbs: Record<string, Vec2>;
+  /** Per-region source-image bounds (from segment stage). */
+  regionBounds: Record<string, { x: number; y: number; w: number; h: number }>;
+  /**
+   * Regions whose segmentation passed a coverage threshold and are safe to
+   * render. Any region not in this set is skipped entirely on the procedural
+   * path (no Polygon2D emitted) — better than drawing a stray colored quad
+   * at unreliable bounds.
+   */
+  validRegions: Set<string>;
+}
+
 export interface ExportInput {
   spec: EnemySpec;
   skeleton: Skeleton;
@@ -35,6 +49,12 @@ export interface ExportInput {
   atlas?: AtlasOutput;
   /** Per-region triangulated mesh in region-local pixel space. */
   regionMeshes?: RegionMesh[];
+  /**
+   * Phase 3: when present, the exporter places meshes using each region's
+   * source-image bounds + the bone's absolute canvas position, ignoring
+   * the template's halfW/halfH. Falls back to the Phase 2 mapping when absent.
+   */
+  proceduralRig?: ProceduralRigInfo;
   /**
    * Sub-path inside the Godot project where this bundle will live. Used to
    * prefix the atlas ext_resource path. Defaults to "" (atlas at project root).
@@ -139,6 +159,7 @@ function emitMeshNodes(
   skeleton: Skeleton,
   regionColors: Record<string, string>,
   textured?: TexturedMeshArgs,
+  procedural?: ProceduralRigInfo,
 ): string[] {
   const lines: string[] = [];
   const meshByRegion = new Map<string, RegionMesh>();
@@ -173,33 +194,47 @@ function emitMeshNodes(
     lines.push(`[node name="${mesh.name}_mesh" type="Polygon2D" parent="${parentPath}"]`);
     lines.push(`z_index = ${mesh.zIndex}`);
 
+    // Decide which mesh-to-bone mapping to use:
+    //   - Procedural (Phase 3): vertex_bone_local = (regionPixel + bounds.{x,y}) - boneAbs
+    //     Direct source-canvas → bone-local translation, since bone positions
+    //     are derived from actual landmarks. Sizes are real, not template.
+    //   - Template (Phase 2 fallback): use template halfW/halfH encoded in
+    //     mesh.vertices to scale the dynamic mesh into a fixed-size quad.
+    const procRect = procedural?.regionBounds[mesh.region];
+    const procBoneAbs = procedural?.boneAbs[mesh.primaryBone];
+    const useProcedural = !!(procedural && procRect && procBoneAbs);
+
+    // Skip regions that didn't pass coverage on the procedural path —
+    // drawing a fallback quad at unreliable bounds creates the floating
+    // strips you'd otherwise see when landmarks didn't lock on.
+    if (procedural && !procedural.validRegions.has(mesh.region) && !useTextured) {
+      continue;
+    }
+
     if (useTextured && dynMesh && atlasRect && textured) {
-      // Map region-local pixel vertices into bone-local space using the
-      // template's anchor + half-extents. This preserves Phase 1 layout
-      // while replacing geometry with the dynamic Delaunay mesh.
-      const tplMesh = mesh; // template Mesh has halfWidth/halfHeight encoded in its vertices
-      // Recover the half-extents from the template quad.
-      const xs = tplMesh.vertices.map((v) => v.x);
-      const ys = tplMesh.vertices.map((v) => v.y);
-      const minX = Math.min(...xs), maxX = Math.max(...xs);
-      const minY = Math.min(...ys), maxY = Math.max(...ys);
-      const halfW = (maxX - minX) / 2;
-      const halfH = (maxY - minY) / 2;
-      const offsetX = -halfW; // both anchor modes are centered horizontally
-      // anchor=center → minY = -halfH; anchor=head → minY = 0.
-      const offsetY = minY;
-
-      const dynW = dynMesh.bounds.w + dynMesh.bounds.x; // not used; we use full image dims via UVs
-      void dynW;
-
-      // The dynMesh.vertices are in region-local pixel coords (whole region image).
-      // Region image dimensions = atlasRect.w/h (we packed at original size).
-      const sx = (2 * halfW) / atlasRect.w;
-      const sy = (2 * halfH) / atlasRect.h;
-      const polygon = dynMesh.vertices.map<Vec2>((v) => ({
-        x: offsetX + v.x * sx,
-        y: offsetY + v.y * sy,
-      }));
+      let polygon: Vec2[];
+      if (useProcedural && procRect && procBoneAbs) {
+        polygon = dynMesh.vertices.map<Vec2>((v) => ({
+          x: v.x + procRect.x - procBoneAbs.x,
+          y: v.y + procRect.y - procBoneAbs.y,
+        }));
+      } else {
+        // Phase 2 path: scale region pixels into the template's halfW/halfH box.
+        const xs = mesh.vertices.map((v) => v.x);
+        const ys = mesh.vertices.map((v) => v.y);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minY = Math.min(...ys), maxY = Math.max(...ys);
+        const halfW = (maxX - minX) / 2;
+        const halfH = (maxY - minY) / 2;
+        const offsetX = -halfW;
+        const offsetY = minY;
+        const sx = (2 * halfW) / atlasRect.w;
+        const sy = (2 * halfH) / atlasRect.h;
+        polygon = dynMesh.vertices.map<Vec2>((v) => ({
+          x: offsetX + v.x * sx,
+          y: offsetY + v.y * sy,
+        }));
+      }
 
       // UVs in atlas pixel coords (Polygon2D `uv` is in texture pixel space).
       const uvs = dynMesh.vertices.map<Vec2>((v) => ({
@@ -218,10 +253,24 @@ function emitMeshNodes(
       lines.push(`uv = ${packedVec2Array(uvs)}`);
       lines.push(`polygons = [${triLines.join(', ')}]`);
     } else {
-      // Flat-color fallback (Phase 1 path).
+      // Flat-color fallback (Phase 1 path or Phase 2/3 region with no mesh).
       const color = regionColors[mesh.region] ?? '#888888';
       lines.push(`color = ${colorFromHex(color)}`);
-      lines.push(`polygon = ${packedVec2Array(mesh.vertices)}`);
+      // If we have procedural bounds, draw the fallback quad at the actual
+      // region's source canvas location — otherwise it would render at the
+      // wrong place (template position) on the procedural rig.
+      if (useProcedural && procRect && procBoneAbs) {
+        const x0 = procRect.x - procBoneAbs.x;
+        const y0 = procRect.y - procBoneAbs.y;
+        const x1 = x0 + procRect.w;
+        const y1 = y0 + procRect.h;
+        const quad: Vec2[] = [
+          { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 },
+        ];
+        lines.push(`polygon = ${packedVec2Array(quad)}`);
+      } else {
+        lines.push(`polygon = ${packedVec2Array(mesh.vertices)}`);
+      }
     }
     lines.push('');
   }
@@ -287,7 +336,7 @@ function formatTrackKeys(track: BoneTrack): string {
 }
 
 export function writeTscn(input: ExportInput): ExportedScene {
-  const { skeleton, animations, rootOffset, regionColors, atlas, regionMeshes, spec } = input;
+  const { skeleton, animations, rootOffset, regionColors, atlas, regionMeshes, proceduralRig, spec } = input;
   void packedInt32Array;
   void indent;
 
@@ -334,8 +383,12 @@ export function writeTscn(input: ExportInput): ExportedScene {
   const nodeLines: string[] = [];
 
   // Root Enemy node (Node2D) positioned at canvas-relative root offset.
+  // On the procedural-rig path, root sits at the figure's actual hip in
+  // source-canvas space, so meshes (which are bone-local relative to the
+  // skeleton's root) line up with where the figure was drawn.
+  const enemyPos = proceduralRig?.boneAbs['root'] ?? rootOffset;
   nodeLines.push(`[node name="Enemy" type="Node2D"]`);
-  nodeLines.push(`position = ${v2(rootOffset)}`);
+  nodeLines.push(`position = ${v2(enemyPos)}`);
   nodeLines.push('');
 
   // Skeleton2D
@@ -349,7 +402,7 @@ export function writeTscn(input: ExportInput): ExportedScene {
   const texturedArgs = isTextured && atlas && regionMeshes && atlasResId
     ? { atlas, regionMeshes, atlasResId }
     : undefined;
-  nodeLines.push(...emitMeshNodes(skeleton, colors, texturedArgs));
+  nodeLines.push(...emitMeshNodes(skeleton, colors, texturedArgs, proceduralRig));
 
   // AnimationPlayer
   nodeLines.push(`[node name="AnimationPlayer" type="AnimationPlayer" parent="."]`);

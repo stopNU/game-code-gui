@@ -2,11 +2,14 @@
 
 Compile text prompts into game-ready 2D skeletal enemy bundles for Godot 4.
 
-**Phase 2** — the front half of the pipeline now runs for real:
+**Phase 3** — the back half of the pipeline now runs for real:
 LLM-backed prompt parser → FAL.ai image generation → background removal via
-Transformers.js (RMBG-1.4) → template-driven region segmentation → Delaunay-
-triangulated meshes → packed atlas → textured `Polygon2D` nodes in the
-exported `.tscn`. Procedural rigging and motion mapping land in Phase 3.
+Transformers.js (MODNet by default) → **landmark detection on the cutout
+→ procedural skeleton with bones placed from actual figure geometry →
+landmark-derived dynamic region rects** → Delaunay-triangulated meshes →
+packed atlas → textured `Polygon2D` nodes parented to bones whose positions
+match the figure. Falls back to template skeleton + template region rects
+when landmark detection can't lock on (non-T-pose, non-humanoid, occluded).
 
 Each stage runs through a deterministic stage runner with score gates and
 per-stage retry; any stage failure cleanly falls back to the Phase 1
@@ -63,24 +66,38 @@ const result = await compileEnemy({
 });
 ```
 
-## Pipeline stages (Phase 2)
+## Pipeline stages (Phase 3)
 
 | Stage   | Implementation                                                            |
 | ------- | ------------------------------------------------------------------------- |
 | parse   | Claude-backed via `@agent-harness/core`, Zod-validated; rule-based fallback |
 | visual  | FAL.ai FLUX/schnell with constrained T-pose prompt; silhouette-stub fallback |
-| segment | Transformers.js / RMBG-1.4 bg removal + template-driven region cropping; color-key fallback |
+| (cutout)| Inline bg-removal via Transformers.js MODNet (default), color-key fallback |
+| rig     | Landmark detection on cutout → procedural skeleton; template fallback      |
+| segment | Crop regions from cutout using landmark-derived dynamic rects (or template) |
 | mesh    | Per-region Delaunay + grid triangulation (alpha-aware); ~25–40 verts/region |
 | atlas   | `maxrects-packer` packs region textures into a single PNG                 |
-| rig     | Template pass-through (Phase 1 layout); procedural rig comes in Phase 3   |
-| motion  | Hand-authored `idle` / `attack` / `hit` / `death` tracks                  |
-| export  | Godot 4 `.tscn` — `Skeleton2D` + textured `Polygon2D` (with UVs into atlas) + `AnimationPlayer` |
+| motion  | Hand-authored `idle` / `attack` / `hit` / `death` tracks (bone-name-targeted) |
+| export  | Godot 4 `.tscn` — `Skeleton2D` (procedural bones) + textured `Polygon2D` parented to bones, with UVs into atlas + `AnimationPlayer` |
 
 Evaluators run per stage and feed retry decisions:
 
 - **silhouette**: opaque-pixel coverage at 64×64 downsample, bell-curve scoring around 35%
 - **part coverage**: fraction of expected regions with ≥32 opaque px
 - **mesh sanity**: degenerate-triangle ratio, vertex-budget compliance
+- **rig sanity** (Phase 3): anatomical plausibility — head above shoulders, hips above knees, left/right symmetry, head proportions
+
+## How procedural rigging works
+
+When a real source image is generated:
+
+1. **Bg-removal** produces a clean cutout with figure on transparent background.
+2. **Landmark detection** (`src/rig/landmarks.ts`) runs row-width profiling on the alpha mask. The maximum-width row in the upper half is the T-pose arm bar; the column with the densest spine column is the figure's center; transitions from "torso column" to "hip mass" mark the hip line; rows where alpha splits into two disjoint runs mark the leg-split. Result: head top/bottom, shoulder Y, hip Y, leg-split Y, plus left/right wrist/elbow/shoulder/hip/knee/ankle.
+3. **Procedural skeleton** (`src/rig/build-skeleton.ts`) places each bone at its detected landmark. Bone names match the template (`root`, `hip`, `spine`, `chest`, `head`, `l_shoulder`, ..., `r_foot`) so the existing motion clips animate the new rig unchanged.
+4. **Dynamic regions** (`src/rig/build-regions.ts`) derive region rects from the landmarks (head bbox between head_top and shoulder_y, arms between shoulders and wrists, legs between hips and ankles). The segment stage crops from these instead of the template's canvas-fixed proportions.
+5. **Mesh-to-bone mapping in the exporter** uses `(regionPixel + boundsInSource) - boneAbs` to place each Polygon2D in its bone's local space — a direct source-canvas → bone-local translation. No template halfW/halfH is involved on this path.
+
+If detection fails (sanity score too low, or bg-removal crashed), the orchestrator falls back to the Phase 2 template-based path.
 
 ## Environment
 

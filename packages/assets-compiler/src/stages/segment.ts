@@ -4,11 +4,23 @@ import type { Stage } from '../orchestrator/stage-runner.js';
 import type { EnemySpec } from '../types/enemy-spec.js';
 import type { VisualOutput, SegmentOutput, RegionSegmentation } from '../types/visual.js';
 import { rmbgAdapter, colorKeyAdapter, type BgRemovalAdapter } from '../adapters/segmenter.js';
-import { loadTemplate } from '../templates/registry.js';
+import { loadTemplate, type RegionRect } from '../templates/registry.js';
 
 export interface SegmentStageInput {
   spec: EnemySpec;
   visual: VisualOutput;
+  /**
+   * Override the template's region rects with landmark-derived dynamic ones
+   * (Phase 3 procedural rig). When omitted, falls back to the template's
+   * fixed proportional rects.
+   */
+  regionsOverride?: RegionRect[];
+  /**
+   * When set, skip bg-removal entirely and crop regions from this cutout.
+   * The orchestrator passes this in when the rig stage already removed the
+   * background to feed landmark detection (Phase 3).
+   */
+  precutPath?: string;
 }
 
 export interface SegmentStageConfig {
@@ -21,33 +33,42 @@ export function createSegmentStage(config: SegmentStageConfig = {}): Stage<Segme
   const allowFallback = config.allowFallback !== false;
   return {
     name: 'segment',
-    async run({ spec, visual }, ctx) {
+    async run({ spec, visual, regionsOverride, precutPath }, ctx) {
       if (visual.kind !== 'image') {
         throw new Error('segment stage requires kind=image visual output');
       }
 
       const dir = await ctx.graph.ensureStageDir('segment');
       const template = await loadTemplate(spec.templateId);
+      const inputRects = regionsOverride ?? template.regions;
 
-      // Background removal. Allow tests/CI to force the color-key adapter
-      // via ASSETS_COMPILER_BG_REMOVAL=color-key (avoids RMBG model download).
-      const envOverride = process.env['ASSETS_COMPILER_BG_REMOVAL'] === 'color-key'
-        ? colorKeyAdapter
-        : undefined;
-      const adapter = config.adapter ?? envOverride ?? rmbgAdapter;
-      let cutout: Buffer;
-      let usedAdapter = adapter.id;
+      let usedAdapter: string;
       let primaryFailure: string | undefined;
-      try {
-        cutout = await adapter.removeBackground(visual.neutralPath);
-      } catch (err) {
-        if (!allowFallback) throw err;
-        primaryFailure = err instanceof Error ? (err.stack ?? err.message) : String(err);
-        usedAdapter = colorKeyAdapter.id;
-        cutout = await colorKeyAdapter.removeBackground(visual.neutralPath);
+      let cutout: Buffer;
+      let cutoutPath: string;
+      if (precutPath) {
+        cutoutPath = precutPath;
+        cutout = await sharp(precutPath).png().toBuffer();
+        usedAdapter = 'precut';
+      } else {
+        // Background removal. Allow tests/CI to force the color-key adapter
+        // via ASSETS_COMPILER_BG_REMOVAL=color-key (avoids RMBG model download).
+        const envOverride = process.env['ASSETS_COMPILER_BG_REMOVAL'] === 'color-key'
+          ? colorKeyAdapter
+          : undefined;
+        const adapter = config.adapter ?? envOverride ?? rmbgAdapter;
+        usedAdapter = adapter.id;
+        try {
+          cutout = await adapter.removeBackground(visual.neutralPath);
+        } catch (err) {
+          if (!allowFallback) throw err;
+          primaryFailure = err instanceof Error ? (err.stack ?? err.message) : String(err);
+          usedAdapter = colorKeyAdapter.id;
+          cutout = await colorKeyAdapter.removeBackground(visual.neutralPath);
+        }
+        cutoutPath = resolve(dir, 'cutout.png');
+        await sharp(cutout).png().toFile(cutoutPath);
       }
-      const cutoutPath = resolve(dir, 'cutout.png');
-      await sharp(cutout).png().toFile(cutoutPath);
 
       // Crop each region. We extract from the cutout (so the alpha is already
       // applied) using the template's proportional rects scaled to image size.
@@ -55,7 +76,7 @@ export function createSegmentStage(config: SegmentStageConfig = {}): Stage<Segme
       const H = visual.height;
       const regions: RegionSegmentation[] = [];
       const regionAvgColor: Record<string, string> = {};
-      for (const r of template.regions) {
+      for (const r of inputRects) {
         const x = Math.max(0, Math.floor(r.x * W));
         const y = Math.max(0, Math.floor(r.y * H));
         const w = Math.min(W - x, Math.ceil(r.w * W));
@@ -102,7 +123,7 @@ export function createSegmentStage(config: SegmentStageConfig = {}): Stage<Segme
         ?? averageOf(Object.values(regionAvgColor))
         ?? '#6a5a4a';
       const fallbackColors: Record<string, string> = {};
-      for (const r of template.regions) {
+      for (const r of inputRects) {
         fallbackColors[r.id] = regionAvgColor[r.id] ?? bodyFallback;
       }
 
@@ -116,12 +137,12 @@ export function createSegmentStage(config: SegmentStageConfig = {}): Stage<Segme
       // Score: ratio of regions that have any coverage. The dedicated
       // part-coverage evaluator runs after this and re-scores more strictly.
       const haveAny = regions.filter((r) => r.coveragePx > 0).length;
-      const score = template.regions.length === 0 ? 1 : haveAny / template.regions.length;
+      const score = inputRects.length === 0 ? 1 : haveAny / inputRects.length;
       const issues: Array<{ severity: 'warn'; message: string }> = [];
-      if (haveAny < template.regions.length) {
+      if (haveAny < inputRects.length) {
         issues.push({
           severity: 'warn',
-          message: `${template.regions.length - haveAny}/${template.regions.length} regions have no coverage`,
+          message: `${inputRects.length - haveAny}/${inputRects.length} regions have no coverage`,
         });
       }
       if (primaryFailure) {
@@ -129,7 +150,7 @@ export function createSegmentStage(config: SegmentStageConfig = {}): Stage<Segme
         const oneLine = primaryFailure.split('\n')[0]!.trim();
         issues.push({
           severity: 'warn',
-          message: `${adapter.id} failed → fell back to ${colorKeyAdapter.id}: ${oneLine}`,
+          message: `bg-removal failed → fell back to ${colorKeyAdapter.id}: ${oneLine}`,
         });
       }
       return { output: out, score, issues };

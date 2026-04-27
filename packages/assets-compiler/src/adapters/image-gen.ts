@@ -23,26 +23,53 @@ export interface ImageGenAdapter {
 
 /**
  * Compose a structured prompt that biases the model toward a clean T-pose
- * on a plain background — the rest of the pipeline (bg removal, segmentation)
- * is brittle on unconstrained AI art, so we constrain heavily here.
+ * on a plain background — the rest of the pipeline (bg removal, segmentation,
+ * landmark detection) is brittle on unconstrained AI art, so we constrain
+ * heavily here.
+ *
+ * FLUX/schnell at 4 inference steps is bad at honoring detailed pose
+ * instructions, so we stack many redundant cues and explicitly refuse the
+ * defaults the model loves (battle pose, holding weapon, dynamic action).
+ * Wearable/wielded items from `spec.optionalParts` are retained — but
+ * always in T-pose orientation, never raised or in motion.
  */
 function buildFalPrompt(spec: EnemySpec): string {
   const palette = spec.palette.length > 0 ? spec.palette.join(', ') : 'muted earth tones';
   const materials = spec.materials.length > 0 ? spec.materials.join(', ') : '';
-  const optional = spec.optionalParts.length > 0 ? `holding/wearing: ${spec.optionalParts.join(', ')}` : '';
   const moodWord = spec.mood === 'neutral' ? '' : spec.mood;
 
-  // The "T-pose, plain flat background" cues are critical for downstream
-  // segmentation. Keep them at the end so the model honors them.
+  // Optional items in T-pose orientation only (no raised weapons, no action grip).
+  const optionalT = spec.optionalParts.length > 0
+    ? `${spec.optionalParts.join(', ')} held in resting T-pose, weapons pointed straight down, no action grip`
+    : '';
+
   return [
-    `${moodWord} ${spec.prompt}`,
+    // Subject
+    `${moodWord} ${spec.prompt}`.trim(),
     materials ? `materials: ${materials}` : '',
     `palette: ${palette}`,
-    optional,
-    'standing T-pose, arms straight out horizontal, legs slightly apart, facing camera',
-    'centered, full body visible, head to feet',
-    'plain flat lavender background #b48dff, no shadow, no foreground objects',
-    'painterly fantasy game art, clean silhouette, even lighting',
+    optionalT,
+
+    // Pose — heavy redundancy because FLUX/schnell often ignores single cues.
+    'character reference sheet, neutral mannequin T-pose',
+    'both arms perfectly horizontal, fully extended outward at chest height',
+    'arms straight as a horizontal bar, hands open palm forward at canvas edges',
+    'legs straight and slightly apart, feet flat on ground',
+    'standing upright, facing the camera directly, no torso rotation',
+    'symmetric pose, both sides identical',
+
+    // What we explicitly do NOT want — phrased positively because FLUX has
+    // no negative-prompt support, but the model still avoids these cues.
+    'static pose only, no motion, no battle stance, no action, no swinging, no leaning',
+    'no weapons raised, no attacking, no dynamic posture',
+
+    // Framing
+    'full body, head to feet, centered, vertical full-figure portrait',
+    'plain flat solid lavender background #b48dff, completely empty background',
+    'no ground, no shadow, no environment, no props, nothing behind the figure',
+
+    // Style
+    'painterly fantasy game art, clean silhouette, even diffuse lighting, sharp edges',
   ]
     .filter(Boolean)
     .join(', ');
