@@ -31,3 +31,7 @@ Thumbs.db
 
 
 .gitnexus
+
+# Local Claude Code settings (per-machine permissions)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
