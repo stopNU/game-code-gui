@@ -1,8 +1,10 @@
 import type { AttackArchetype, EnemySpec, OptionalPart } from '../types/enemy-spec.js';
+import type { SlotData } from './slot-schema.js';
+import { llmParseSlots } from './llm-parser.js';
 
 /**
- * Phase 1 prompt parser: deterministic, rule-based.
- * Phase 2 will swap in an LLM-backed parser via @agent-harness/core.
+ * Deterministic, rule-based parser. Used as a fallback when no
+ * ANTHROPIC_API_KEY is set or the LLM call fails.
  */
 
 const ATTACK_KEYWORDS: Array<[AttackArchetype, RegExp]> = [
@@ -100,5 +102,56 @@ export function parsePrompt(opts: ParseOptions): EnemySpec {
     attackArchetype: o.attackArchetype ?? detectAttackArchetype(prompt),
     optionalParts: o.optionalParts ?? detectOptionalParts(prompt),
     seed: opts.seed ?? hashSeed(prompt),
+  };
+}
+
+export interface ParsePromptAsyncOptions extends ParseOptions {
+  /** When false, skip the LLM call and use the rule-based parser only. */
+  useLlm?: boolean;
+  signal?: AbortSignal;
+  /** Receives a one-line trace string for telemetry. */
+  onTrace?: (msg: string) => void;
+}
+
+/**
+ * Async parser. Tries the LLM-backed parser first; on any failure (no API
+ * key, network error, malformed JSON, Zod rejection) falls back to the
+ * deterministic rule-based parser. Always returns a valid EnemySpec.
+ */
+export async function parsePromptAsync(opts: ParsePromptAsyncOptions): Promise<EnemySpec> {
+  const prompt = opts.prompt.trim();
+  if (!prompt) throw new Error('parsePromptAsync: prompt is empty');
+
+  const useLlm = opts.useLlm !== false && !!process.env['ANTHROPIC_API_KEY'];
+  const o = opts.overrides ?? {};
+  let llmSlots: SlotData | undefined;
+
+  if (useLlm) {
+    try {
+      llmSlots = await llmParseSlots({
+        prompt,
+        ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
+      });
+      opts.onTrace?.('parser: used LLM');
+    } catch (err) {
+      opts.onTrace?.(`parser: LLM failed (${(err as Error).message}); falling back to rules`);
+    }
+  } else {
+    opts.onTrace?.('parser: rule-based (no ANTHROPIC_API_KEY or useLlm=false)');
+  }
+
+  const ruleSpec = parsePrompt(opts);
+  if (!llmSlots) return ruleSpec;
+
+  // LLM slots win, but explicit overrides + opts.id/name/seed still take priority.
+  return {
+    ...ruleSpec,
+    id: opts.id ?? llmSlots.id,
+    name: opts.name ?? llmSlots.name,
+    palette: o.palette ?? llmSlots.palette,
+    materials: o.materials ?? llmSlots.materials,
+    mood: o.mood ?? llmSlots.mood,
+    attackArchetype: o.attackArchetype ?? llmSlots.attackArchetype,
+    optionalParts: o.optionalParts ?? llmSlots.optionalParts,
   };
 }

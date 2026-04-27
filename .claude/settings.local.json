@@ -164,7 +164,8 @@
       "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --check-only --script D:/dev/game-code-gui/templates/deckbuilder/src/scenes/EnemySkeletalDemo.gd --path D:/dev/game-code-gui/templates/deckbuilder)",
       "Bash(\"C:/Users/Michael/Desktop/Godot_v4.6.2-stable_win64.exe\" --headless --quit --path D:/dev/game-code-gui/templates/deckbuilder src/scenes/EnemySkeletalDemo.tscn)",
       "Bash(node --check D:/dev/game-code-gui/apps/assets-compiler/scripts/preview.js)",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(ASSETS_COMPILER_BG_REMOVAL=color-key node ./bin/assets-compiler.js compile --prompt \"rust-armored skeleton knight\" --output ./out/p2-smoke)"
     ]
   }
 }

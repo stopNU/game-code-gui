@@ -24,7 +24,7 @@ async function godotAvailable(): Promise<boolean> {
   }
 }
 
-describe('assets-compiler round-trip', () => {
+describe('assets-compiler round-trip (flat-color path)', () => {
   it('compiles a humanoid enemy and produces a structurally complete .tscn', async () => {
     const out = await mkdtemp(resolve(tmpdir(), 'assets-compiler-'));
     try {
@@ -32,13 +32,14 @@ describe('assets-compiler round-trip', () => {
         prompt: 'rust-armored skeleton knight, slow heavy attacks',
         outputDir: out,
         seed: 12345,
+        flatOnly: true, // skip image gen / segmentation / mesh / atlas
+        useLlm: false,  // skip LLM call so test is offline-safe
       });
       expect(result.ok).toBe(true);
       expect(existsSync(result.files.tscn)).toBe(true);
       expect(existsSync(result.files.meta)).toBe(true);
 
       const tscn = await readFile(result.files.tscn, 'utf8');
-      // Must reference Skeleton2D, key bones, AnimationPlayer, all four clips.
       expect(tscn).toMatch(/type="Skeleton2D"/);
       expect(tscn).toMatch(/type="AnimationPlayer"/);
       expect(tscn).toMatch(/type="AnimationLibrary"/);
@@ -48,7 +49,6 @@ describe('assets-compiler round-trip', () => {
       for (const anim of ['idle', 'attack', 'hit', 'death']) {
         expect(tscn).toMatch(new RegExp(`resource_name = "${anim}"`));
       }
-      // 15 Polygon2D meshes (one per region in REQUIRED_REGIONS).
       const polyCount = (tscn.match(/type="Polygon2D"/g) ?? []).length;
       expect(polyCount).toBe(15);
 
@@ -64,19 +64,17 @@ describe('assets-compiler round-trip', () => {
   it(
     'produces a .tscn that loads cleanly in stock Godot 4',
     async () => {
-      if (!(await godotAvailable())) {
-        // Skip silently when Godot isn't installed.
-        return;
-      }
+      if (!(await godotAvailable())) return;
       const out = await mkdtemp(resolve(tmpdir(), 'assets-compiler-godot-'));
       try {
         const result = await compileEnemy({
           prompt: 'rust-armored skeleton knight, slow heavy attacks',
           outputDir: out,
           seed: 12345,
+          flatOnly: true,
+          useLlm: false,
         });
 
-        // Stage the bundle inside the harness Godot project so res:// paths resolve.
         const stagedDir = resolve(HARNESS_DIR, 'tmp-bundle');
         await rm(stagedDir, { recursive: true, force: true });
         await mkdir(stagedDir, { recursive: true });
@@ -87,18 +85,11 @@ describe('assets-compiler round-trip', () => {
         try {
           await execFileP(
             GODOT,
-            [
-              '--headless',
-              '--path', HARNESS_DIR,
-              '--', // separator: everything after is user args (OS.get_cmdline_user_args)
-              '--enemy', 'res://tmp-bundle/enemy.tscn',
-              '--report', reportPath,
-            ],
+            ['--headless', '--path', HARNESS_DIR, '--',
+             '--enemy', 'res://tmp-bundle/enemy.tscn', '--report', reportPath],
             { timeout: 60_000 },
           );
         } catch (err) {
-          // Godot may exit non-zero if the harness reports issues; we still want
-          // the report contents in the failure message.
           const report = existsSync(reportPath) ? await readFile(reportPath, 'utf8') : '<no report>';
           throw new Error(`godot harness failed: ${(err as Error).message}\nreport: ${report}`);
         }
@@ -107,7 +98,6 @@ describe('assets-compiler round-trip', () => {
         expect(report.ok).toBe(true);
         expect(report.loaded).toBe(true);
         expect(report.errors).toEqual([]);
-        // 20 bones in the humanoid template (root + hip + spine/chest/neck/head + arms + legs).
         expect(report.bones.length).toBe(20);
         expect(report.meshes.length).toBe(15);
         const animNames = (report.animations as Array<{ name: string }>).map((a) => a.name).sort();
@@ -122,5 +112,52 @@ describe('assets-compiler round-trip', () => {
   );
 });
 
-// silence unused warnings for helpers we keep available for future tests
+describe('assets-compiler round-trip (textured path with stub silhouette + color-key)', () => {
+  it(
+    'runs the full Phase 2 pipeline (stub image gen → bg-removal → mesh → atlas → textured tscn)',
+    async () => {
+      // Force the offline path: stub silhouette gen + color-key bg removal.
+      const prevBg = process.env['ASSETS_COMPILER_BG_REMOVAL'];
+      const prevFal = process.env['FAL_KEY'];
+      process.env['ASSETS_COMPILER_BG_REMOVAL'] = 'color-key';
+      delete process.env['FAL_KEY'];
+      const out = await mkdtemp(resolve(tmpdir(), 'assets-compiler-tex-'));
+      try {
+        const result = await compileEnemy({
+          prompt: 'rust-armored skeleton knight, slow heavy attacks',
+          outputDir: out,
+          seed: 12345,
+          useLlm: false,
+        });
+        expect(result.ok).toBe(true);
+        expect(existsSync(result.files.tscn)).toBe(true);
+        expect(existsSync(result.files.atlas)).toBe(true);
+
+        // Pipeline ran the textured stages.
+        const stageNames = result.stages.map((s) => s.stage);
+        expect(stageNames).toContain('segment');
+        expect(stageNames).toContain('mesh');
+        expect(stageNames).toContain('atlas');
+
+        const tscn = await readFile(result.files.tscn, 'utf8');
+        // Textured polygons reference the atlas as an ext_resource and have UVs.
+        expect(tscn).toMatch(/ext_resource type="Texture2D"/);
+        expect(tscn).toMatch(/uv = PackedVector2Array/);
+        expect(tscn).toMatch(/polygons = \[PackedInt32Array/);
+
+        const meta = JSON.parse(await readFile(result.files.meta, 'utf8'));
+        expect(meta.scores.segment).toBeGreaterThan(0);
+        expect(meta.scores.mesh).toBeGreaterThan(0);
+        expect(meta.scores.atlas).toBeGreaterThan(0);
+      } finally {
+        if (prevBg === undefined) delete process.env['ASSETS_COMPILER_BG_REMOVAL'];
+        else process.env['ASSETS_COMPILER_BG_REMOVAL'] = prevBg;
+        if (prevFal !== undefined) process.env['FAL_KEY'] = prevFal;
+        await rm(out, { recursive: true, force: true });
+      }
+    },
+    90_000,
+  );
+});
+
 void writeFile;

@@ -1,5 +1,7 @@
+import { basename } from 'node:path';
 import type { Animation, Bone, Mesh, Skeleton, Vec2, BoneTrack } from '../types/skeleton.js';
 import type { EnemySpec } from '../types/enemy-spec.js';
+import type { AtlasOutput, RegionMesh } from '../types/visual.js';
 
 /**
  * Godot 4.x .tscn writer.
@@ -11,13 +13,15 @@ import type { EnemySpec } from '../types/enemy-spec.js';
  *       Bone2D "root"
  *         Bone2D "hip"
  *           ...                    (parent-before-child hierarchy)
- *         Polygon2D "head"          (child of its primary bone, flat-colored)
+ *         Polygon2D "<region>_mesh"   (child of its primary bone)
  *         ...
  *     AnimationPlayer "AnimationPlayer"
  *       (idle, attack, hit, death)
  *
- * Phase 1 uses flat-colored Polygon2D (no textures). Phase 2 will add an
- * AtlasTexture per region and pack textures.
+ * Two render modes:
+ *   - flat-color: each Polygon2D has a `color` property only (Phase 1 / fallback).
+ *   - textured:   a shared atlas ExtResource is loaded; each Polygon2D has a
+ *                 dynamic mesh (Delaunay triangulated) with UVs into the atlas.
  */
 
 export interface ExportInput {
@@ -25,8 +29,18 @@ export interface ExportInput {
   skeleton: Skeleton;
   animations: Animation[];
   rootOffset: Vec2;
-  /** Region name -> sRGB hex (e.g. "#a8b0b8") from the visual stub stage. */
-  regionColors: Record<string, string>;
+  /** Region name -> sRGB hex (used only in flat-color mode). */
+  regionColors?: Record<string, string>;
+  /** When set, exporter renders textured polygons referencing this atlas. */
+  atlas?: AtlasOutput;
+  /** Per-region triangulated mesh in region-local pixel space. */
+  regionMeshes?: RegionMesh[];
+  /**
+   * Sub-path inside the Godot project where this bundle will live. Used to
+   * prefix the atlas ext_resource path. Defaults to "" (atlas at project root).
+   * Example: "enemies/cultist" → res://enemies/cultist/enemy.atlas.png.
+   */
+  bundleSubdir?: string;
 }
 
 export interface ExportedScene {
@@ -115,29 +129,99 @@ function emitBoneNodes(skeleton: Skeleton): string[] {
   return lines;
 }
 
-function emitMeshNodes(skeleton: Skeleton, regionColors: Record<string, string>): string[] {
+interface TexturedMeshArgs {
+  atlas: AtlasOutput;
+  regionMeshes: RegionMesh[];
+  atlasResId: string;
+}
+
+function emitMeshNodes(
+  skeleton: Skeleton,
+  regionColors: Record<string, string>,
+  textured?: TexturedMeshArgs,
+): string[] {
   const lines: string[] = [];
+  const meshByRegion = new Map<string, RegionMesh>();
+  const rectByRegion = new Map<string, AtlasOutput['rects'][number]>();
+  if (textured) {
+    for (const m of textured.regionMeshes) meshByRegion.set(m.region, m);
+    for (const r of textured.atlas.rects) rectByRegion.set(r.region, r);
+  }
+
+  const byName = new Map(skeleton.bones.map((b) => [b.name, b]));
   for (const mesh of skeleton.meshes) {
-    // Polygon2D as a child of Skeleton (so AnimationPlayer paths are stable).
-    // We position the mesh node at the bone's world position via remote_path,
-    // but Phase 1 uses a simpler approach: parent the Polygon2D directly to
-    // the driving bone so it inherits its transform automatically.
-    // The driving bone's full path:
-    const byName = new Map(skeleton.bones.map((b) => [b.name, b]));
     const bone = byName.get(mesh.primaryBone);
     if (!bone) {
       throw new Error(`Mesh ${mesh.name} references unknown bone ${mesh.primaryBone}`);
     }
     const parentPath = bonePath(bone, skeleton.bones);
-    const color = regionColors[mesh.region] ?? '#888888';
+
+    // Decide rendering: textured if the atlas provides this region AND the
+    // mesh stage built triangles for it; otherwise flat color.
+    const dynMesh = textured ? meshByRegion.get(mesh.region) : undefined;
+    const atlasRect = textured ? rectByRegion.get(mesh.region) : undefined;
+    const useTextured = !!(
+      dynMesh &&
+      atlasRect &&
+      textured &&
+      atlasRect.w > 0 &&
+      atlasRect.h > 0 &&
+      dynMesh.vertices.length >= 3 &&
+      dynMesh.triangles.length >= 3
+    );
+
     lines.push(`[node name="${mesh.name}_mesh" type="Polygon2D" parent="${parentPath}"]`);
     lines.push(`z_index = ${mesh.zIndex}`);
-    lines.push(`color = ${colorFromHex(color)}`);
-    lines.push(`polygon = ${packedVec2Array(mesh.vertices)}`);
-    if (mesh.triangles.length > 0) {
-      // Godot's Polygon2D triangulates concave shapes automatically; for our
-      // simple convex quads the explicit indices aren't strictly needed.
-      // We omit `polygons` (sub-polygon list) and let Godot triangulate.
+
+    if (useTextured && dynMesh && atlasRect && textured) {
+      // Map region-local pixel vertices into bone-local space using the
+      // template's anchor + half-extents. This preserves Phase 1 layout
+      // while replacing geometry with the dynamic Delaunay mesh.
+      const tplMesh = mesh; // template Mesh has halfWidth/halfHeight encoded in its vertices
+      // Recover the half-extents from the template quad.
+      const xs = tplMesh.vertices.map((v) => v.x);
+      const ys = tplMesh.vertices.map((v) => v.y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const halfW = (maxX - minX) / 2;
+      const halfH = (maxY - minY) / 2;
+      const offsetX = -halfW; // both anchor modes are centered horizontally
+      // anchor=center → minY = -halfH; anchor=head → minY = 0.
+      const offsetY = minY;
+
+      const dynW = dynMesh.bounds.w + dynMesh.bounds.x; // not used; we use full image dims via UVs
+      void dynW;
+
+      // The dynMesh.vertices are in region-local pixel coords (whole region image).
+      // Region image dimensions = atlasRect.w/h (we packed at original size).
+      const sx = (2 * halfW) / atlasRect.w;
+      const sy = (2 * halfH) / atlasRect.h;
+      const polygon = dynMesh.vertices.map<Vec2>((v) => ({
+        x: offsetX + v.x * sx,
+        y: offsetY + v.y * sy,
+      }));
+
+      // UVs in atlas pixel coords (Polygon2D `uv` is in texture pixel space).
+      const uvs = dynMesh.vertices.map<Vec2>((v) => ({
+        x: atlasRect.x + v.x,
+        y: atlasRect.y + v.y,
+      }));
+
+      // Sub-polygon list = one entry per triangle so Godot doesn't auto-triangulate.
+      const triLines: string[] = [];
+      for (let t = 0; t < dynMesh.triangles.length; t += 3) {
+        triLines.push(`PackedInt32Array(${dynMesh.triangles[t]}, ${dynMesh.triangles[t + 1]}, ${dynMesh.triangles[t + 2]})`);
+      }
+
+      lines.push(`texture = ExtResource("${textured.atlasResId}")`);
+      lines.push(`polygon = ${packedVec2Array(polygon)}`);
+      lines.push(`uv = ${packedVec2Array(uvs)}`);
+      lines.push(`polygons = [${triLines.join(', ')}]`);
+    } else {
+      // Flat-color fallback (Phase 1 path).
+      const color = regionColors[mesh.region] ?? '#888888';
+      lines.push(`color = ${colorFromHex(color)}`);
+      lines.push(`polygon = ${packedVec2Array(mesh.vertices)}`);
     }
     lines.push('');
   }
@@ -203,11 +287,25 @@ function formatTrackKeys(track: BoneTrack): string {
 }
 
 export function writeTscn(input: ExportInput): ExportedScene {
-  const { skeleton, animations, rootOffset, regionColors, spec } = input;
+  const { skeleton, animations, rootOffset, regionColors, atlas, regionMeshes, spec } = input;
   void packedInt32Array;
   void indent;
 
+  const isTextured = !!(atlas && regionMeshes && regionMeshes.length > 0);
+  const colors = regionColors ?? {};
+
   const subResources: string[] = [];
+  const extResources: string[] = [];
+  let atlasResId: string | undefined;
+  if (isTextured && atlas) {
+    atlasResId = `tex_${spec.id}_atlas`;
+    const atlasFile = basename(atlas.atlasPath);
+    const subdir = (input.bundleSubdir ?? '').replace(/^\/+|\/+$/g, '');
+    const atlasResPath = subdir ? `res://${subdir}/${atlasFile}` : `res://${atlasFile}`;
+    extResources.push(
+      `[ext_resource type="Texture2D" path="${atlasResPath}" id="${atlasResId}"]`,
+    );
+  }
   const animIds: Record<string, string> = {};
   const animPrefix = `anim_${spec.id}`;
   for (const anim of animations) {
@@ -229,7 +327,7 @@ export function writeTscn(input: ExportInput): ExportedScene {
 
   // load_steps: header value is hint-only (Godot recalculates on load), but
   // setting it close to actual sub-resource count keeps the file tidy.
-  const loadSteps = subResources.length + 1;
+  const loadSteps = subResources.length + extResources.length + 1;
   const header = `[gd_scene load_steps=${loadSteps} format=3 uid="uid://enemy_${spec.id}"]`;
 
   // --- Node tree ---
@@ -248,13 +346,16 @@ export function writeTscn(input: ExportInput): ExportedScene {
   nodeLines.push(...emitBoneNodes(skeleton));
 
   // Polygon2D meshes (parented to their primary bones)
-  nodeLines.push(...emitMeshNodes(skeleton, regionColors));
+  const texturedArgs = isTextured && atlas && regionMeshes && atlasResId
+    ? { atlas, regionMeshes, atlasResId }
+    : undefined;
+  nodeLines.push(...emitMeshNodes(skeleton, colors, texturedArgs));
 
   // AnimationPlayer
   nodeLines.push(`[node name="AnimationPlayer" type="AnimationPlayer" parent="."]`);
   nodeLines.push(`libraries = {\n"": SubResource("${libId}")\n}`);
   nodeLines.push('');
 
-  const tscn = [header, '', ...subResources, ...nodeLines].join('\n');
+  const tscn = [header, '', ...extResources, '', ...subResources, ...nodeLines].join('\n');
   return { tscn };
 }

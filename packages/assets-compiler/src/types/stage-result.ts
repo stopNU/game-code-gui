@@ -3,6 +3,7 @@ export type StageName =
   | 'visual'
   | 'segment'
   | 'mesh'
+  | 'atlas'
   | 'rig'
   | 'motion'
   | 'export';

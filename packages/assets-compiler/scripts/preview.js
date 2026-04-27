@@ -18,11 +18,20 @@ const PREVIEW_DIR = resolve(HARNESS_DIR, 'preview-bundle');
 const CLI = resolve(PKG_ROOT, 'bin', 'assets-compiler.js');
 
 function parseArgs(argv) {
-  const out = { prompt: 'rust-armored skeleton knight, slow heavy attacks', seed: undefined };
+  // Default to color-key bg removal so the preview stays offline; pass
+  // `--bg-removal rmbg` to download the RMBG model the first time.
+  const out = {
+    prompt: 'rust-armored skeleton knight, slow heavy attacks',
+    seed: undefined,
+    bgRemoval: 'color-key',
+    flat: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--prompt' && argv[i + 1]) { out.prompt = argv[++i]; continue; }
     if (a === '--seed' && argv[i + 1]) { out.seed = argv[++i]; continue; }
+    if (a === '--bg-removal' && argv[i + 1]) { out.bgRemoval = argv[++i]; continue; }
+    if (a === '--flat') { out.flat = true; continue; }
   }
   return out;
 }
@@ -35,12 +44,20 @@ function ensureBuilt() {
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
-function compile({ prompt, seed }) {
+function compile({ prompt, seed, bgRemoval, flat }) {
   rmSync(PREVIEW_DIR, { recursive: true, force: true });
   mkdirSync(PREVIEW_DIR, { recursive: true });
-  const args = [CLI, 'compile', '--prompt', prompt, '--output', PREVIEW_DIR];
+  const args = [
+    CLI, 'compile',
+    '--prompt', prompt,
+    '--output', PREVIEW_DIR,
+    '--bundle-subdir', 'preview-bundle', // matches PREVIEW_DIR's path under the harness project
+  ];
   if (seed !== undefined) args.push('--seed', seed);
+  if (bgRemoval) args.push('--bg-removal', bgRemoval);
+  if (flat) args.push('--flat');
   console.log(`[preview] compiling: ${prompt}`);
+  console.log(`[preview]   bg-removal=${bgRemoval}${flat ? ' (flat-only mode)' : ''}`);
   const r = spawnSync(process.execPath, args, { stdio: 'inherit' });
   if (r.status !== 0) process.exit(r.status ?? 1);
 }

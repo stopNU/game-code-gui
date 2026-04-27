@@ -1,13 +1,15 @@
 import type { EnemySpec } from '../types/enemy-spec.js';
+import type { VisualOutput } from '../types/visual.js';
 import type { Stage } from '../orchestrator/stage-runner.js';
 
 /**
- * Phase 1 stub: instead of generating real images, this stage produces a
- * deterministic per-region color map derived from the spec's palette.
- * The exporter renders parts as flat-colored Polygon2D nodes so we can
- * round-trip into Godot without needing a texture pipeline yet.
+ * Phase 1 stub: produces a deterministic per-region color map derived from
+ * the spec's palette and returns a `kind: 'flat-colors'` visual output.
+ * The exporter renders parts as flat-colored Polygon2D nodes.
  *
- * Phase 2 replaces this with real FAL.ai image generation.
+ * Phase 2's `visualStage` (in ./visual.ts) wraps this as the fallback path
+ * when image-gen fails. The stub is kept as a standalone export so tests
+ * can opt into the deterministic flat-color path without a FAL key.
  */
 
 const COLOR_WORDS: Record<string, string> = {
@@ -34,8 +36,6 @@ function paletteHexes(palette: string[]): string[] {
 }
 
 function shadeRegion(region: string, palette: string[]): string {
-  // Stable region → palette-color mapping. Body parts (chest/hip) get color[0],
-  // limbs get color[1] (or color[0] if only one), head gets a slightly lifted color[0].
   const hexes = paletteHexes(palette);
   const limb = hexes[1] ?? hexes[0]!;
   if (region === 'head') return liftHex(hexes[0]!, 16);
@@ -53,11 +53,6 @@ function liftHex(hex: string, amount: number): string {
   return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
-export interface VisualOutput {
-  /** Map of region key -> sRGB hex color, e.g. { head: "#dcd2b5", torso: "#8a3a1f", ... }. */
-  regionColors: Record<string, string>;
-}
-
 export const REQUIRED_REGIONS = [
   'head', 'torso', 'hip',
   'l_upper_arm', 'l_lower_arm', 'l_hand',
@@ -73,7 +68,8 @@ export const visualStubStage: Stage<EnemySpec, VisualOutput> = {
     for (const region of REQUIRED_REGIONS) {
       regionColors[region] = shadeRegion(region, spec.palette);
     }
-    await ctx.graph.writeJson('visual', 'colors.json', regionColors);
-    return { output: { regionColors }, score: 1.0 };
+    const output: VisualOutput = { kind: 'flat-colors', regionColors };
+    await ctx.graph.writeJson('visual', 'output.json', output);
+    return { output, score: 1.0 };
   },
 };

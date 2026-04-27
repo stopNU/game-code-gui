@@ -8,5 +8,8 @@
     "types": ["node"],
     "resolveJsonModule": true
   },
+  "references": [
+    { "path": "../core" }
+  ],
   "include": ["src/**/*"]
 }

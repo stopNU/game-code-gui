@@ -22,12 +22,19 @@ interface SkeletonJson {
   }>;
 }
 
+export interface RegionRect {
+  id: string;
+  x: number; y: number; w: number; h: number;
+}
+
 export interface TemplateData {
   templateId: string;
   canvasSize: { width: number; height: number };
   rootOffset: Vec2;
   skeleton: Skeleton;
   animations: Animation[];
+  /** Proportional region rects on the source T-pose image (fractions in [0,1]). */
+  regions: RegionRect[];
 }
 
 const MOTION_NAMES = ['idle', 'attack', 'hit', 'death'] as const;
@@ -93,11 +100,16 @@ export async function loadTemplate(templateId: 'humanoid'): Promise<TemplateData
     animations.push(raw);
   }
 
+  const regionsRaw = JSON.parse(
+    await readFile(resolve(root, 'regions.json'), 'utf8'),
+  ) as { regions: RegionRect[] };
+
   return {
     templateId: skelRaw.templateId,
     canvasSize: skelRaw.canvasSize,
     rootOffset: skelRaw.rootOffset,
     skeleton,
     animations,
+    regions: regionsRaw.regions,
   };
 }

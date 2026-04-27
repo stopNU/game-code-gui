@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { config as loadEnv } from 'dotenv';
 import { resolve } from 'node:path';
 import { compileEnemy } from './orchestrator/compile.js';
+
+// Load .env from cwd and from the monorepo root.
+//   dist/cli.js → ../ = packages/assets-compiler → ../../ = packages → ../../../ = repo root
+loadEnv({ path: resolve(process.cwd(), '.env') });
+loadEnv({ path: resolve(import.meta.dirname, '../../../.env') });
+// Also try one level deeper in case the package is hoisted differently.
+loadEnv({ path: resolve(import.meta.dirname, '../../../../.env') });
 
 const program = new Command();
 
@@ -20,6 +28,10 @@ program
   .option('--id <id>', 'override slug id')
   .option('--name <name>', 'override display name')
   .option('--retries <n>', 'per-stage retry budget', (v) => parseInt(v, 10))
+  .option('--flat', 'skip image gen / segmentation / mesh / atlas — emit flat-colored polygons (Phase 1 path)', false)
+  .option('--no-llm', 'use rule-based prompt parser only (skip ANTHROPIC_API_KEY usage)')
+  .option('--bg-removal <mode>', 'background removal adapter: "rmbg" (default) or "color-key"', 'rmbg')
+  .option('--bundle-subdir <path>', 'sub-path inside the consuming Godot project (e.g. "enemies/cultist"); used to prefix atlas ext_resource path')
   .option('--json', 'emit JSON progress to stdout', false)
   .action(async (opts) => {
     const startedAt = Date.now();
@@ -31,6 +43,9 @@ program
       if (useJson) process.stdout.write(JSON.stringify(obj) + '\n');
     };
 
+    if (opts.bgRemoval === 'color-key') {
+      process.env['ASSETS_COMPILER_BG_REMOVAL'] = 'color-key';
+    }
     try {
       const result = await compileEnemy({
         prompt: opts.prompt,
@@ -40,6 +55,9 @@ program
         ...(opts.id ? { id: opts.id } : {}),
         ...(opts.name ? { name: opts.name } : {}),
         ...(opts.retries !== undefined ? { retries: { perStage: opts.retries } } : {}),
+        ...(opts.flat ? { flatOnly: true } : {}),
+        ...(opts.llm === false ? { useLlm: false } : {}),
+        ...(opts.bundleSubdir ? { bundleSubdir: opts.bundleSubdir } : {}),
         onEvent: (evt) => {
           if (useJson) {
             emit(evt);
@@ -50,6 +68,9 @@ program
           } else if (evt.type === 'stage-result') {
             const sym = evt.result.ok ? '✓' : '✗';
             log(`${sym} ${evt.stage} score=${evt.result.score.toFixed(2)} retries=${evt.result.retries} (${evt.result.durationMs}ms)`);
+            for (const issue of evt.result.issues) {
+              log(`    ${issue.severity}: ${issue.message}`);
+            }
           } else if (evt.type === 'stage-retry') {
             log(`↻ ${evt.stage}: ${evt.reason}`);
           }
@@ -78,6 +99,23 @@ program
         log(`  bundle: ${result.bundlePath}`);
         log(`  tscn:   ${result.files.tscn}`);
         log(`  meta:   ${result.files.meta}`);
+        // Visibility: which image-gen + bg-removal ran?
+        try {
+          const fs = await import('node:fs/promises');
+          const visualOut = JSON.parse(
+            await fs.readFile(resolve(result.bundlePath, '.compiler/visual/output.json'), 'utf8'),
+          );
+          if (visualOut.kind === 'image') {
+            log(`  visual: ${visualOut.provenance}  (${visualOut.width}×${visualOut.height})`);
+          } else {
+            log(`  visual: flat-color fallback (no image — set FAL_KEY for real generation)`);
+          }
+          const segPath = resolve(result.bundlePath, '.compiler/segment/output.json');
+          const segOut = JSON.parse(await fs.readFile(segPath, 'utf8')).adapter;
+          if (segOut) log(`  segment: ${segOut}`);
+        } catch {
+          // Intermediate artifacts not present (flat-only or stage failed).
+        }
       }
       process.exit(result.ok ? 0 : 1);
     } catch (err) {
