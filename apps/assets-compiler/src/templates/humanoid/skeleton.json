@@ -1,0 +1,49 @@
+{
+  "templateId": "humanoid",
+  "canvasSize": { "width": 256, "height": 384 },
+  "rootOffset": { "x": 128, "y": 200 },
+  "bones": [
+    { "name": "root",          "parent": null,            "position": { "x": 0, "y": 0 },    "rotation": 0, "length": 0 },
+    { "name": "hip",           "parent": "root",          "position": { "x": 0, "y": 0 },    "rotation": 0, "length": 18 },
+
+    { "name": "spine",         "parent": "hip",           "position": { "x": 0, "y": -22 },  "rotation": 0, "length": 22 },
+    { "name": "chest",         "parent": "spine",         "position": { "x": 0, "y": -28 },  "rotation": 0, "length": 28 },
+    { "name": "neck",          "parent": "chest",         "position": { "x": 0, "y": -22 },  "rotation": 0, "length": 12 },
+    { "name": "head",          "parent": "neck",          "position": { "x": 0, "y": -14 },  "rotation": 0, "length": 32 },
+
+    { "name": "l_shoulder",    "parent": "chest",         "position": { "x": -22, "y": -16 }, "rotation": 0, "length": 0 },
+    { "name": "l_upper_arm",   "parent": "l_shoulder",    "position": { "x": 0,   "y": 0 },   "rotation": 0, "length": 28 },
+    { "name": "l_lower_arm",   "parent": "l_upper_arm",   "position": { "x": 0,   "y": 28 },  "rotation": 0, "length": 26 },
+    { "name": "l_hand",        "parent": "l_lower_arm",   "position": { "x": 0,   "y": 26 },  "rotation": 0, "length": 12 },
+
+    { "name": "r_shoulder",    "parent": "chest",         "position": { "x": 22, "y": -16 },  "rotation": 0, "length": 0 },
+    { "name": "r_upper_arm",   "parent": "r_shoulder",    "position": { "x": 0,   "y": 0 },   "rotation": 0, "length": 28 },
+    { "name": "r_lower_arm",   "parent": "r_upper_arm",   "position": { "x": 0,   "y": 28 },  "rotation": 0, "length": 26 },
+    { "name": "r_hand",        "parent": "r_lower_arm",   "position": { "x": 0,   "y": 26 },  "rotation": 0, "length": 12 },
+
+    { "name": "l_upper_leg",   "parent": "hip",           "position": { "x": -10, "y": 6 },   "rotation": 0, "length": 36 },
+    { "name": "l_lower_leg",   "parent": "l_upper_leg",   "position": { "x": 0,   "y": 36 },  "rotation": 0, "length": 32 },
+    { "name": "l_foot",        "parent": "l_lower_leg",   "position": { "x": 0,   "y": 32 },  "rotation": 0, "length": 14 },
+
+    { "name": "r_upper_leg",   "parent": "hip",           "position": { "x": 10,  "y": 6 },   "rotation": 0, "length": 36 },
+    { "name": "r_lower_leg",   "parent": "r_upper_leg",   "position": { "x": 0,   "y": 36 },  "rotation": 0, "length": 32 },
+    { "name": "r_foot",        "parent": "r_lower_leg",   "position": { "x": 0,   "y": 32 },  "rotation": 0, "length": 14 }
+  ],
+  "meshes": [
+    { "name": "head",        "region": "head",        "primaryBone": "head",        "halfWidth": 28, "halfHeight": 32, "anchor": "center", "zIndex": 10 },
+    { "name": "torso",       "region": "torso",       "primaryBone": "chest",       "halfWidth": 26, "halfHeight": 28, "anchor": "center", "zIndex": 5 },
+    { "name": "hip",         "region": "hip",         "primaryBone": "hip",         "halfWidth": 20, "halfHeight": 14, "anchor": "center", "zIndex": 4 },
+    { "name": "l_upper_arm", "region": "l_upper_arm", "primaryBone": "l_upper_arm", "halfWidth": 9,  "halfHeight": 16, "anchor": "head",   "zIndex": 6 },
+    { "name": "l_lower_arm", "region": "l_lower_arm", "primaryBone": "l_lower_arm", "halfWidth": 8,  "halfHeight": 14, "anchor": "head",   "zIndex": 7 },
+    { "name": "l_hand",      "region": "l_hand",      "primaryBone": "l_hand",      "halfWidth": 8,  "halfHeight": 8,  "anchor": "head",   "zIndex": 8 },
+    { "name": "r_upper_arm", "region": "r_upper_arm", "primaryBone": "r_upper_arm", "halfWidth": 9,  "halfHeight": 16, "anchor": "head",   "zIndex": 6 },
+    { "name": "r_lower_arm", "region": "r_lower_arm", "primaryBone": "r_lower_arm", "halfWidth": 8,  "halfHeight": 14, "anchor": "head",   "zIndex": 7 },
+    { "name": "r_hand",      "region": "r_hand",      "primaryBone": "r_hand",      "halfWidth": 8,  "halfHeight": 8,  "anchor": "head",   "zIndex": 8 },
+    { "name": "l_upper_leg", "region": "l_upper_leg", "primaryBone": "l_upper_leg", "halfWidth": 10, "halfHeight": 20, "anchor": "head",   "zIndex": 3 },
+    { "name": "l_lower_leg", "region": "l_lower_leg", "primaryBone": "l_lower_leg", "halfWidth": 9,  "halfHeight": 18, "anchor": "head",   "zIndex": 3 },
+    { "name": "l_foot",      "region": "l_foot",      "primaryBone": "l_foot",      "halfWidth": 10, "halfHeight": 8,  "anchor": "head",   "zIndex": 3 },
+    { "name": "r_upper_leg", "region": "r_upper_leg", "primaryBone": "r_upper_leg", "halfWidth": 10, "halfHeight": 20, "anchor": "head",   "zIndex": 3 },
+    { "name": "r_lower_leg", "region": "r_lower_leg", "primaryBone": "r_lower_leg", "halfWidth": 9,  "halfHeight": 18, "anchor": "head",   "zIndex": 3 },
+    { "name": "r_foot",      "region": "r_foot",      "primaryBone": "r_foot",      "halfWidth": 10, "halfHeight": 8,  "anchor": "head",   "zIndex": 3 }
+  ]
+}

@@ -8,6 +8,10 @@ dist/
 # Generated game output dirs (not the templates)
 apps/*/output/
 
+# assets-compiler local outputs
+apps/assets-compiler/out/
+apps/assets-compiler/test-out/
+
 # Playwright artifacts
 test-results/
 playwright-report/

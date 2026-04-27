@@ -1,0 +1,388 @@
+[gd_scene load_steps=6 format=3 uid="uid://enemy_stoic_bone_armored_humanoid_sentinel"]
+
+[sub_resource type="Animation" id="anim_stoic_bone_armored_humanoid_sentinel_idle"]
+resource_name = "idle"
+length = 2
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Skeleton/root/hip/spine/chest:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1, 2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, -28), Vector2(0, -30), Vector2(0, -28)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Skeleton/root/hip/spine/chest/neck/head:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 1, 2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0, -0.04, 0]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Skeleton/root/hip/spine/chest/l_shoulder/l_upper_arm:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 1, 2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.05, 0.1, 0.05]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("Skeleton/root/hip/spine/chest/r_shoulder/r_upper_arm:rotation")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 1, 2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [-0.05, -0.1, -0.05]
+}
+
+[sub_resource type="Animation" id="anim_stoic_bone_armored_humanoid_sentinel_attack"]
+resource_name = "attack"
+length = 0.6
+loop_mode = 0
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Skeleton/root/hip/spine/chest/r_shoulder/r_upper_arm:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.25, 0.4, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [0, -1.6, 1.2, 0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Skeleton/root/hip/spine/chest/r_shoulder/r_upper_arm/r_lower_arm:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.25, 0.4, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [0, -0.8, 0.4, 0]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Skeleton/root/hip/spine/chest:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.25, 0.4, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [0, -0.15, 0.2, 0]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("Skeleton/root/hip/spine/chest/neck/head:rotation")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.25, 0.4, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [0, -0.1, 0.15, 0]
+}
+
+[sub_resource type="Animation" id="anim_stoic_bone_armored_humanoid_sentinel_hit"]
+resource_name = "hit"
+length = 0.3
+loop_mode = 0
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Skeleton/root:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.08, 0.2, 0.3),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(6, -2), Vector2(-2, 0), Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Skeleton/root/hip/spine/chest:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.3),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0, 0.25, 0]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Skeleton/root/hip/spine/chest/neck/head:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.3),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0, 0.35, 0]
+}
+
+[sub_resource type="Animation" id="anim_stoic_bone_armored_humanoid_sentinel_death"]
+resource_name = "death"
+length = 1
+loop_mode = 0
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Skeleton/root:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.6, 1),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0, -1, -1.5708]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Skeleton/root:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.6, 1),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(-10, 30), Vector2(-20, 60)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Skeleton/root/hip/spine/chest:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.5, 1),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0, 0.2, 0.4]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("Skeleton/root/hip/spine/chest/neck/head:rotation")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.5, 1),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0, 0.3, 0.5]
+}
+
+[sub_resource type="AnimationLibrary" id="lib_stoic_bone_armored_humanoid_sentinel"]
+_data = {
+"idle": SubResource("anim_stoic_bone_armored_humanoid_sentinel_idle"),
+"attack": SubResource("anim_stoic_bone_armored_humanoid_sentinel_attack"),
+"hit": SubResource("anim_stoic_bone_armored_humanoid_sentinel_hit"),
+"death": SubResource("anim_stoic_bone_armored_humanoid_sentinel_death")
+}
+
+[node name="Enemy" type="Node2D"]
+position = Vector2(128, 200)
+
+[node name="Skeleton" type="Skeleton2D" parent="."]
+
+[node name="root" type="Bone2D" parent="Skeleton"]
+position = Vector2(0, 0)
+
+[node name="hip" type="Bone2D" parent="Skeleton/root"]
+position = Vector2(0, 0)
+auto_calculate_length_and_angle = false
+length = 18
+
+[node name="spine" type="Bone2D" parent="Skeleton/root/hip"]
+position = Vector2(0, -22)
+auto_calculate_length_and_angle = false
+length = 22
+
+[node name="chest" type="Bone2D" parent="Skeleton/root/hip/spine"]
+position = Vector2(0, -28)
+auto_calculate_length_and_angle = false
+length = 28
+
+[node name="neck" type="Bone2D" parent="Skeleton/root/hip/spine/chest"]
+position = Vector2(0, -22)
+auto_calculate_length_and_angle = false
+length = 12
+
+[node name="head" type="Bone2D" parent="Skeleton/root/hip/spine/chest/neck"]
+position = Vector2(0, -14)
+auto_calculate_length_and_angle = false
+length = 32
+
+[node name="l_shoulder" type="Bone2D" parent="Skeleton/root/hip/spine/chest"]
+position = Vector2(-22, -16)
+
+[node name="l_upper_arm" type="Bone2D" parent="Skeleton/root/hip/spine/chest/l_shoulder"]
+position = Vector2(0, 0)
+auto_calculate_length_and_angle = false
+length = 28
+
+[node name="l_lower_arm" type="Bone2D" parent="Skeleton/root/hip/spine/chest/l_shoulder/l_upper_arm"]
+position = Vector2(0, 28)
+auto_calculate_length_and_angle = false
+length = 26
+
+[node name="l_hand" type="Bone2D" parent="Skeleton/root/hip/spine/chest/l_shoulder/l_upper_arm/l_lower_arm"]
+position = Vector2(0, 26)
+auto_calculate_length_and_angle = false
+length = 12
+
+[node name="r_shoulder" type="Bone2D" parent="Skeleton/root/hip/spine/chest"]
+position = Vector2(22, -16)
+
+[node name="r_upper_arm" type="Bone2D" parent="Skeleton/root/hip/spine/chest/r_shoulder"]
+position = Vector2(0, 0)
+auto_calculate_length_and_angle = false
+length = 28
+
+[node name="r_lower_arm" type="Bone2D" parent="Skeleton/root/hip/spine/chest/r_shoulder/r_upper_arm"]
+position = Vector2(0, 28)
+auto_calculate_length_and_angle = false
+length = 26
+
+[node name="r_hand" type="Bone2D" parent="Skeleton/root/hip/spine/chest/r_shoulder/r_upper_arm/r_lower_arm"]
+position = Vector2(0, 26)
+auto_calculate_length_and_angle = false
+length = 12
+
+[node name="l_upper_leg" type="Bone2D" parent="Skeleton/root/hip"]
+position = Vector2(-10, 6)
+auto_calculate_length_and_angle = false
+length = 36
+
+[node name="l_lower_leg" type="Bone2D" parent="Skeleton/root/hip/l_upper_leg"]
+position = Vector2(0, 36)
+auto_calculate_length_and_angle = false
+length = 32
+
+[node name="l_foot" type="Bone2D" parent="Skeleton/root/hip/l_upper_leg/l_lower_leg"]
+position = Vector2(0, 32)
+auto_calculate_length_and_angle = false
+length = 14
+
+[node name="r_upper_leg" type="Bone2D" parent="Skeleton/root/hip"]
+position = Vector2(10, 6)
+auto_calculate_length_and_angle = false
+length = 36
+
+[node name="r_lower_leg" type="Bone2D" parent="Skeleton/root/hip/r_upper_leg"]
+position = Vector2(0, 36)
+auto_calculate_length_and_angle = false
+length = 32
+
+[node name="r_foot" type="Bone2D" parent="Skeleton/root/hip/r_upper_leg/r_lower_leg"]
+position = Vector2(0, 32)
+auto_calculate_length_and_angle = false
+length = 14
+
+[node name="head_mesh" type="Polygon2D" parent="Skeleton/root/hip/spine/chest/neck/head"]
+z_index = 10
+color = Color(0.9255, 0.8863, 0.7725, 1)
+polygon = PackedVector2Array(-28, -32, 28, -32, 28, 32, -28, 32)
+
+[node name="torso_mesh" type="Polygon2D" parent="Skeleton/root/hip/spine/chest"]
+z_index = 5
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-26, -28, 26, -28, 26, 28, -26, 28)
+
+[node name="hip_mesh" type="Polygon2D" parent="Skeleton/root/hip"]
+z_index = 4
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-20, -14, 20, -14, 20, 14, -20, 14)
+
+[node name="l_upper_arm_mesh" type="Polygon2D" parent="Skeleton/root/hip/spine/chest/l_shoulder/l_upper_arm"]
+z_index = 6
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-9, 0, 9, 0, 9, 32, -9, 32)
+
+[node name="l_lower_arm_mesh" type="Polygon2D" parent="Skeleton/root/hip/spine/chest/l_shoulder/l_upper_arm/l_lower_arm"]
+z_index = 7
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-8, 0, 8, 0, 8, 28, -8, 28)
+
+[node name="l_hand_mesh" type="Polygon2D" parent="Skeleton/root/hip/spine/chest/l_shoulder/l_upper_arm/l_lower_arm/l_hand"]
+z_index = 8
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-8, 0, 8, 0, 8, 16, -8, 16)
+
+[node name="r_upper_arm_mesh" type="Polygon2D" parent="Skeleton/root/hip/spine/chest/r_shoulder/r_upper_arm"]
+z_index = 6
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-9, 0, 9, 0, 9, 32, -9, 32)
+
+[node name="r_lower_arm_mesh" type="Polygon2D" parent="Skeleton/root/hip/spine/chest/r_shoulder/r_upper_arm/r_lower_arm"]
+z_index = 7
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-8, 0, 8, 0, 8, 28, -8, 28)
+
+[node name="r_hand_mesh" type="Polygon2D" parent="Skeleton/root/hip/spine/chest/r_shoulder/r_upper_arm/r_lower_arm/r_hand"]
+z_index = 8
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-8, 0, 8, 0, 8, 16, -8, 16)
+
+[node name="l_upper_leg_mesh" type="Polygon2D" parent="Skeleton/root/hip/l_upper_leg"]
+z_index = 3
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-10, 0, 10, 0, 10, 40, -10, 40)
+
+[node name="l_lower_leg_mesh" type="Polygon2D" parent="Skeleton/root/hip/l_upper_leg/l_lower_leg"]
+z_index = 3
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-9, 0, 9, 0, 9, 36, -9, 36)
+
+[node name="l_foot_mesh" type="Polygon2D" parent="Skeleton/root/hip/l_upper_leg/l_lower_leg/l_foot"]
+z_index = 3
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-10, 0, 10, 0, 10, 16, -10, 16)
+
+[node name="r_upper_leg_mesh" type="Polygon2D" parent="Skeleton/root/hip/r_upper_leg"]
+z_index = 3
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-10, 0, 10, 0, 10, 40, -10, 40)
+
+[node name="r_lower_leg_mesh" type="Polygon2D" parent="Skeleton/root/hip/r_upper_leg/r_lower_leg"]
+z_index = 3
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-9, 0, 9, 0, 9, 36, -9, 36)
+
+[node name="r_foot_mesh" type="Polygon2D" parent="Skeleton/root/hip/r_upper_leg/r_lower_leg/r_foot"]
+z_index = 3
+color = Color(0.8627, 0.8235, 0.7098, 1)
+polygon = PackedVector2Array(-10, 0, 10, 0, 10, 16, -10, 16)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("lib_stoic_bone_armored_humanoid_sentinel")
+}

@@ -1,0 +1,31 @@
+{
+  "name": "idle",
+  "length": 2.0,
+  "loop": true,
+  "tracks": [
+    {
+      "bone": "chest",
+      "property": "position",
+      "times": [0.0, 1.0, 2.0],
+      "values": [{ "x": 0, "y": -28 }, { "x": 0, "y": -30 }, { "x": 0, "y": -28 }]
+    },
+    {
+      "bone": "head",
+      "property": "rotation",
+      "times": [0.0, 1.0, 2.0],
+      "values": [0.0, -0.04, 0.0]
+    },
+    {
+      "bone": "l_upper_arm",
+      "property": "rotation",
+      "times": [0.0, 1.0, 2.0],
+      "values": [0.05, 0.10, 0.05]
+    },
+    {
+      "bone": "r_upper_arm",
+      "property": "rotation",
+      "times": [0.0, 1.0, 2.0],
+      "values": [-0.05, -0.10, -0.05]
+    }
+  ]
+}

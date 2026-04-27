@@ -1,0 +1,30 @@
+{
+  "id": "stoic_bone_armored_humanoid_sentinel",
+  "name": "Stoic Bone Armored Humanoid Sentinel",
+  "prompt": "stoic bone-armored humanoid sentinel",
+  "templateId": "humanoid",
+  "palette": [
+    "bone"
+  ],
+  "materials": [
+    "bone"
+  ],
+  "mood": "stoic",
+  "attackArchetype": "melee-fast",
+  "optionalParts": [],
+  "seed": 3001158157,
+  "generatedAt": "2026-04-27T12:32:28.244Z",
+  "scores": {
+    "parse": 1,
+    "visual": 1,
+    "rig": 1,
+    "export": 1
+  },
+  "retries": {
+    "parse": 0,
+    "visual": 0,
+    "rig": 0,
+    "export": 0
+  },
+  "compilerVersion": "0.1.0"
+}
