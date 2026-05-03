@@ -14,7 +14,7 @@
     "assets-compiler": "./bin/assets-compiler.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node ./scripts/copy-templates.js",
+    "build": "tsc -p tsconfig.json",
     "start": "node ./bin/assets-compiler.js",
     "dev": "tsx src/cli.ts",
     "preview": "node ./scripts/preview.js",
@@ -27,14 +27,11 @@
     "@fal-ai/client": "^1.0.0",
     "@huggingface/transformers": "^3.0.0",
     "commander": "^12.0.0",
-    "delaunator": "^5.0.0",
     "dotenv": "^16.4.0",
-    "maxrects-packer": "^2.7.0",
     "sharp": "^0.33.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@types/delaunator": "^5.0.0",
     "@types/node": "^22.0.0",
     "rimraf": "^6.0.0",
     "tsx": "^4.19.0",

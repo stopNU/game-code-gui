@@ -1,11 +1,7 @@
 export type StageName =
   | 'parse'
   | 'visual'
-  | 'segment'
-  | 'mesh'
-  | 'atlas'
-  | 'rig'
-  | 'motion'
+  | 'bg-remove'
   | 'export';
 
 export interface StageIssue {
@@ -30,7 +26,7 @@ export interface CompileResult {
   bundlePath: string;
   files: {
     tscn: string;
-    atlas: string;
+    sprite: string;
     meta: string;
   };
   stages: StageResult[];

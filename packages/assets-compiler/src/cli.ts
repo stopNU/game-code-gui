@@ -15,7 +15,7 @@ const program = new Command();
 
 program
   .name('assets-compiler')
-  .description('Compile text prompts into game-ready 2D skeletal enemy bundles for Godot')
+  .description('Compile text prompts into static enemy sprite bundles for Godot')
   .version('0.1.0');
 
 program
@@ -23,16 +23,13 @@ program
   .description('Compile a single enemy from a prompt')
   .requiredOption('-p, --prompt <text>', 'enemy description')
   .requiredOption('-o, --output <dir>', 'output bundle directory')
-  .option('-t, --template <id>', 'anatomy template id', 'humanoid')
   .option('-s, --seed <n>', 'deterministic seed', (v) => parseInt(v, 10))
   .option('--id <id>', 'override slug id')
   .option('--name <name>', 'override display name')
   .option('--retries <n>', 'per-stage retry budget', (v) => parseInt(v, 10))
-  .option('--flat', 'skip image gen / segmentation / mesh / atlas — emit flat-colored polygons (Phase 1 path)', false)
   .option('--no-llm', 'use rule-based prompt parser only (skip ANTHROPIC_API_KEY usage)')
-  .option('--no-procedural-rig', 'skip landmark detection; always use the template skeleton')
   .option('--bg-removal <mode>', 'background removal adapter: "rmbg" (default) or "color-key"', 'rmbg')
-  .option('--bundle-subdir <path>', 'sub-path inside the consuming Godot project (e.g. "enemies/cultist"); used to prefix atlas ext_resource path')
+  .option('--bundle-subdir <path>', 'sub-path inside the consuming Godot project (e.g. "enemies/cultist"); used to prefix sprite ext_resource path')
   .option('--json', 'emit JSON progress to stdout', false)
   .action(async (opts) => {
     const startedAt = Date.now();
@@ -51,14 +48,11 @@ program
       const result = await compileEnemy({
         prompt: opts.prompt,
         outputDir: resolve(opts.output),
-        templateId: opts.template,
         ...(opts.seed !== undefined ? { seed: opts.seed } : {}),
         ...(opts.id ? { id: opts.id } : {}),
         ...(opts.name ? { name: opts.name } : {}),
         ...(opts.retries !== undefined ? { retries: { perStage: opts.retries } } : {}),
-        ...(opts.flat ? { flatOnly: true } : {}),
         ...(opts.llm === false ? { useLlm: false } : {}),
-        ...(opts.proceduralRig === false ? { noProceduralRig: true } : {}),
         ...(opts.bundleSubdir ? { bundleSubdir: opts.bundleSubdir } : {}),
         onEvent: (evt) => {
           if (useJson) {
@@ -100,29 +94,19 @@ program
         log(`✓ compiled in ${summary.durationMs}ms`);
         log(`  bundle: ${result.bundlePath}`);
         log(`  tscn:   ${result.files.tscn}`);
+        log(`  sprite: ${result.files.sprite}`);
         log(`  meta:   ${result.files.meta}`);
-        // Visibility: which image-gen + bg-removal ran?
+        // Visibility: which image-gen ran?
         try {
           const fs = await import('node:fs/promises');
           const visualOut = JSON.parse(
             await fs.readFile(resolve(result.bundlePath, '.compiler/visual/output.json'), 'utf8'),
           );
-          if (visualOut.kind === 'image') {
+          if (visualOut.provenance) {
             log(`  visual: ${visualOut.provenance}  (${visualOut.width}×${visualOut.height})`);
-          } else {
-            log(`  visual: flat-color fallback (no image — set FAL_KEY for real generation)`);
           }
-          const segPath = resolve(result.bundlePath, '.compiler/segment/output.json');
-          const segOut = JSON.parse(await fs.readFile(segPath, 'utf8')).adapter;
-          if (segOut) log(`  segment: ${segOut}`);
-          try {
-            const rigArtifact = JSON.parse(
-              await fs.readFile(resolve(result.bundlePath, '.compiler/rig/output.json'), 'utf8'),
-            );
-            log(`  rig:     ${rigArtifact.source ?? 'unknown'}`);
-          } catch { /* no rig artifact in flat-only path */ }
         } catch {
-          // Intermediate artifacts not present (flat-only or stage failed).
+          // Intermediate artifacts not present (visual stage failed).
         }
       }
       process.exit(result.ok ? 0 : 1);
@@ -135,13 +119,6 @@ program
       }
       process.exit(2);
     }
-  });
-
-program
-  .command('templates')
-  .description('List available anatomy templates')
-  .action(() => {
-    process.stdout.write('humanoid\n');
   });
 
 program.parseAsync(process.argv).catch((err) => {

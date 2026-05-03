@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, rm, writeFile, copyFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, copyFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { compileEnemy } from '../src/index.js';
+import { writeTscn } from '../src/index.js';
+import type { EnemySpec } from '../src/types/enemy-spec.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HARNESS_DIR = resolve(HERE, 'godot-harness');
@@ -24,41 +25,55 @@ async function godotAvailable(): Promise<boolean> {
   }
 }
 
-describe('assets-compiler round-trip (flat-color path)', () => {
-  it('compiles a humanoid enemy and produces a structurally complete .tscn', async () => {
-    const out = await mkdtemp(resolve(tmpdir(), 'assets-compiler-'));
-    try {
-      const result = await compileEnemy({
-        prompt: 'rust-armored skeleton knight, slow heavy attacks',
-        outputDir: out,
-        seed: 12345,
-        flatOnly: true, // skip image gen / segmentation / mesh / atlas
-        useLlm: false,  // skip LLM call so test is offline-safe
-      });
-      expect(result.ok).toBe(true);
-      expect(existsSync(result.files.tscn)).toBe(true);
-      expect(existsSync(result.files.meta)).toBe(true);
+const SAMPLE_SPEC: EnemySpec = {
+  id: 'sample',
+  name: 'Sample',
+  prompt: 'sample',
+  templateId: 'humanoid',
+  palette: ['shadow', 'bone'],
+  materials: [],
+  mood: 'neutral',
+  attackArchetype: 'melee-fast',
+  optionalParts: [],
+  seed: 1,
+};
 
-      const tscn = await readFile(result.files.tscn, 'utf8');
-      expect(tscn).toMatch(/type="Skeleton2D"/);
-      expect(tscn).toMatch(/type="AnimationPlayer"/);
-      expect(tscn).toMatch(/type="AnimationLibrary"/);
-      for (const bone of ['root', 'hip', 'chest', 'head', 'l_upper_arm', 'r_upper_arm', 'l_upper_leg', 'r_upper_leg']) {
-        expect(tscn).toMatch(new RegExp(`name="${bone}" type="Bone2D"`));
-      }
-      for (const anim of ['idle', 'attack', 'hit', 'death']) {
-        expect(tscn).toMatch(new RegExp(`resource_name = "${anim}"`));
-      }
-      const polyCount = (tscn.match(/type="Polygon2D"/g) ?? []).length;
-      expect(polyCount).toBe(15);
+describe('tscn-writer (static sprite)', () => {
+  it('emits a Node2D + Sprite2D + GroundAnchor scene', () => {
+    const { tscn } = writeTscn({
+      spec: SAMPLE_SPEC,
+      spriteFilename: 'enemy.png',
+      spriteWidth: 768,
+      spriteHeight: 1024,
+      footY: 1000,
+    });
 
-      const meta = JSON.parse(await readFile(result.files.meta, 'utf8'));
-      expect(meta.id).toBe('rust_armored_skeleton_knight');
-      expect(meta.attackArchetype).toBe('melee-heavy');
-      expect(meta.seed).toBe(12345);
-    } finally {
-      await rm(out, { recursive: true, force: true });
-    }
+    expect(tscn).toMatch(/\[gd_scene load_steps=2 format=3/);
+    expect(tscn).toMatch(/ext_resource type="Texture2D" path="res:\/\/enemy\.png"/);
+    expect(tscn).toMatch(/\[node name="Enemy" type="Node2D"\]/);
+    expect(tscn).toMatch(/\[node name="Sprite" type="Sprite2D" parent="\."\]/);
+    expect(tscn).toMatch(/centered = false/);
+    // offset.x = -W/2 = -384, offset.y = -footY = -1000
+    expect(tscn).toMatch(/offset = Vector2\(-384, -1000\)/);
+    expect(tscn).toMatch(/\[node name="GroundAnchor" type="Marker2D" parent="\."\]/);
+
+    // No skeletal artifacts.
+    expect(tscn).not.toMatch(/Skeleton2D/);
+    expect(tscn).not.toMatch(/Bone2D/);
+    expect(tscn).not.toMatch(/Polygon2D/);
+    expect(tscn).not.toMatch(/AnimationPlayer/);
+  });
+
+  it('prefixes the sprite path with bundleSubdir when given', () => {
+    const { tscn } = writeTscn({
+      spec: SAMPLE_SPEC,
+      spriteFilename: 'enemy.png',
+      spriteWidth: 256,
+      spriteHeight: 256,
+      footY: 240,
+      bundleSubdir: 'enemies/cultist',
+    });
+    expect(tscn).toMatch(/path="res:\/\/enemies\/cultist\/enemy\.png"/);
   });
 
   it(
@@ -67,22 +82,42 @@ describe('assets-compiler round-trip (flat-color path)', () => {
       if (!(await godotAvailable())) return;
       const out = await mkdtemp(resolve(tmpdir(), 'assets-compiler-godot-'));
       try {
-        const result = await compileEnemy({
-          prompt: 'rust-armored skeleton knight, slow heavy attacks',
-          outputDir: out,
-          seed: 12345,
-          flatOnly: true,
-          useLlm: false,
+        // Synthesize a tiny solid-color PNG as the sprite — the test only
+        // validates the .tscn structure, not the image content.
+        const sharp = (await import('sharp')).default;
+        const pngBuf = await sharp({
+          create: { width: 64, height: 64, channels: 4, background: { r: 200, g: 60, b: 60, alpha: 1 } },
+        }).png().toBuffer();
+        const spritePath = resolve(out, 'enemy.png');
+        await (await import('node:fs/promises')).writeFile(spritePath, pngBuf);
+
+        const { tscn } = writeTscn({
+          spec: SAMPLE_SPEC,
+          spriteFilename: 'enemy.png',
+          spriteWidth: 64,
+          spriteHeight: 64,
+          footY: 60,
+          bundleSubdir: 'tmp-bundle',
         });
+        const tscnPath = resolve(out, 'enemy.tscn');
+        await (await import('node:fs/promises')).writeFile(tscnPath, tscn);
 
         const stagedDir = resolve(HARNESS_DIR, 'tmp-bundle');
         await rm(stagedDir, { recursive: true, force: true });
         await mkdir(stagedDir, { recursive: true });
-        const stagedTscn = resolve(stagedDir, 'enemy.tscn');
-        await copyFile(result.files.tscn, stagedTscn);
+        await copyFile(tscnPath, resolve(stagedDir, 'enemy.tscn'));
+        await copyFile(spritePath, resolve(stagedDir, 'enemy.png'));
         const reportPath = resolve(stagedDir, 'report.json');
 
         try {
+          // Import the staged PNG so Godot can resolve it as a Texture2D
+          // ext_resource. Without this the headless scene loader fails with
+          // "no loader found for resource".
+          await execFileP(
+            GODOT,
+            ['--headless', '--import', '--path', HARNESS_DIR],
+            { timeout: 60_000 },
+          );
           await execFileP(
             GODOT,
             ['--headless', '--path', HARNESS_DIR, '--',
@@ -98,10 +133,8 @@ describe('assets-compiler round-trip (flat-color path)', () => {
         expect(report.ok).toBe(true);
         expect(report.loaded).toBe(true);
         expect(report.errors).toEqual([]);
-        expect(report.bones.length).toBe(20);
-        expect(report.meshes.length).toBe(15);
-        const animNames = (report.animations as Array<{ name: string }>).map((a) => a.name).sort();
-        expect(animNames).toEqual(['attack', 'death', 'hit', 'idle']);
+        expect(report.hasSprite).toBe(true);
+        expect(report.hasGroundAnchor).toBe(true);
 
         await rm(stagedDir, { recursive: true, force: true });
       } finally {
@@ -111,62 +144,3 @@ describe('assets-compiler round-trip (flat-color path)', () => {
     90_000,
   );
 });
-
-describe('assets-compiler round-trip (textured path with stub silhouette + color-key)', () => {
-  it(
-    'runs the full Phase 2 pipeline (stub image gen → bg-removal → mesh → atlas → textured tscn)',
-    async () => {
-      // Force the offline path: stub silhouette gen + color-key bg removal.
-      const prevBg = process.env['ASSETS_COMPILER_BG_REMOVAL'];
-      const prevFal = process.env['FAL_KEY'];
-      process.env['ASSETS_COMPILER_BG_REMOVAL'] = 'color-key';
-      delete process.env['FAL_KEY'];
-      const out = await mkdtemp(resolve(tmpdir(), 'assets-compiler-tex-'));
-      try {
-        const result = await compileEnemy({
-          prompt: 'rust-armored skeleton knight, slow heavy attacks',
-          outputDir: out,
-          seed: 12345,
-          useLlm: false,
-        });
-        expect(result.ok).toBe(true);
-        expect(existsSync(result.files.tscn)).toBe(true);
-        expect(existsSync(result.files.atlas)).toBe(true);
-
-        // Pipeline ran the textured stages.
-        const stageNames = result.stages.map((s) => s.stage);
-        expect(stageNames).toContain('segment');
-        expect(stageNames).toContain('mesh');
-        expect(stageNames).toContain('atlas');
-
-        const tscn = await readFile(result.files.tscn, 'utf8');
-        // Textured polygons reference the atlas as an ext_resource and have UVs.
-        expect(tscn).toMatch(/ext_resource type="Texture2D"/);
-        expect(tscn).toMatch(/uv = PackedVector2Array/);
-        expect(tscn).toMatch(/polygons = \[PackedInt32Array/);
-
-        const meta = JSON.parse(await readFile(result.files.meta, 'utf8'));
-        expect(meta.scores.segment).toBeGreaterThan(0);
-        expect(meta.scores.mesh).toBeGreaterThan(0);
-        expect(meta.scores.atlas).toBeGreaterThan(0);
-
-        // Phase 3: rig stage ran and reports its source. The stub silhouette
-        // has clean T-pose proportions, so landmarks should detect.
-        const rigArtifact = JSON.parse(
-          await readFile(resolve(out, '.compiler/rig/output.json'), 'utf8'),
-        );
-        expect(rigArtifact.source).toBe('procedural');
-        expect(rigArtifact.landmarks).toBeDefined();
-        expect(rigArtifact.bones?.length).toBe(20);
-      } finally {
-        if (prevBg === undefined) delete process.env['ASSETS_COMPILER_BG_REMOVAL'];
-        else process.env['ASSETS_COMPILER_BG_REMOVAL'] = prevBg;
-        if (prevFal !== undefined) process.env['FAL_KEY'] = prevFal;
-        await rm(out, { recursive: true, force: true });
-      }
-    },
-    90_000,
-  );
-});
-
-void writeFile;

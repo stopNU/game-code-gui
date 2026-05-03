@@ -25,9 +25,9 @@ func _ready() -> void:
 		"loaded": false,
 		"enemyPath": enemy_path,
 		"errors": [],
-		"bones": [],
-		"meshes": [],
-		"animations": [],
+		"hasSprite": false,
+		"hasGroundAnchor": false,
+		"spriteOffset": [0.0, 0.0],
 	}
 
 	if enemy_path.is_empty() or report_path.is_empty():
@@ -52,50 +52,24 @@ func _ready() -> void:
 		return
 	add_child(instance)
 
-	var skeleton: Skeleton2D = instance.get_node_or_null("Skeleton") as Skeleton2D
-	if skeleton == null:
-		report["errors"].append("Skeleton2D not found at 'Skeleton'")
+	var sprite: Sprite2D = instance.get_node_or_null("Sprite") as Sprite2D
+	if sprite == null:
+		report["errors"].append("Sprite2D not found at 'Sprite'")
 	else:
-		_collect_bones(skeleton, report["bones"])
-		_collect_meshes(skeleton, report["meshes"])
+		report["hasSprite"] = true
+		report["spriteOffset"] = [sprite.offset.x, sprite.offset.y]
+		if sprite.texture == null:
+			report["errors"].append("Sprite2D has no texture")
 
-	var anim_player: AnimationPlayer = instance.get_node_or_null("AnimationPlayer") as AnimationPlayer
-	if anim_player == null:
-		report["errors"].append("AnimationPlayer not found at 'AnimationPlayer'")
+	var anchor: Marker2D = instance.get_node_or_null("GroundAnchor") as Marker2D
+	if anchor == null:
+		report["errors"].append("Marker2D not found at 'GroundAnchor'")
 	else:
-		for anim_name in anim_player.get_animation_list():
-			var clip: Animation = anim_player.get_animation(anim_name)
-			report["animations"].append({
-				"name": String(anim_name),
-				"length": clip.length,
-				"track_count": clip.get_track_count(),
-				"loop_mode": int(clip.loop_mode),
-			})
+		report["hasGroundAnchor"] = true
 
 	report["ok"] = report["errors"].is_empty()
 	_write_report(report_path, report)
 	get_tree().quit(0 if report["ok"] else 1)
-
-func _collect_bones(node: Node, out: Array) -> void:
-	for child in node.get_children():
-		if child is Bone2D:
-			out.append({
-				"name": child.name,
-				"path": String(child.get_path()),
-			})
-			_collect_bones(child, out)
-		else:
-			_collect_bones(child, out)
-
-func _collect_meshes(node: Node, out: Array) -> void:
-	for child in node.get_children():
-		if child is Polygon2D:
-			out.append({
-				"name": child.name,
-				"path": String(child.get_path()),
-				"polygon_size": child.polygon.size(),
-			})
-		_collect_meshes(child, out)
 
 func _write_report(path: String, data: Dictionary) -> void:
 	if path.is_empty():

@@ -24,14 +24,12 @@ function parseArgs(argv) {
     prompt: 'rust-armored skeleton knight, slow heavy attacks',
     seed: undefined,
     bgRemoval: 'color-key',
-    flat: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--prompt' && argv[i + 1]) { out.prompt = argv[++i]; continue; }
     if (a === '--seed' && argv[i + 1]) { out.seed = argv[++i]; continue; }
     if (a === '--bg-removal' && argv[i + 1]) { out.bgRemoval = argv[++i]; continue; }
-    if (a === '--flat') { out.flat = true; continue; }
   }
   return out;
 }
@@ -44,7 +42,7 @@ function ensureBuilt() {
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
-function compile({ prompt, seed, bgRemoval, flat }) {
+function compile({ prompt, seed, bgRemoval }) {
   rmSync(PREVIEW_DIR, { recursive: true, force: true });
   mkdirSync(PREVIEW_DIR, { recursive: true });
   const args = [
@@ -55,9 +53,8 @@ function compile({ prompt, seed, bgRemoval, flat }) {
   ];
   if (seed !== undefined) args.push('--seed', seed);
   if (bgRemoval) args.push('--bg-removal', bgRemoval);
-  if (flat) args.push('--flat');
   console.log(`[preview] compiling: ${prompt}`);
-  console.log(`[preview]   bg-removal=${bgRemoval}${flat ? ' (flat-only mode)' : ''}`);
+  console.log(`[preview]   bg-removal=${bgRemoval}`);
   const r = spawnSync(process.execPath, args, { stdio: 'inherit' });
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
@@ -71,7 +68,7 @@ function launchEditor() {
   const godot = process.env.GODOT_PATH ?? 'godot';
   const scenePath = 'res://preview-bundle/enemy.tscn';
   console.log(`[preview] launching Godot editor → ${scenePath}`);
-  console.log(`[preview]   in the editor: select AnimationPlayer, pick a clip, press play.`);
+  console.log(`[preview]   the scene is a single Sprite2D + GroundAnchor — no animations.`);
   const child = spawn(godot, ['--editor', '--path', HARNESS_DIR, scenePath], {
     stdio: 'inherit',
     detached: true,
